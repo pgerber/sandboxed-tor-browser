@@ -1,5 +1,5 @@
 # sandboxed-bor-browser
-# Yanwing Angel (yawning at schwanenlied dot me)
+### Yanwing Angel (yawning at schwanenlied dot me)
 
 Tor Browser sandboxed somewhat correctly, requires bubblewrap and a system-wide
 Tor instance.  Obviously only works on Linux, and will NEVER support anything
