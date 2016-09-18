@@ -134,7 +134,10 @@ func overrideBundlePrefs(cfg *config.Config) error {
 	//    will  be mounted read-only so this won't work.
 	//
 	// nb: Despite the Tor Browser (aka firefox) updater being disabled, it's
-	// still possible to force a check via the "About Tor Browser" menu item.
+	// still possible to force a check via the "About Tor Browser" menu item
+	// or via the torbutton menu item, and `about:tor` will still suggest you
+	// do so.
+	//
 	// See: https://trac.torproject.org/projects/tor/ticket/20083
 	const overriddenPrefs = "user_pref(\"app.update.enabled\", false);\n" +
 		"user_pref(\"extensions.update.enabled\", false);\n"
