@@ -132,10 +132,11 @@ func run(cfg *config.Config, cmdPath string, cmdArgs []string, extraBwrapArgs []
 
 		// Standard directories required out of any functional U*IX system.
 		//
-		// XXX: /proc is a shitfest, unless it's mounted with hidepid=1, but
-		// bubblewrap doesn't support that.  Firefox crashes out without
-		// /proc mounted, fairly eary since it expects `proc/self` to be
-		// readable, but this needs to be investigated further.
+		// XXX: /proc is a shitfest.  Firefox crashes out without /proc
+		// mounted, fairly eary since it expects `proc/self` to be
+		// readable, but this needs to be investigated further, since if it's
+		// the only call that requires access to proc, it'll be easy to fake
+		// out the specific check that fails.
 		"--tmpfs", "/tmp",
 		"--proc", "/proc",
 		"--dev", "/dev",
