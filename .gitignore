@@ -1,0 +1,3 @@
+bin/
+pkg/
+src/cmd/sandboxed-tor-browser/internal/sandbox/stub.go
