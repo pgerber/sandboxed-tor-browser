@@ -32,7 +32,13 @@ func x11CraftAuthority(realDisplay string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	real, err := ioutil.ReadFile(path.Join(u.HomeDir, ".Xauthority"))
+	xauthPath := os.Getenv("XAUTHORITY")
+	if xauthPath == "" {
+		xauthPath = path.Join(u.HomeDir, ".Xauthority")
+	} else if strings.HasPrefix(xauthPath, "~/") {
+		xauthPath = path.Join(u.HomeDir, xauthPath[1:])
+	}
+	real, err := ioutil.ReadFile(xauthPath)
 	if err != nil {
 		return nil, err
 	}
