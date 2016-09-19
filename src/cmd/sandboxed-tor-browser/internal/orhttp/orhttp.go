@@ -12,6 +12,7 @@ import (
 	"crypto/x509"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"net/http"
 	gourl "net/url"
 	"os"
@@ -64,6 +65,10 @@ func Get(ctrl *bulb.Conn, url string, certChain []*x509.Certificate) (*http.Resp
 	if certChain != nil && !certChainEquals(certChain, resp.TLS.PeerCertificates) {
 		resp.Body.Close()
 		return nil, errors.New("certificate chain mismatch")
+	}
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("http status: %v", resp.StatusCode)
 	}
 
 	return resp, nil

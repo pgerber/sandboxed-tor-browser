@@ -147,7 +147,6 @@ func run(cfg *config.Config, cmdPath string, cmdArgs []string, extraBwrapArgs []
 		"--hostname", sandboxedHostname, // Requires bubblewrap 0.1.2 or later.
 		"--dir", "/home/amnesia",
 		"--setenv", "HOME", "/home/amnesia",
-		"--setenv", "LOCALE", cfg.Locale,
 
 		// XDG_RUNTIME_DIR.
 		"--bind", cfg.RuntimeDir(), runtimeDir(),

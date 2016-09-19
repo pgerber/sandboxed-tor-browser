@@ -14,7 +14,6 @@ import (
 
 	"cmd/sandboxed-tor-browser/internal/config"
 	"cmd/sandboxed-tor-browser/internal/orhttp"
-
 )
 
 type parsedDownloads struct {

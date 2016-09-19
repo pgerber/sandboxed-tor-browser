@@ -32,6 +32,7 @@ const (
 	defaultControlPort = "tcp://127.0.0.1:9051"
 	defaultChannel     = "release"
 	defaultLocale      = "en-US"
+	allLocale          = "ALL"
 
 	osLinux     = "linux"
 	archLinux32 = "linux32"
@@ -166,7 +167,9 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 	switch cfg.Channel {
-	case "release", "alpha", "hardened":
+	case "release", "alpha":
+	case "hardened":
+		cfg.Locale = allLocale
 	default:
 		return nil, fmt.Errorf("invalid Channel: %v", cfg.Channel)
 	}
