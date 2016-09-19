@@ -27,7 +27,6 @@ import (
 
 	"cmd/sandboxed-tor-browser/internal/config"
 	"cmd/sandboxed-tor-browser/internal/orhttp"
-
 )
 
 func backupDirectory(fpath string) error {
@@ -139,8 +138,10 @@ func overrideBundlePrefs(cfg *config.Config) error {
 	// do so.
 	//
 	// See: https://trac.torproject.org/projects/tor/ticket/20083
-	const overriddenPrefs = "user_pref(\"app.update.enabled\", false);\n" +
-		"user_pref(\"extensions.update.enabled\", false);\n"
+	const overriddenPrefs = `
+user_pref("app.update.enabled", false);
+user_pref("extensions.torbutton.versioncheck_enabled", false);
+user_pref("extensions.update.enabled", false);`
 
 	if _, err := f.WriteString(overriddenPrefs); err != nil {
 		return err
