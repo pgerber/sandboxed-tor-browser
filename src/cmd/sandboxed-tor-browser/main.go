@@ -84,7 +84,7 @@ func main() {
 	// Install/Update as appropriate.
 	if err := installer.Install(cfg); err != nil {
 		log.Printf("failed to install/update: %v", err)
-	//	return // XXX
+		return
 	}
 
 	// Launch sandboxed tor browser.
