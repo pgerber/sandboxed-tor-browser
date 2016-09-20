@@ -1,4 +1,4 @@
-// installer.go - Tor Browser installer/updater.
+// installer.go - Tor Browser installer.
 // Copyright (C) 2016  Yawning Angel.
 //
 // This work is licensed under the Creative Commons Attribution-NonCommercial-
@@ -264,10 +264,8 @@ func Install(cfg *config.Config) error {
 		// functionality will break.
 		log.Printf("updating bundle: out of date")
 
-		return fmt.Errorf("updating not supported yet") // XXX
+		return doUpdate(cfg, ctrl, onDisk, bundleDownloads)
 	} else {
-		// XXX: Check that the bundle actually exists in the directory.
-
 		// Up to date.
 		return nil
 	}

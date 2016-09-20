@@ -10,8 +10,10 @@
 package sandbox
 
 import (
+	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
@@ -27,6 +29,8 @@ const (
 	sandboxedHostname = "amnesia"
 	controlSocket     = "control"
 	socksSocket       = "socks"
+
+	browserHome = "/home/amnesia/sandboxed-tor-browser/tor-browser/Browser"
 )
 
 func runtimeDir() string {
@@ -249,6 +253,7 @@ func run(cfg *config.Config, cmdPath string, cmdArgs []string, extraBwrapArgs []
 
 	// Finalize the arguments to be written out via the fd.
 	bwrapArgs = append(bwrapArgs, extraBwrapArgs...)
+
 	var bwrapArgsBuf []byte
 	for _, arg := range bwrapArgs {
 		bwrapArgsBuf = append(bwrapArgsBuf, []byte(arg)...)
@@ -278,7 +283,6 @@ func RunTorBrowser(cfg *config.Config) (*exec.Cmd, error) {
 	const (
 		profileSubDir = "TorBrowser/Data/Browser/profile.default"
 		cachesSubDir  = "TorBrowser/Data/Browser/Caches"
-		browserHome   = "/home/amnesia/sandboxed-tor-browser/tor-browser/Browser"
 	)
 
 	realBrowserHome := path.Join(cfg.UserDataDir(), "tor-browser/Browser")
@@ -332,4 +336,111 @@ func RunTorBrowser(cfg *config.Config) (*exec.Cmd, error) {
 	}
 
 	return run(cfg, cmdPath, cmdArgs, extraBwrapArgs, true)
+}
+
+func stageUpdate(updateDir, installDir string, mar []byte) error {
+	copyFile := func(src, dst string) error {
+		// stat() the source file to get the file mode.
+		fi, err := os.Lstat(src)
+		if err != nil {
+			return err
+		}
+
+		// Read the source file into memory.
+		b, err := ioutil.ReadFile(src)
+		if err != nil {
+			return err
+		}
+
+		// Create and write the destination file.
+		f, err := os.OpenFile(dst, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, fi.Mode())
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		_, err = f.Write(b)
+		f.Sync()
+
+		return err
+	}
+
+	// 1. Create a directory outside of the application's installation
+	//    directory to be updated.
+	if err := os.MkdirAll(updateDir, os.ModeDir|0700); err != nil {
+		return err
+	}
+
+	// 2. Copy updater from the application's installation directory that is
+	//    to be upgraded into the outside directory. If you would like to
+	//    display the updater user interface while it is applying the update
+	//    also copy the updater.ini into the outside directory.
+	if err := copyFile(path.Join(installDir, "Browser", "updater"), path.Join(updateDir, "updater")); err != nil {
+		return err
+	}
+	if err := copyFile(path.Join(installDir, "Browser", "updater.ini"), path.Join(updateDir, "updater.ini")); err != nil {
+		return err
+	}
+
+	// 3. Download the appropriate .mar file and put it into the outside
+	//    directory you created (see Where to get a mar file).
+	// 4. Rename the mar file you downloaded to update.mar.
+	if err := ioutil.WriteFile(path.Join(updateDir, "update.mar"), mar, 0600); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func RunUpdate(cfg *config.Config, mar []byte) error {
+	// https://wiki.mozilla.org/Software_Update:Manually_Installing_a_MAR_file
+
+	const (
+		installDir = "/home/amnesia/sandboxed-tor-browser/tor-browser"
+		updateDir  = "/home/amnesia/sandboxed-tor-browser/update"
+	)
+	realInstallDir := path.Join(cfg.UserDataDir(), "tor-browser")
+	realUpdateDir := path.Join(cfg.UserDataDir(), "update")
+
+	// Setup the bwrap args for `updater`.
+	extraBwrapArgs := []string{
+		// Filesystem stuff.
+		"--bind", realInstallDir, installDir,
+		"--bind", realUpdateDir, updateDir,
+		"--chdir", browserHome, // Required (Step 5.)
+
+		"--setenv", "LD_LIBRARY_PATH", browserHome,
+		"--setenv", "FONTCONFIG_PATH", path.Join(browserHome, "TorBrowser/Data/fontconfig"),
+		"--setenv", "FONTCONFIG_FILE", "fonts.conf",
+	}
+
+	// Do the work neccecary to make the firefox `updater` happy.
+	if err := stageUpdate(realUpdateDir, realInstallDir, mar); err != nil {
+		return err
+	}
+
+	// 7. For Firefox 40.x and above run the following from the command prompto
+	//    after adding the path to the existing installation directory to the
+	//    LD_LIBRARY_PATH environment variable.
+	cmdPath := path.Join(updateDir, "updater")
+	cmdArgs := []string{updateDir, browserHome, browserHome}
+	cmd, err := run(cfg, cmdPath, cmdArgs, extraBwrapArgs, false)
+	if err != nil {
+		return err
+	}
+	cmd.Wait()
+
+	// 8. After the update has completed a file named update.status will be
+	//    created in the outside directory.
+	status, err := ioutil.ReadFile(path.Join(realUpdateDir, "update.status"))
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(bytes.TrimSpace(status), []byte("succeeded")) {
+		return fmt.Errorf("failed to apply update: %v", string(status))
+	}
+
+	// Since the update was successful, clean out the "outside" directory.
+	os.RemoveAll(realUpdateDir)
+
+	return nil
 }

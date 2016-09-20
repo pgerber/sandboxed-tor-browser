@@ -52,7 +52,7 @@ func makeDirectories(cfg *config.Config) (err error) {
 	dirs = append(dirs, cfg.RuntimeDir())
 
 	for _, d := range dirs {
-		if err = os.MkdirAll(d, os.ModeDir | 0700); err != nil {
+		if err = os.MkdirAll(d, os.ModeDir|0700); err != nil {
 			return
 		}
 	}

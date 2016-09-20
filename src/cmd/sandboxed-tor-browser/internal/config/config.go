@@ -55,10 +55,10 @@ type Config struct {
 	// Channel is the release channel ("release", "hardened", "alpha").
 	Channel string
 
-	// Architecture is the architecture to fetch ("linux64", "linux32").
+	// Architecture is the architecture to download ("linux64", "linux32").
 	Architecture string
 
-	// Locale is the locale of the bundle to download.
+	// Locale is the locale of the bundle to download ("en-US)", "ja-JP").
 	Locale string
 }
 

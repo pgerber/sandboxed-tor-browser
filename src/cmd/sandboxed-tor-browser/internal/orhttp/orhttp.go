@@ -39,16 +39,18 @@ func Get(ctrl *bulb.Conn, url string, certChain []*x509.Certificate) (*http.Resp
 		return nil, err
 	}
 
-	// Create the HTTP client instance, with disabled HTTP/2 support,
-	// that does not follow redirects.
+	// Create the HTTP client instance, with disabled HTTP/2 support.
 	client := &http.Client{
 		Transport: &http.Transport{
 			Dial: torDialer.Dial,
 			TLSNextProto: emptyTLSNextProtoMap,
 		},
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+	}
+	if certChain != nil {
+		// If we are enforcing certs, don't honor redirects.
+		client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
 			return fmt.Errorf("received a redirect via: %v", via[0].URL)
-		},
+		}
 	}
 
 	// Create a HTTP request.
