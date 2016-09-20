@@ -8,7 +8,6 @@
 package installer
 
 import (
-	"crypto/x509"
 	"encoding/json"
 
 	"git.schwanenlied.me/yawning/bulb.git"
@@ -30,30 +29,18 @@ type downloadEntry struct {
 }
 
 func getBundleDownloads(cfg *config.Config, ctrl *bulb.Conn) (*parsedDownloads, error) {
+	// This is subject to change to `aus1.torproject.org` once the cert pinning
+	// mess is sorted out.
+	//
+	// See: https://trac.torproject.org/projects/tor/ticket/19481
 	const (
-		distTpoBase = "https://dist.torproject.org/torbrowser/update_2/"
-		aus1TpoBase = "https://aus1.torproject.org/torbrowser/update_2/"
-
+		downloadsBase = "https://dist.torproject.org/torbrowser/update_2/"
 		downloadsTail = "/downloads.json"
 	)
-
-	// The autoupdate infrastructure currently is split between dist.tp.o
-	// (release) and aus1.tp.o (other channels).  This is set to be unified
-	// in the future to aus1.tp.o with a redirect, but frustratingly, the
-	// latter uses a Let's Encrypt cert so can't be pinned.
-	//
-	// https://trac.torproject.org/projects/tor/ticket/19481
-	var certChain  []*x509.Certificate
-	downloadsBase := aus1TpoBase
-	if cfg.Channel == "release" {
-		downloadsBase = distTpoBase
-		certChain = distTpoCertChain
-	}
-
 	url := downloadsBase + cfg.Channel + downloadsTail
 
 	// Fetch the json document containing the current release.
-	response, err := orhttp.Get(ctrl, url, certChain)
+	response, err := orhttp.Get(ctrl, url, distTpoCertChain)
 	if err != nil {
 		return nil, err
 	}
