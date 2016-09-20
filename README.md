@@ -1,13 +1,17 @@
 # sandboxed-bor-browser
 ### Yanwing Angel (yawning at schwanenlied dot me)
 
+> I would build a great sandbox.  And nobody builds sandboxes better than me,
+> believe me.  I will build a great, great sandbox on our application border.
+> And I will have Tor Browser pay for that sandbox.
+
 Tor Browser sandboxed somewhat correctly, requires bubblewrap and a system-wide
 Tor instance.  Obviously only works on Linux, and will NEVER support anything
 else.
 
 Dependencies:
 
- * A modern Linux system on x86_64 architecture.
+ * A modern Linux system on x86/x86_64 architecture (Tested on 64 bit).
  * tor running as a daemon with the SOCKS and control ports accessible.
  * libseccomp2
  * bubblewrap >= 0.1.2 (https://github.com/projectatomic/bubblewrap)
@@ -20,8 +24,10 @@ Broken functionality:
 
  * Audio
  * DRI
+ * X11 input methods (IBus requires access to the host D-Bus).
+ * Installing addons via the browser UI.
  * Tor Browser UI update related UI elements should be hidden/disabled, but
-   can't be..  (https://trac.torproject.org/projects/tor/ticket/20083)
+   can't be (https://trac.torproject.org/projects/tor/ticket/20083).
 
 Notes:
 
