@@ -42,7 +42,7 @@ func main() {
 
 	src, err := ioutil.ReadFile(srcPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to read src file %v: %v", srcPath, err)
+		fmt.Fprintf(os.Stderr, "failed to read src file %v: %v\n", srcPath, err)
 		os.Exit(-1)
 	}
 
@@ -61,7 +61,7 @@ func main() {
 
 	
 	if err := ioutil.WriteFile(dstPath, []byte(b), 0600); err != nil {
-		fmt.Fprintf(os.Stderr, "failed to write dst file %v: %v", dstPath, err)
+		fmt.Fprintf(os.Stderr, "failed to write dst file %v: %v\n", dstPath, err)
 		os.Exit(-1)
 	}
 }
