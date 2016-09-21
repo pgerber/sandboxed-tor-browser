@@ -290,10 +290,11 @@ func RunTorBrowser(cfg *config.Config) (*exec.Cmd, error) {
 	realProfileDir := path.Join(realBrowserHome, profileSubDir)
 	realCachesDir := path.Join(realBrowserHome, cachesSubDir)
 	realDownloadsDir := path.Join(realBrowserHome, "Downloads")
+	if err := os.MkdirAll(realDownloadsDir, os.ModeDir|0700); err != nil { // Make mountpoint before overriding.
+		return nil, err
+	}
 	if cfg.DownloadsDirectory != "" {
 		realDownloadsDir = cfg.DownloadsDirectory
-	} else if err := os.MkdirAll(realDownloadsDir, os.ModeDir|0700); err != nil {
-		return nil, err
 	}
 
 	profileDir := path.Join(browserHome, profileSubDir)
