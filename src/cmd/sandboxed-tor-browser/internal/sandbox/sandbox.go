@@ -435,8 +435,9 @@ func RunUpdate(cfg *config.Config, mar []byte) error {
 	if err != nil {
 		return err
 	}
-	if !bytes.Equal(bytes.TrimSpace(status), []byte("succeeded")) {
-		return fmt.Errorf("failed to apply update: %v", string(status))
+	trimmedStatus := bytes.TrimSpace(status)
+	if !bytes.Equal(trimmedStatus, []byte("succeeded")) {
+		return fmt.Errorf("failed to apply update: %v", string(trimmedStatus))
 	}
 
 	// Since the update was successful, clean out the "outside" directory.
