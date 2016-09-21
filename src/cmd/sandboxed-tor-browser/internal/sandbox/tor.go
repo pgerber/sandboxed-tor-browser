@@ -10,6 +10,8 @@ package sandbox
 import (
 	"bufio"
 	"bytes"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -23,7 +25,7 @@ import (
 
 	"cmd/sandboxed-tor-browser/internal/config"
 
-	"git.schwanenlied.me/yawning/bulb.git"
+	"github.com/yawning/or-ctl-filter/socks5"
 )
 
 const (
@@ -38,17 +40,39 @@ const (
 
 	errAuthenticationRequired = "514 Authentication required\r\n"
 	errUnrecognizedCommand    = "510 Unrecognized command\r\n"
+	errUnspecifiedTor         = "550 Unspecified Tor error\r\n"
 
 	// These responses are entirely synthetic so they don't matter.
 	torVersion = "0.2.8.7"
 	socksAddr  = "127.0.0.1:9150"
 )
 
-func socksAcceptLoop(l net.Listener, sNet, sAddr string) {
-	defer l.Close()
+type socksProxy struct {
+	sync.RWMutex
+	sNet, sAddr string
+	tag         string
+
+	l net.Listener
+}
+
+func (p *socksProxy) newTag() error {
+	p.Lock()
+	defer p.Unlock()
+
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return err
+	}
+	p.tag = "sandboxed-tor-browser:" + hex.EncodeToString(b[:])
+
+	return nil
+}
+
+func (p *socksProxy) acceptLoop() {
+	defer p.l.Close()
 
 	for {
-		conn, err := l.Accept()
+		conn, err := p.l.Accept()
 		if err != nil {
 			if e, ok := err.(net.Error); ok && e.Temporary() {
 				continue
@@ -56,19 +80,61 @@ func socksAcceptLoop(l net.Listener, sNet, sAddr string) {
 			log.Printf("failed to accept SOCKS conn: %v", err)
 			return
 		}
-		go socksCopyLoop(conn, sNet, sAddr)
+		go p.handleConn(conn)
 	}
 }
 
-func socksCopyLoop(downConn net.Conn, sNet, sAddr string) {
-	defer downConn.Close()
+func (p *socksProxy) handleConn(conn net.Conn) {
+	defer conn.Close()
 
-	upConn, err := net.Dial(sNet, sAddr)
+	// Do the SOCKS5 protocol chatter with the application.
+	req, err := socks5.Handshake(conn)
 	if err != nil {
-		log.Printf("failed to dial upstream SOCKS: %v", err)
 		return
 	}
 
+	// Append our isolation tag.
+	if err := p.rewriteTag(conn, req); err != nil {
+		req.Reply(socks5.ReplyGeneralFailure)
+		return
+	}
+
+	// Redispatch the modified SOCKS5 request upstream.
+	upConn, addr, err := socks5.Redispatch(p.sNet, p.sAddr, req)
+	if err != nil {
+		req.Reply(socks5.ErrorToReplyCode(err))
+		return
+	}
+	defer upConn.Close()
+
+	// Complete the SOCKS5 handshake with the app.
+	if err := req.ReplyAddr(socks5.ReplySucceeded, addr); err != nil {
+		return
+	}
+
+	p.copyLoop(upConn, conn)
+}
+
+func (p *socksProxy) rewriteTag(conn net.Conn, req *socks5.Request) error {
+	p.RLock()
+	defer p.RUnlock()
+	if req.Auth.Uname == nil {
+		// Should never happen, but does.
+		// See https://bugs.torproject.org/20195
+		h, _ := req.Addr.HostPort()
+		req.Auth.Uname = []byte(h)
+		req.Auth.Passwd = []byte(p.tag)
+	} else {
+		req.Auth.Passwd = append(req.Auth.Passwd, []byte(":"+p.tag)...)
+		// With the current format this should never happen, ever.
+		if len(req.Auth.Passwd) > 255 {
+			return fmt.Errorf("failed to redispatch, socks5 password too long")
+		}
+	}
+	return nil
+}
+
+func (p *socksProxy) copyLoop(upConn, downConn net.Conn) {
 	errChan := make(chan error, 2)
 
 	var wg sync.WaitGroup
@@ -89,43 +155,47 @@ func socksCopyLoop(downConn net.Conn, sNet, sAddr string) {
 	wg.Wait()
 }
 
-func launchSocksProxy(cfg *config.Config) error {
+func launchSocksProxy(cfg *config.Config) (*socksProxy, error) {
+	p := new(socksProxy)
+	if err := p.newTag(); err != nil {
+		return nil, err
+	}
+
 	ctrl, err := cfg.DialControlPort()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer ctrl.Close()
 
-	sNet, sAddr, err := ctrl.SocksPort()
+	p.sNet, p.sAddr, err = ctrl.SocksPort()
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	log.Printf("upstream socks port is: %v:%v", sNet, sAddr)
 
 	sPath := path.Join(cfg.RuntimeDir(), socksSocket)
 	os.Remove(sPath)
-	l, err := net.Listen("unix", sPath)
+	p.l, err = net.Listen("unix", sPath)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	go socksAcceptLoop(l, sNet, sAddr)
+	go p.acceptLoop()
 
-	return nil
+	return p, nil
 }
 
 type ctrlProxyConn struct {
 	cfg           *config.Config
-	ctrlConn      *bulb.Conn
+	socks         *socksProxy
 	appConn       net.Conn
 	appConnReader *bufio.Reader
 	isPreAuth     bool
 }
 
-func newCtrlProxyConn(cfg *config.Config, conn net.Conn) *ctrlProxyConn {
+func newCtrlProxyConn(cfg *config.Config, conn net.Conn, socks *socksProxy) *ctrlProxyConn {
 	return &ctrlProxyConn{
 		cfg:           cfg,
+		socks:         socks,
 		appConn:       conn,
 		appConnReader: bufio.NewReader(conn),
 	}
@@ -218,6 +288,11 @@ func (c *ctrlProxyConn) sendErrUnrecognizedCommand() error {
 	return err
 }
 
+func (c *ctrlProxyConn) sendErrUnspecifiedTor() error {
+	_, err := c.appConnWrite([]byte(errUnspecifiedTor))
+	return err
+}
+
 func (c *ctrlProxyConn) sendErrUnexpectedArgCount(cmd string, expected, actual int) error {
 	var err error
 	var respStr string
@@ -268,22 +343,13 @@ func (c *ctrlProxyConn) onCmdSignal(splitCmd []string, raw []byte) error {
 		_, err := c.appConnWrite([]byte(respStr))
 		return err
 	} else {
-		// We only bother opening the upstream control conn if it's required.
-		if c.ctrlConn != nil {
-			resp, err := c.ctrlConn.Request("SIGNAL NEWNYM")
-			if err != nil {
-				return err
-			}
-			for _, l := range resp.RawLines {
-				if _, err := c.appConnWrite([]byte(l + "\r\n")); err != nil {
-					return err
-				}
-			}
-			return nil
-		} else {
-			_, err := c.appConnWrite([]byte(responseOk))
-			return err
+		// Since we are appending our own nonce to the SOCKS auth, we can
+		// entirely omit the NEWNYM as long as we refresh the nonce.
+		if err := c.socks.newTag(); err != nil {
+			return c.sendErrUnspecifiedTor()
 		}
+		_, err := c.appConnWrite([]byte(responseOk))
+		return err
 	}
 }
 
@@ -296,20 +362,10 @@ func (c *ctrlProxyConn) handle() {
 		return
 	}
 
-	// The alpha and hardened channels as of recent builds don't need to send a
-	// NEWNYM on New Identity since I fixed the behavior.
-	if c.cfg.Channel == "release" {
-		if c.ctrlConn, err = c.cfg.DialControlPort(); err != nil {
-			log.Printf("failed to connect to real control port: %v", err)
-			return
-		}
-		defer c.ctrlConn.Close()
-	}
-
 	c.proxyAndFilerApp()
 }
 
-func ctrlAcceptLoop(cfg *config.Config, l net.Listener) {
+func ctrlAcceptLoop(cfg *config.Config, l net.Listener, socks *socksProxy) {
 	defer l.Close()
 
 	for {
@@ -322,12 +378,12 @@ func ctrlAcceptLoop(cfg *config.Config, l net.Listener) {
 			return
 		}
 
-		c := newCtrlProxyConn(cfg, conn)
+		c := newCtrlProxyConn(cfg, conn, socks)
 		go c.handle()
 	}
 }
 
-func launchCtrlProxy(cfg *config.Config) error {
+func launchCtrlProxy(cfg *config.Config, socks *socksProxy) error {
 	cPath := path.Join(cfg.RuntimeDir(), controlSocket)
 	os.Remove(cPath)
 	l, err := net.Listen("unix", cPath)
@@ -335,7 +391,7 @@ func launchCtrlProxy(cfg *config.Config) error {
 		return err
 	}
 
-	go ctrlAcceptLoop(cfg, l)
+	go ctrlAcceptLoop(cfg, l, socks)
 
 	return nil
 }

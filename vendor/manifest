@@ -32,6 +32,13 @@
 			"branch": "master"
 		},
 		{
+			"importpath": "github.com/yawning/or-ctl-filter/socks5",
+			"repository": "https://github.com/yawning/or-ctl-filter",
+			"revision": "d56ea6fad15982b05a379a9dc43d062e40d9544f",
+			"branch": "master",
+			"path": "/socks5"
+		},
+		{
 			"importpath": "golang.org/x/crypto",
 			"repository": "https://go.googlesource.com/crypto",
 			"revision": "351dc6a5bf92a5f2ae22fadeee08eb6a45aa2d93",

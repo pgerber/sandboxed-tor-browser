@@ -325,13 +325,14 @@ func RunTorBrowser(cfg *config.Config) (*exec.Cmd, error) {
 	cmdPath := path.Join(browserHome, "firefox")
 	cmdArgs := []string{"--class", "Tor Browser", "-profile", profileDir}
 
-	// Proxy a restricted control port into the sandbox.
-	if err := launchCtrlProxy(cfg); err != nil {
+	// Proxy the SOCKS port into the sandbox.
+	socks, err := launchSocksProxy(cfg)
+	if err != nil {
 		return nil, err
 	}
 
-	// Proxy the SOCKS port into the sandbox.
-	if err := launchSocksProxy(cfg); err != nil {
+	// Proxy a restricted control port into the sandbox.
+	if err := launchCtrlProxy(cfg, socks); err != nil {
 		return nil, err
 	}
 
