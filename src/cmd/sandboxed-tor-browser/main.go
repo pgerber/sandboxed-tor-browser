@@ -10,7 +10,9 @@ package main
 import (
 	"log"
 	"os"
+	"os/signal"
 	"path"
+	"syscall"
 
 	"cmd/sandboxed-tor-browser/internal/config"
 	"cmd/sandboxed-tor-browser/internal/installer"
@@ -72,25 +74,41 @@ func main() {
 		log.Fatalf("failed to create directories: %v", err)
 	}
 
+	// Install the signal handlers before acquiring the lock.
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, os.Kill, syscall.SIGTERM)
+
 	// Aquire the lock file.
 	lock, err := createLockFile(cfg)
 	if err != nil {
 		log.Fatalf("failed to create lock file: %v", err)
 	}
-	defer lock.unlock() // Don't use `log.Fatalf()` past here, instead return.
+	defer lock.unlock()
 
-	// XXX: Install a bunch of signal handlers so that cleanup is possible.
+	// Install/Update in a separage goroutine so cleanup happens.
+	doneCh := make(chan interface{})
+	go func() {
+		// Install/Update as appropriate.
+		if err := installer.Install(cfg); err != nil {
+			log.Printf("failed to install/update: %v", err)
+			return
+		}
 
-	// Install/Update as appropriate.
-	if err := installer.Install(cfg); err != nil {
-		log.Printf("failed to install/update: %v", err)
-		return
-	}
+		// Launch sandboxed tor browser.
+		if cmd, err := sandbox.RunTorBrowser(cfg); err != nil {
+			log.Printf("failed to spawn sandbox: %v", err)
+		} else {
+			cmd.Wait()
+		}
+		doneCh <- true
+	}()
 
-	// Launch sandboxed tor browser.
-	if cmd, err := sandbox.RunTorBrowser(cfg); err != nil {
-		log.Printf("failed to spawn sandbox: %v", err)
-	} else {
-		cmd.Wait()
+	// Wait for the actual work to finish, or a fatal signal to be received.
+	select {
+	case _ = <-doneCh:
+		// Goroutine terminated.
+	case sig := <-sigCh:
+		// Caught a signal handler.
+		log.Printf("exiting on signal: %v", sig)
 	}
 }
