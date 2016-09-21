@@ -60,6 +60,10 @@ type Config struct {
 
 	// Locale is the locale of the bundle to download ("en-US)", "ja-JP").
 	Locale string
+
+	// DownloadsDirectory is the path to the host filesystem directory that
+	// gets mapped in as `Browser/Downloads`.
+	DownloadsDirectory string
 }
 
 // ControlPortAddr returns the net/addr pair of the Control Port suitable for
@@ -177,6 +181,13 @@ func Load() (*Config, error) {
 	case archLinux32, archLinux64: // Intel Linux only for now.
 	default:
 		return nil, fmt.Errorf("invalid Architecture: %v", cfg.Architecture)
+	}
+	if cfg.DownloadsDirectory != "" {
+		if fi, err := os.Lstat(cfg.DownloadsDirectory); err != nil {
+			return nil, fmt.Errorf("invalid DownloadsDirectory: %v", err)
+		} else if !fi.IsDir() {
+			return nil, fmt.Errorf("invalid DownloadsDirectory: not a directoru")
+		}
 	}
 
 	return cfg, nil

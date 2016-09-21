@@ -234,6 +234,7 @@ func run(cfg *config.Config, cmdPath string, cmdArgs []string, extraBwrapArgs []
 	} else if err := newFdFile("/home/amnesia/.Xauthority", xauth); err != nil {
 		return nil, err
 	}
+	bwrapArgs = append(bwrapArgs, "--setenv", "XAUTHORITY", "/home/amnesia/.Xauthority")
 
 	// TODO:
 	// Setup access to DRI in the sandbox.
@@ -289,15 +290,16 @@ func RunTorBrowser(cfg *config.Config) (*exec.Cmd, error) {
 	realProfileDir := path.Join(realBrowserHome, profileSubDir)
 	realCachesDir := path.Join(realBrowserHome, cachesSubDir)
 	realDownloadsDir := path.Join(realBrowserHome, "Downloads")
+	if cfg.DownloadsDirectory != "" {
+		realDownloadsDir = cfg.DownloadsDirectory
+	} else if err := os.MkdirAll(realDownloadsDir, os.ModeDir|0700); err != nil {
+		return nil, err
+	}
 
 	profileDir := path.Join(browserHome, profileSubDir)
 	cachesDir := path.Join(browserHome, cachesSubDir)
 	downloadsDir := path.Join(browserHome, "Downloads")
 
-	// Ensure the `Downlaods` directory exists.
-	if err := os.MkdirAll(realDownloadsDir, os.ModeDir|0700); err != nil {
-		return nil, err
-	}
 
 	// Setup the bwrap args to repliccate start-tor-browser.
 	extraBwrapArgs := []string{
@@ -310,6 +312,7 @@ func RunTorBrowser(cfg *config.Config) (*exec.Cmd, error) {
 		"--chdir", browserHome,
 
 		// Env vars taken from start-tor-browser
+		"--setenv", "HOME", browserHome,
 		"--setenv", "LD_LIBRARY_PATH", browserHome,
 		"--setenv", "FONTCONFIG_PATH", path.Join(browserHome, "TorBrowser/Data/fontconfig"),
 		"--setenv", "FONTCONFIG_FILE", "fonts.conf",
