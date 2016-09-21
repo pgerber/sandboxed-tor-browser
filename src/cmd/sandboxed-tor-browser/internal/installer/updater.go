@@ -139,6 +139,11 @@ func doUpdate(cfg *config.Config, ctrl *bulb.Conn, onDisk *manifest, bundleDownl
 		return fmt.Errorf("unsupported hash function: %v", patch.HashFunction)
 	}
 
+	// Verify the signature block in the MAR with our copy of the key.
+	if err = verifyTorBrowserMAR(bin); err != nil {
+		return fmt.Errorf("failed to verify MAR signature: %v", err)
+	}
+
 	// Install the MAR using the `updater` executable, in a sandboxed
 	// enviornment.
 	if err := sandbox.RunUpdate(cfg, bin); err != nil {
