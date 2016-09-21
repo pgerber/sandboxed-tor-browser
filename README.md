@@ -1,5 +1,5 @@
-# sandboxed-bor-browser
-### Yanwing Angel (yawning at schwanenlied dot me)
+# sandboxed-tor-browser
+### Yanwnig Angel (yawning at schwanenlied dot me)
 
 > I would build a great sandbox.  And nobody builds sandboxes better than me,
 > believe me.  I will build a great, great sandbox on our application border.
@@ -15,10 +15,10 @@ Dependencies:
  * tor running as a daemon with the SOCKS and control ports accessible.
  * libseccomp2
  * bubblewrap >= 0.1.2 (https://github.com/projectatomic/bubblewrap)
- * Go (Tested with 1.7.x build time only)
- * gb (https://getgb.io/ build time only, fuck cloudflare)
- * A C compiler (build time only)
- * Make (build time only)
+ * Go (Tested with 1.7.x, Build time only)
+ * gb (https://getgb.io/ Build time only, fuck cloudflare)
+ * A C compiler (Build time only)
+ * Make (Build time only)
 
 Broken functionality:
 
