@@ -136,11 +136,12 @@ func Load() (*Config, error) {
 	}
 
 	// Apply overrides and default values.
-	if env := os.Getenv(envControlPort); env != "" {
-		cfg.ControlPort = env
-	}
 	if cfg.ControlPort == "" {
-		cfg.ControlPort = defaultControlPort
+		if env := os.Getenv(envControlPort); env != "" {
+			cfg.ControlPort = env
+		} else {
+			cfg.ControlPort = defaultControlPort
+		}
 	}
 	if env := os.Getenv(envControlPasswd); env != "" {
 		cfg.ControlPortPassword = env
