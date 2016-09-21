@@ -19,7 +19,6 @@ import (
 	"path"
 	"runtime"
 	"strings"
-	"time"
 
 	"git.schwanenlied.me/yawning/bulb.git"
 	"github.com/ulikunitz/xz"
@@ -28,16 +27,6 @@ import (
 	"cmd/sandboxed-tor-browser/internal/config"
 	"cmd/sandboxed-tor-browser/internal/orhttp"
 )
-
-func backupDirectory(fpath string) error {
-	if _, err := os.Stat(fpath); err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return err
-	}
-	return os.Rename(fpath, fmt.Sprintf("%s-%v", fpath, time.Now().Unix()))
-}
 
 func slurp(ctrl *bulb.Conn, url string) ([]byte, error) {
 	resp, err := orhttp.Get(ctrl, url, nil)
@@ -159,11 +148,6 @@ func doInstall(cfg *config.Config, ctrl *bulb.Conn, onDisk *manifest, bundleDown
 	onDisk.Locale = cfg.Locale
 	onDisk.Version = bundleDownloads.Version
 
-	// Backup the old bundle directory if it exists.
-	if err := backupDirectory(cfg.BundleInstallDir()); err != nil {
-		return err
-	}
-
 	// This routine throws the entire bundle into memory, so force a garbage
 	// collection cycle as we return.
 	defer runtime.GC()
@@ -190,6 +174,9 @@ func doInstall(cfg *config.Config, ctrl *bulb.Conn, onDisk *manifest, bundleDown
 		// check returns an error, but this doesn't hurt...
 		return fmt.Errorf("unexpected entity signed bundle: %v", ent)
 	}
+
+	// Obliterate the old bundle directory if it exists.
+	os.RemoveAll(cfg.BundleInstallDir())
 
 	// Extract the archive.
 	log.Printf("extracting bundle")
