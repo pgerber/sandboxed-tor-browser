@@ -47,7 +47,7 @@ Features:
 
    * Version check over Tor on launch, validating the `dist.torproject.org`
      cert with an internal copy.
-   * Download MAR format udpates over Tor.
+   * Download MAR format updates over Tor.
    * Validates the MAR signature with hard coded copies of the MAR signing
      key(s).
    * Apply the MAR updates using the `updater` excutable shipped with Tor,
