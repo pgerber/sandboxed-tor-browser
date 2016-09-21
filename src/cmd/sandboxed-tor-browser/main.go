@@ -67,7 +67,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to load configuration: %v", err)
 	}
-	log.Printf("config: %v", cfg)
 
 	// Create all the directories where files are stored if missing.
 	if err = makeDirectories(cfg); err != nil {
@@ -88,6 +87,7 @@ func main() {
 	// Install/Update in a separage goroutine so cleanup happens.
 	doneCh := make(chan interface{})
 	go func() {
+		defer func() { doneCh <- true}()
 		// Install/Update as appropriate.
 		if err := installer.Install(cfg); err != nil {
 			log.Printf("failed to install/update: %v", err)
@@ -100,7 +100,6 @@ func main() {
 		} else {
 			cmd.Wait()
 		}
-		doneCh <- true
 	}()
 
 	// Wait for the actual work to finish, or a fatal signal to be received.
