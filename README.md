@@ -81,7 +81,9 @@ Features:
 Sandbox weaknesses:
 
  * X11 is a huge mess of utter fail.  Since the sandboxed processes get direct
-   access to the host X server, this is an exploitation vector.
+   access to the host X server, this is an exploitation vector.  Using a nested
+   X solution "just works" assuming access control is setup, so that's a way to
+   mitigate this for those that want that.
  * Firefox requires a `/proc` filesystem, which contains more information than
    it should have access to.
  * While the user name is re-written in the sandbox to `amnesia`, the UID/GID
