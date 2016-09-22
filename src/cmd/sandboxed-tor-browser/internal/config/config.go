@@ -25,6 +25,7 @@ const (
 	bundleDir  = "tor-browser"
 	configFile = "sandboxed-tor-browser.toml"
 
+	envDisplay       = "DISPLAY"
 	envControlPort   = "TOR_CONTROL_PORT"
 	envControlPasswd = "TOR_CONTROL_PASSWD"
 	envRuntimeDir    = "XDG_RUNTIME_DIR"
@@ -64,6 +65,9 @@ type Config struct {
 	// DownloadsDirectory is the path to the host filesystem directory that
 	// gets mapped in as `Browser/Downloads`.
 	DownloadsDirectory string
+
+	// Display is the X11 DISPLAY env var override.
+	Display string
 }
 
 // ControlPortAddr returns the net/addr pair of the Control Port suitable for
@@ -165,6 +169,9 @@ func Load() (*Config, error) {
 	}
 	if cfg.Locale == "" {
 		cfg.Locale = defaultLocale
+	}
+	if cfg.Display == "" {
+		cfg.Display = os.Getenv("DISPLAY")
 	}
 
 	// Validate.

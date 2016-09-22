@@ -145,7 +145,7 @@ func x11CraftAuthority(realDisplay string) ([]byte, error) {
 
 func prepareSandboxedX11(cfg *config.Config) ([]byte, error) {
 	// Figure out the X11 display that should be allowed in the sandbox.
-	display := os.Getenv("DISPLAY")
+	display := cfg.Display
 	if display == "" {
 		return nil, fmt.Errorf("no DISPLAY env var set")
 	}

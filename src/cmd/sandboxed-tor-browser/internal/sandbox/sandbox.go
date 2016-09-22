@@ -158,7 +158,7 @@ func run(cfg *config.Config, cmdPath string, cmdArgs []string, extraBwrapArgs []
 
 		// X11. TODO: Improve the way I do this.
 		"--bind", "/tmp/.X11-unix", "/tmp/.X11-unix",
-		"--setenv", "DISPLAY", os.Getenv("DISPLAY"),
+		"--setenv", "DISPLAY", cfg.Display,
 
 		// The UI looks like total shit without these.  When Tor Browser
 		// moves to Gtk-3.0 this will need to be revised.
