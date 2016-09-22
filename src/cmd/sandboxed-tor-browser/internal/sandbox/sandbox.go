@@ -216,8 +216,8 @@ func run(cfg *config.Config, cmdPath string, cmdArgs []string, extraBwrapArgs []
 	if injectStub {
 		bwrapArgs = append(bwrapArgs, []string{
 			"--setenv", "LD_PRELOAD", "/tmp/tbb_stub.so",
-			"--setenv", "TOR_CONTROL_SOCKET", path.Join(runtimeDir(), controlSocket),
-			"--setenv", "TOR_SOCKS_SOCKET", path.Join(runtimeDir(), socksSocket),
+			"--setenv", "TOR_STUB_CONTROL_SOCKET", path.Join(runtimeDir(), controlSocket),
+			"--setenv", "TOR_STUB_SOCKS_SOCKET", path.Join(runtimeDir(), socksSocket),
 		}...)
 		if err := newFdFile("/tmp/tbb_stub.so", stub); err != nil {
 			return nil, err

@@ -131,19 +131,19 @@ socket(int domain, int type, int protocol)
 static void
 stub_init(void)
 {
-  char *socks_path = secure_getenv("TOR_SOCKS_SOCKET");
-  char *control_path = secure_getenv("TOR_CONTROL_SOCKET");
+  char *socks_path = secure_getenv("TOR_STUB_SOCKS_SOCKET");
+  char *control_path = secure_getenv("TOR_STUB_CONTROL_SOCKET");
   size_t dest_len = sizeof(socks_addr.sun_path);
 
-  /* If `TOR_SOCKS_SOCKET` isn't set, bail. */
+  /* If `TOR_STUB_SOCKS_SOCKET` isn't set, bail. */
   if (socks_path == NULL) {
-    fprintf(stderr, "ERROR: `TOR_SOCKS_SOCKET` enviornment variable not set.\n");
+    fprintf(stderr, "ERROR: `TOR_STUB_SOCKS_SOCKET` enviornment variable not set.\n");
     goto out;
   }
 
-  /* If `TOR_CONTROL_SOCKET` isn't set, bail. */
+  /* If `TOR_STUB_CONTROL_SOCKET` isn't set, bail. */
   if (control_path == NULL) {
-    fprintf(stderr, "ERROR: `TOR_CONTROL_SOCKET` enviornment variable not set.\n");
+    fprintf(stderr, "ERROR: `TOR_STUB_CONTROL_SOCKET` enviornment variable not set.\n");
     goto out;
   }
 
