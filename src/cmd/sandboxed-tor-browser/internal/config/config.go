@@ -104,20 +104,20 @@ func (cfg *Config) RuntimeDir() string {
 
 // DialControlPort dials and authenticates to the Tor control port.
 func (cfg *Config) DialControlPort() (*bulb.Conn, error) {
-        // Connect to the control port, and authenticate.
-        net, addr, err := cfg.ControlPortAddr()
-        if err != nil {
-                return nil, err
-        }
-        ctrl, err := bulb.Dial(net, addr)
-        if err != nil {
-                return nil, err
-        }
-        if err := ctrl.Authenticate(cfg.ControlPortPassword); err != nil {
-                ctrl.Close()
-                return nil, err
-        }
-        return ctrl, nil
+	// Connect to the control port, and authenticate.
+	net, addr, err := cfg.ControlPortAddr()
+	if err != nil {
+		return nil, err
+	}
+	ctrl, err := bulb.Dial(net, addr)
+	if err != nil {
+		return nil, err
+	}
+	if err := ctrl.Authenticate(cfg.ControlPortPassword); err != nil {
+		ctrl.Close()
+		return nil, err
+	}
+	return ctrl, nil
 }
 
 // Load loads and validates the configuration file, returning a ready to use
@@ -196,6 +196,9 @@ func Load() (*Config, error) {
 		} else if !fi.IsDir() {
 			return nil, fmt.Errorf("invalid DownloadsDirectory: not a directoru")
 		}
+	}
+	if cfg.Display == "" {
+		return nil, fmt.Errorf("invalid or missing DISPLAY")
 	}
 
 	return cfg, nil

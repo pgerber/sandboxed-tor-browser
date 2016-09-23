@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"os"
 	"os/exec"
 	"path"
@@ -156,7 +157,7 @@ func run(cfg *config.Config, cmdPath string, cmdArgs []string, extraBwrapArgs []
 		"--bind", cfg.RuntimeDir(), runtimeDir(),
 		"--setenv", "XDG_RUNTIME_DIR", runtimeDir(),
 
-		// X11. TODO: Improve the way I do this.
+		// X11.
 		"--bind", "/tmp/.X11-unix", "/tmp/.X11-unix",
 		"--setenv", "DISPLAY", cfg.Display,
 
@@ -230,7 +231,8 @@ func run(cfg *config.Config, cmdPath string, cmdArgs []string, extraBwrapArgs []
 	// copied into the sancbox.  Whatever, X11 is the weakest link and this
 	// shit should use Wayland anyway.
 	if xauth, err := prepareSandboxedX11(cfg); err != nil {
-		return nil, err
+		// Failure to setup Xauthority is non-fatal.
+		log.Printf("failed to configure sandboxed x11: %v", err)
 	} else if err := newFdFile("/home/amnesia/.Xauthority", xauth); err != nil {
 		return nil, err
 	}
@@ -300,7 +302,6 @@ func RunTorBrowser(cfg *config.Config) (*exec.Cmd, error) {
 	profileDir := path.Join(browserHome, profileSubDir)
 	cachesDir := path.Join(browserHome, cachesSubDir)
 	downloadsDir := path.Join(browserHome, "Downloads")
-
 
 	// Setup the bwrap args to repliccate start-tor-browser.
 	extraBwrapArgs := []string{
