@@ -119,17 +119,19 @@ func (p *socksProxy) rewriteTag(conn net.Conn, req *socks5.Request) error {
 	p.RLock()
 	defer p.RUnlock()
 	if req.Auth.Uname == nil {
-		// Should never happen, but does.
-		// See https://bugs.torproject.org/20195
-		h, _ := req.Addr.HostPort()
-		req.Auth.Uname = []byte(h)
-		req.Auth.Passwd = []byte(p.tag)
-	} else {
-		req.Auth.Passwd = append(req.Auth.Passwd, []byte(":"+p.tag)...)
-		// With the current format this should never happen, ever.
-		if len(req.Auth.Passwd) > 255 {
-			return fmt.Errorf("failed to redispatch, socks5 password too long")
-		}
+		// Should never happen, but does. See https://bugs.torproject.org/20195
+		//
+		// Just use what pre 6.5a Tor Browser considers the first "catch-all"
+		// circuit since this appears to only happen at first lauch on the
+		// current relase builds, and that's what's supposed to be used for
+		// the internal check in question.
+		req.Auth.Uname = []byte("---unknown---")
+		req.Auth.Passwd = []byte("0")
+	}
+	req.Auth.Passwd = append(req.Auth.Passwd, []byte(":"+p.tag)...)
+	// With the current format this should never happen, ever.
+	if len(req.Auth.Passwd) > 255 {
+		return fmt.Errorf("failed to redispatch, socks5 password too long")
 	}
 	return nil
 }
