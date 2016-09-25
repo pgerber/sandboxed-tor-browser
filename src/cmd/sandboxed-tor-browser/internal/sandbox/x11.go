@@ -143,22 +143,25 @@ func x11CraftAuthority(realDisplay string) ([]byte, error) {
 	return nil, fmt.Errorf("failed to find an appropriate Xauthority entry")
 }
 
-func prepareSandboxedX11(cfg *config.Config) ([]byte, error) {
-	// Figure out the X11 display that should be allowed in the sandbox.
+func prepareSandboxedX11(cfg *config.Config) ([]string, []byte, error) {
+	const x11SockDir = "/tmp/.X11-unix"
+
+	// Figure out the X11 display number and socket path.
 	display := cfg.Display
 	if display == "" {
-		return nil, fmt.Errorf("no DISPLAY env var set")
+		return nil, nil, fmt.Errorf("no DISPLAY env var set")
 	}
 	if !strings.HasPrefix(display, ":") {
-		return nil, fmt.Errorf("non-local X11 displays not supported")
+		return nil, nil, fmt.Errorf("non-local X11 displays not supported")
 	}
 	display = strings.TrimLeft(display, ":")
+	xSock := path.Join(x11SockDir, "X"+display)
+	xSockArgs := []string{
+		"--dir", x11SockDir,
+		"--bind", xSock, xSock,
+	}
 
 	// Create a Xauthority file contents.
 	xauth, err := x11CraftAuthority(display)
-	if err != nil {
-		return nil, err
-	}
-
-	return xauth, nil
+	return xSockArgs, xauth, err
 }

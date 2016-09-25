@@ -67,8 +67,7 @@ Features:
      exposed in the sandbox, only the `Downloads` directory.
      * System library directories.
      * Gtk Theme related directories.
-     * The X11 AF_LOCAL socket directory in /tmp (.Xauthority is re-written to
-       only expose credentials for the active display).
+     * The X11 AF_LOCAL socket.
      * The browser directory.
      * The browser profile directory (read/write, extensions sub-dir read only).
      * The browser downloads directory (read/write)

@@ -158,7 +158,6 @@ func run(cfg *config.Config, cmdPath string, cmdArgs []string, extraBwrapArgs []
 		"--setenv", "XDG_RUNTIME_DIR", runtimeDir(),
 
 		// X11.
-		"--bind", "/tmp/.X11-unix", "/tmp/.X11-unix",
 		"--setenv", "DISPLAY", cfg.Display,
 
 		// The UI looks like total shit without these.  When Tor Browser
@@ -226,20 +225,24 @@ func run(cfg *config.Config, cmdPath string, cmdArgs []string, extraBwrapArgs []
 	}
 
 	// Setup access to X11 in the sandbox.
-	//
-	// While all of the sockets are exposed, only one Xauthority entry is
-	// copied into the sancbox.  Whatever, X11 is the weakest link and this
-	// shit should use Wayland anyway.
-	if xauth, err := prepareSandboxedX11(cfg); err != nil {
-		// Failure to setup Xauthority is non-fatal.
+	xSockArgs, xauth, err := prepareSandboxedX11(cfg)
+	if err != nil {
+		// Failed to determine the X server socket.
+		if xSockArgs == nil {
+			return nil, err
+		}
+
+		// Failure to proxy auth is non-fatal.
 		log.Printf("failed to configure sandboxed x11: %v", err)
-	} else if err := newFdFile("/home/amnesia/.Xauthority", xauth); err != nil {
-		return nil, err
+	} else if xauth != nil {
+		if err := newFdFile("/home/amnesia/.Xauthority", xauth); err != nil {
+			return nil, err
+		}
+		bwrapArgs = append(bwrapArgs, "--setenv", "XAUTHORITY", "/home/amnesia/.Xauthority")
 	}
-	bwrapArgs = append(bwrapArgs, "--setenv", "XAUTHORITY", "/home/amnesia/.Xauthority")
+	bwrapArgs = append(bwrapArgs, xSockArgs...)
 
 	// TODO:
-	// Setup access to DRI in the sandbox.
 	// Setup access to pulseaudio in the sandbox.
 
 	// Add the extra files.
