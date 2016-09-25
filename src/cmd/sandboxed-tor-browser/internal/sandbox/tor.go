@@ -24,8 +24,7 @@ import (
 	"sync"
 
 	"cmd/sandboxed-tor-browser/internal/config"
-
-	"github.com/yawning/or-ctl-filter/socks5"
+	"cmd/sandboxed-tor-browser/internal/socks5"
 )
 
 const (
@@ -100,7 +99,7 @@ func (p *socksProxy) handleConn(conn net.Conn) {
 	}
 
 	// Redispatch the modified SOCKS5 request upstream.
-	upConn, addr, err := socks5.Redispatch(p.sNet, p.sAddr, req)
+	upConn, err := socks5.Redispatch(p.sNet, p.sAddr, req)
 	if err != nil {
 		req.Reply(socks5.ErrorToReplyCode(err))
 		return
@@ -108,7 +107,7 @@ func (p *socksProxy) handleConn(conn net.Conn) {
 	defer upConn.Close()
 
 	// Complete the SOCKS5 handshake with the app.
-	if err := req.ReplyAddr(socks5.ReplySucceeded, addr); err != nil {
+	if err := req.Reply(socks5.ReplySucceeded); err != nil {
 		return
 	}
 
