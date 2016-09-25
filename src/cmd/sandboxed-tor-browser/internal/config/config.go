@@ -40,6 +40,15 @@ const (
 	archLinux64 = "linux64"
 )
 
+// Unsafe config is the configuration substructure for options that potentially
+// reduce security/anonymity.
+type Unsafe struct {
+	// VolatileExtensionsDir mounts the extensions directory read/write to
+	// allow the installation of addons.  The addon auto-update mechanism is
+	// still left disabled.
+	VolatileExtensionsDir bool
+}
+
 // Config is a configuration instance.
 type Config struct {
 	// ControlPort is the Tor Control Port URI.
@@ -68,6 +77,9 @@ type Config struct {
 
 	// Display is the X11 DISPLAY env var override.
 	Display string
+
+	// Unsafe is the potentially dangerous configuration options.
+	Unsafe Unsafe
 }
 
 // ControlPortAddr returns the net/addr pair of the Control Port suitable for

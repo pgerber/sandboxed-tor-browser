@@ -28,7 +28,7 @@ Functionality intentionally broken with the sandbox:
  * Audio
  * DRI
  * X11 input methods (IBus requires access to the host D-Bus)
- * Installing addons via the browser UI.
+ * Installing addons via the browser UI, unless allowed via the config.
  * Tor Browser's updater.
  * Tor Browser's circuit display.
 
@@ -69,6 +69,7 @@ Features:
      * Gtk Theme related directories.
      * The X11 AF_LOCAL socket.
      * The browser directory.
+     * The browser caches directory (read/write, might be removed).
      * The browser profile directory (read/write, extensions sub-dir read only).
      * The browser downloads directory (read/write)
      * A runtime directory.

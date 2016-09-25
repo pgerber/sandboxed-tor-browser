@@ -311,7 +311,6 @@ func RunTorBrowser(cfg *config.Config) (*exec.Cmd, error) {
 		// Filesystem stuff.
 		"--ro-bind", cfg.UserDataDir(), "/home/amnesia/sandboxed-tor-browser",
 		"--bind", realProfileDir, profileDir,
-		"--ro-bind", path.Join(realProfileDir, "extensions"), path.Join(profileDir, "extensions"),
 		"--bind", realDownloadsDir, downloadsDir, // Optionally allow the user to respecify this.
 		"--bind", realCachesDir, cachesDir, // XXX: Do I need this?
 		"--chdir", browserHome,
@@ -329,6 +328,11 @@ func RunTorBrowser(cfg *config.Config) (*exec.Cmd, error) {
 		"--setenv", "TOR_CONTROLPORT", "9151",
 		"--setenv", "TOR_SKIP_LAUNCH", "1",
 		"--setenv", "TOR_NO_DISPLAY_NETWORK_SETTINGS", "1",
+	}
+	if !cfg.Unsafe.VolatileExtensionsDir {
+		// Unless overridden, the extensions directory should be mounted
+		// read-only.
+		extraBwrapArgs = append(extraBwrapArgs, "--ro-bind", path.Join(realProfileDir, "extensions"), path.Join(profileDir, "extensions"))
 	}
 	cmdPath := path.Join(browserHome, "firefox")
 	cmdArgs := []string{"--class", "Tor Browser", "-profile", profileDir}
