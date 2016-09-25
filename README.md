@@ -80,25 +80,29 @@ Features:
 
 Sandbox weaknesses:
 
- * X11 is a huge mess of utter fail.  Since the sandboxed processes get direct
-   access to the host X server, this is an exploitation vector.  Using a nested
-   X solution "just works" assuming access control is setup, so that's a way to
+Basically sandbox escape should require one of a kernel exploit, display server
+exploit, or Tor SOCKS port based exploit in addition to the Firefox exploit, so
+from a security standpoint things are vastly improved.
+
+ * (Security) X11 is a huge mess of utter fail.  Since the sandboxed processes
+   get direct access to the host X server, this is an exploitation vector.
+   Using a nested X solution such as Xephyr "just works", so that's a way to
    mitigate this for those that want that.
- * Firefox requires a `/proc` filesystem, which contains more information than
-   it should have access to.
- * While the user name is re-written in the sandbox to `amnesia`, the UID/GID
-   are not.
- * The Firefox process still can access the network over Tor to exfiltrate
-   data.
- * The Firefox process can write bad things to the profile directory if it
-   choses to do so.
+ * (Fingerprinting) Firefox requires a `/proc` filesystem, which contains more
+   information than it should have access to.
+ * (Fingerprinting) While the user name is re-written in the sandbox to
+   `amnesia`, the UID/GID are not.
+ * (Security) The Firefox process still can access the network over Tor to
+   exfiltrate data.
+ * (Security) The Firefox process can write bad things to the profile
+   directory if it choses to do so.
 
 Bugs:
 
  * Tor Browser still shows update related UI elements.
-   (https://trac.torproject.org/projects/tor/ticket/20083)
+   (https://bugs.torproject.org/20083)
  * The alpha/hardened bundles can't be installed.
-   (https://bugs.torproject.org/19481 https://bugs.torproject.org/20180)
+   (https://bugs.torproject.org/20219)
 
 Notes:
 
@@ -108,7 +112,6 @@ Notes:
  * Yes, I'm serious about the license.  It's not ready to be used by the
    general public, no one should be re-distributing binaries, and no one
    should be making pre-compiled packages.
- * Unlike `tor-browser-launcher` there is no fancy GUI, and never will be.
  * Questions that could be answered by reading the code will be ignored.
  * Unless you're capable of debugging it, don't use it, and don't contact me
    about it.
