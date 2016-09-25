@@ -154,7 +154,7 @@ func run(cfg *config.Config, cmdPath string, cmdArgs []string, extraBwrapArgs []
 		"--setenv", "HOME", "/home/amnesia",
 
 		// XDG_RUNTIME_DIR.
-		"--bind", cfg.RuntimeDir(), runtimeDir(),
+		"--dir", runtimeDir(),
 		"--setenv", "XDG_RUNTIME_DIR", runtimeDir(),
 
 		// X11.
@@ -214,10 +214,15 @@ func run(cfg *config.Config, cmdPath string, cmdArgs []string, extraBwrapArgs []
 	// Inject the AF_LOCAL compatibility hack stub into the filesystem, and
 	// append the relevant args required for functionality.
 	if injectStub {
+		ctrlPath := path.Join(runtimeDir(), controlSocket)
+		socksPath := path.Join(runtimeDir(), socksSocket)
+
 		bwrapArgs = append(bwrapArgs, []string{
 			"--setenv", "LD_PRELOAD", "/tmp/tbb_stub.so",
-			"--setenv", "TOR_STUB_CONTROL_SOCKET", path.Join(runtimeDir(), controlSocket),
-			"--setenv", "TOR_STUB_SOCKS_SOCKET", path.Join(runtimeDir(), socksSocket),
+			"--bind", path.Join(cfg.RuntimeDir(), controlSocket), ctrlPath,
+			"--bind", path.Join(cfg.RuntimeDir(), socksSocket), socksPath,
+			"--setenv", "TOR_STUB_CONTROL_SOCKET", ctrlPath,
+			"--setenv", "TOR_STUB_SOCKS_SOCKET", socksPath,
 		}...)
 		if err := newFdFile("/tmp/tbb_stub.so", stub); err != nil {
 			return nil, err
