@@ -134,7 +134,7 @@ func x11CraftAuthority(realDisplay string) ([]byte, error) {
 		xauth := make([]byte, 2)
 		binary.BigEndian.PutUint16(xauth[0:], family)
 		xauth = append(xauth, encodeXString([]byte(sandboxedHostname))...)
-		xauth = append(xauth, encodeXString([]byte(disp))...)
+		xauth = append(xauth, encodeXString([]byte("0"))...)
 		xauth = append(xauth, encodeXString(authMeth)...)
 		xauth = append(xauth, encodeXString(authData)...)
 		return xauth, nil
@@ -155,10 +155,9 @@ func prepareSandboxedX11(cfg *config.Config) ([]string, []byte, error) {
 		return nil, nil, fmt.Errorf("non-local X11 displays not supported")
 	}
 	display = strings.TrimLeft(display, ":")
-	xSock := path.Join(x11SockDir, "X"+display)
 	xSockArgs := []string{
 		"--dir", x11SockDir,
-		"--bind", xSock, xSock,
+		"--bind", path.Join(x11SockDir, "X"+display), path.Join(x11SockDir, "X0"),
 	}
 
 	// Create a Xauthority file contents.

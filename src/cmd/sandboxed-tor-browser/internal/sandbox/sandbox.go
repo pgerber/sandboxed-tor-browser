@@ -158,7 +158,7 @@ func run(cfg *config.Config, cmdPath string, cmdArgs []string, extraBwrapArgs []
 		"--setenv", "XDG_RUNTIME_DIR", runtimeDir(),
 
 		// X11.
-		"--setenv", "DISPLAY", cfg.Display,
+		"--setenv", "DISPLAY", ":0",
 
 		// The UI looks like total shit without these.  When Tor Browser
 		// moves to Gtk-3.0 this will need to be revised.
