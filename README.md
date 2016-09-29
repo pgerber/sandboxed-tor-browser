@@ -109,13 +109,6 @@ Notes:
  * It can take a while for the browser window to actually appear because it
    is checking for updates over Tor, and potentially installing/updating the
    bundle (also over Tor).
- * Yes, I'm serious about the license.  It's not ready to be used by the
-   general public, no one should be re-distributing binaries, and no one
-   should be making pre-compiled packages.
  * Questions that could be answered by reading the code will be ignored.
  * Unless you're capable of debugging it, don't use it, and don't contact me
    about it.
- * Really, just fuck off and leave me alone.  I'm making this available as an
-   example of how something like this can work, and not because I want to talk
-   to people about it.
-
