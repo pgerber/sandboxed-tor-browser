@@ -130,7 +130,7 @@ func (p *socksProxy) rewriteTag(conn net.Conn, req *socks5.Request) error {
 		// Should never happen, but does. See https://bugs.torproject.org/20195
 		//
 		// Just use what pre 6.5a Tor Browser considers the first "catch-all"
-		// circuit since this appears to only happen at first lauch on the
+		// circuit since this appears to only happen at first launch on the
 		// current relase builds, and that's what's supposed to be used for
 		// the internal check in question.
 		req.Auth.Uname = []byte("---unknown---")
@@ -200,15 +200,6 @@ type ctrlProxyConn struct {
 	appConn       net.Conn
 	appConnReader *bufio.Reader
 	isPreAuth     bool
-}
-
-func newCtrlProxyConn(cfg *config.Config, conn net.Conn, socks *socksProxy) *ctrlProxyConn {
-	return &ctrlProxyConn{
-		cfg:           cfg,
-		socks:         socks,
-		appConn:       conn,
-		appConnReader: bufio.NewReader(conn),
-	}
 }
 
 func (c *ctrlProxyConn) appConnWrite(b []byte) (int, error) {
@@ -375,11 +366,18 @@ func (c *ctrlProxyConn) handle() {
 	c.proxyAndFilerApp()
 }
 
-func ctrlAcceptLoop(cfg *config.Config, l net.Listener, socks *socksProxy) {
-	defer l.Close()
+type ctrlProxy struct {
+	cfg   *config.Config
+	socks *socksProxy
+
+	l net.Listener
+}
+
+func (p *ctrlProxy) acceptLoop() {
+	defer p.l.Close()
 
 	for {
-		conn, err := l.Accept()
+		conn, err := p.l.Accept()
 		if err != nil {
 			if e, ok := err.(net.Error); ok && e.Temporary() {
 				continue
@@ -387,21 +385,36 @@ func ctrlAcceptLoop(cfg *config.Config, l net.Listener, socks *socksProxy) {
 			log.Printf("failed to accept control conn: %v", err)
 			return
 		}
-
-		c := newCtrlProxyConn(cfg, conn, socks)
-		go c.handle()
+		p.handleConn(conn)
 	}
 }
 
+func (p *ctrlProxy) handleConn(conn net.Conn) {
+	c := &ctrlProxyConn{
+		cfg:           p.cfg,
+		socks:         p.socks,
+		appConn:       conn,
+		appConnReader: bufio.NewReader(conn),
+	}
+	go c.handle()
+}
+
 func launchCtrlProxy(cfg *config.Config, socks *socksProxy) error {
+	p := new(ctrlProxy)
+	p.cfg = cfg
+	p.socks = socks
+
+	// XXX: Connect to the upstream control port, and start the circuit
+	// monitor.
+
+	var err error
 	cPath := path.Join(cfg.RuntimeDir(), controlSocket)
 	os.Remove(cPath)
-	l, err := net.Listen("unix", cPath)
+	p.l, err = net.Listen("unix", cPath)
 	if err != nil {
 		return err
 	}
-
-	go ctrlAcceptLoop(cfg, l, socks)
+	go p.acceptLoop()
 
 	return nil
 }
