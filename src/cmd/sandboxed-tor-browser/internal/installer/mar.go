@@ -279,61 +279,70 @@ func verifyTorBrowserMAR(mar []byte) error {
 	numSignatures := binary.BigEndian.Uint32(mar[8:12])
 	if numSignatures == 0 || numSignatures > 8 {
 		return fmt.Errorf("numSignatures (%v) violates constraints", numSignatures)
-	} else if numSignatures > 1 {
-		// Fuck it.
-		return fmt.Errorf("bug: numSignatures != 1 not supported: %v", numSignatures)
 	}
 	h.Write(mar[0:12])
 	mar = mar[12:]
 
-	// SIGNATURE_ENTRY:
-	//  4 bytes : SignatureAlgorithmID - ID representing the type of signature algorithm.
-	//  4 bytes : SignatureSize - Size in bytes of the signature that follows
-	//  N bytes : Signature - The signature of type SIGNATURE_ENTRY.SignatureAlgorithmID and size N = SIGNATURE_ENTRY.SignatureSize bytes
-	if len(mar) < 8 {
-		return fmt.Errorf("missing/truncated SIGNATURE_ENTRY")
-	}
-	signatureAlgorithmID := binary.BigEndian.Uint32(mar[0:4])
-	signatureSize := binary.BigEndian.Uint32(mar[4:8])
-	if signatureSize > 2048 {
-		return fmt.Errorf("signatureSize (%v) violates constraints", signatureSize)
-	}
-	h.Write(mar[0:8])
-	mar = mar[8:]
+	var signatures [][]byte
+	for i := 0; i < int(numSignatures); i++ {
+		// SIGNATURE_ENTRY:
+		//  4 bytes : SignatureAlgorithmID - ID representing the type of signature algorithm.
+		//  4 bytes : SignatureSize - Size in bytes of the signature that follows
+		//  N bytes : Signature - The signature of type SIGNATURE_ENTRY.SignatureAlgorithmID and size N = SIGNATURE_ENTRY.SignatureSize bytes
+		if len(mar) < 8 {
+			return fmt.Errorf("missing/truncated SIGNATURE_ENTRY")
+		}
+		signatureAlgorithmID := binary.BigEndian.Uint32(mar[0:4])
+		if signatureAlgorithmID != 512 {
+			// Tor Browser uses a custom signature algorithm ID.
+			// See: bugs.torproject.org/13379
+			return fmt.Errorf("invalid signature ID: %v", signatureAlgorithmID)
+		}
+		signatureSize := binary.BigEndian.Uint32(mar[4:8])
+		if signatureSize > 2048 {
+			return fmt.Errorf("signatureSize (%v) violates constraints", signatureSize)
+		}
+		h.Write(mar[0:8])
+		mar = mar[8:]
 
-	// The signature doesn't cover itself, obviously.
-	signature := mar[0:signatureSize]
-	h.Write(mar[signatureSize:])
+		signatures = append(signatures, mar[0:signatureSize])
 
-	// At this point we have extracted the signature algorithm, signature, and
-	// have a copy of the MAR file with the signature omitted suitable for
-	// verification.
-	if signatureAlgorithmID != 512 {
-		// Tor Browser uses a custom signature algorithm ID.
-		// See: bugs.torproject.org/13379
-		return fmt.Errorf("invalid signature ID: %v", signatureAlgorithmID)
+		// The signature doesn't cover itself, obviously.
+		mar = mar[signatureSize:]
 	}
 
-	// Validate the signature.
-	//
-	// Predictably I managed to start writing this in the middle of the Tor
-	// Browser developers transitioning the MAR signing key.  As far as I can
-	// tell current updates are signed with the primary key, but check both
-	// before giving up.
-	//
-	// See: https://bugs.torproject.org/18008
+	// Write out the rest of the MAR into the digest.
+	h.Write(mar)
 	digest := h.Sum(nil)
-	for _, cert := range tbbMARCerts {
-		k, ok := cert.PublicKey.(*rsa.PublicKey)
-		if !ok {
-			continue
-		}
-		if err := rsa.VerifyPKCS1v15(k, crypto.SHA512, digest[:], signature); err == nil {
-			return nil
+
+	// Validate the signatures.
+	validSigs := 0
+	for _, sig := range signatures {
+		// MAR signature entries don't have information regarding which public
+		// keys were used for signing, at all.  This is totally fucking
+		// retarded, and the only thing that's possible is to check each
+		// sig against all possible public keys.
+		//
+		// Apparently the Tor Browser developers are trying to transition to
+		// a new MAR signing key as well.
+		//
+		// See: https://bugs.torproject.org/18008
+		for _, cert := range tbbMARCerts {
+			k, ok := cert.PublicKey.(*rsa.PublicKey)
+			if !ok {
+				continue
+			}
+			if err := rsa.VerifyPKCS1v15(k, crypto.SHA512, digest[:], sig); err == nil {
+				validSigs++
+			}
 		}
 	}
 
-	return fmt.Errorf("signature verification error")
+	if validSigs <= 0 || validSigs > int(numSignatures) {
+		return fmt.Errorf("signature verification error")
+	}
+
+	return nil
 }
 
 func init() {
