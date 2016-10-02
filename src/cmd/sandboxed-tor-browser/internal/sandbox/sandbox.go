@@ -144,6 +144,10 @@ func installSeccompRules(fd *os.File) error {
 		"nfsservctl",
 		"get_kernel_syms",
 	}
+	if runtime.GOARCH == "386" {
+		syscallBlacklist = append(syscallBlacklist, "vm86", "vm86old")
+	}
+
 	for _, n := range syscallBlacklist {
 		s, err := seccomp.GetSyscallFromName(n)
 		if err != nil {
