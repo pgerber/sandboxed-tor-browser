@@ -56,6 +56,10 @@ type Unsafe struct {
 	// allow the installation of addons.  The addon auto-update mechanism is
 	// still left disabled.
 	VolatileExtensionsDir bool
+
+	// EnablePulseAudio enables access to the host PulseAudio daemon inside
+	// the sandbox.
+	EnablePulseAudio bool
 }
 
 // Config is a configuration instance.

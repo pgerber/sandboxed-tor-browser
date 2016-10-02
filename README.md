@@ -20,6 +20,7 @@ Runtime dependencies:
  * tor running as a daemon with the SOCKS and control ports accessible
  * bubblewrap >= 0.1.2 (https://github.com/projectatomic/bubblewrap)
  * libseccomp2
+ * (Optional) PulseAudio
 
 Build time dependencies:
 
@@ -30,7 +31,7 @@ Build time dependencies:
 
 Things that the sandbox breaks:
 
- * Audio (Will optionally be allowed)
+ * Audio (Unless allowd via the config)
  * DRI
  * X11 input methods (IBus requires access to the host D-Bus)
  * Installing addons via the browser UI (Unless allowed via the config)

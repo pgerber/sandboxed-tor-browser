@@ -43,9 +43,8 @@ Design requirements:
  * I have no idea how to handle meek, I sort of don't care for the
    0.0.1 non-shit sandbox implementation.  Something to keep in mind.
 
- * Audio is a mess.  Could proxy pulseaudio, but not everyone uses
-   that.  Direct access to the device is probably a path to a lot of
-   pain.  I don't care enough about this either.
+ * Audio is a mess.  If the host system has PulseAudio, it can optionally be
+   exposed in the sandbox, but that is another attack vector.
 
  * This really needs Wayland, because the X11 security model is a
    shitfest of total fail, and "firefox owned the X server and got out"
@@ -89,6 +88,7 @@ sandboxed-tor-browser is a Go application that handles:
        * System library directories.
        * Gtk Theme related directories.
         * The X11 AF_LOCAL socket.
+        * (Optionally) The PulseAudio socket.
         * The browser directory.
         * The browser caches directory (read/write, might be removed).
         * The browser profile directory (read/write, extensions sub-dir
@@ -117,6 +117,10 @@ from a security standpoint things are vastly improved.
 
    Using a nested X solution such as Xephyr "just works", so that's a way to
    mitigate this for those that want that.
+
+ * (Security, Privacy) If the user opts to enable PulseAudio support, it opens
+   up another attack vector for exploits, government ultrasonic mind control,
+   the browser acting as a listening device, and etc.
 
  * (Security, Privacy) Firefox requires a `/proc` filesystem, which contains more
    information than it should have access to.

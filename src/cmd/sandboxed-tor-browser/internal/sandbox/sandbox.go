@@ -302,8 +302,36 @@ func run(cfg *config.Config, cmdPath string, cmdArgs []string, extraBwrapArgs []
 	}
 	bwrapArgs = append(bwrapArgs, xSockArgs...)
 
-	// TODO:
-	// Setup access to pulseaudio in the sandbox.
+	// Setup access to PulseAudio in the sandbox.
+	if cfg.Unsafe.EnablePulseAudio {
+		paSock, cookie, err := prepareSandboxedPulseAudio(cfg)
+		if err != nil {
+			// Failure to configure PulseAudio is non-fatal.
+			log.Printf("failed to configure sandboxed PulseAudio")
+		} else {
+			sandboxPulseSock := path.Join(runtimeDir(), "pulse/native")
+			sandboxPulseCookie := path.Join(runtimeDir(), "pulse/cookie")
+			sandboxPulseConf := path.Join(runtimeDir(), "pulse/client.conf")
+			bwrapArgs = append(bwrapArgs, []string{
+				"--bind", paSock, sandboxPulseSock,
+				"--setenv", pulseServer, "unix:" + sandboxPulseSock,
+			}...)
+
+			// Inject a client config that disables shared memory, since
+			// the sandbox has a new IPC namespace.
+			bwrapArgs = append(bwrapArgs, "--setenv", "PULSE_CLIENTCONFIG", sandboxPulseConf)
+			if err := newFdFile(sandboxPulseConf, []byte("enable-shm=no")); err != nil {
+				return nil, err
+			}
+
+			if cookie != nil {
+				if err := newFdFile(sandboxPulseCookie, cookie); err != nil {
+					return nil, err
+				}
+				bwrapArgs = append(bwrapArgs, "--setenv", pulseCookie, sandboxPulseCookie)
+			}
+		}
+	}
 
 	// Create the fd used to pass seccomp arguments.
 	seccompW, err := newSandboxedPipe("seccomp")
