@@ -78,7 +78,9 @@ func installSeccompRules(fd *os.File) error {
 		"migrate_pages",
 
 		// Don't allow subnamespace setups:
-		// XXX/yawning: The clone restriction breaks bwrap.  c'est la vie.
+		// XXX/yawning: The clone restriction breaks bwrap.  c'est la vie.  It
+		// looks like Mozilla is considering using user namespaces for the
+		// content process sandboxing efforts, so this may need to be enabled.
 		"unshare",
 		"mount",
 		"pivot_root",
@@ -136,7 +138,7 @@ func installSeccompRules(fd *os.File) error {
 		// migrate_pages
 		// move_pages
 		"vmsplice",
-		"chroot", // XXX: Is this ok?
+		"chroot",
 		"tuxcall",
 		"reboot",
 		"nfsservctl",
@@ -193,10 +195,8 @@ func run(cfg *config.Config, cmdPath string, cmdArgs []string, extraBwrapArgs []
 		// Standard directories required out of any functional U*IX system.
 		//
 		// XXX: /proc is a shitfest.  Firefox crashes out without /proc
-		// mounted, fairly eary since it expects `proc/self` to be
-		// readable, but this needs to be investigated further, since if it's
-		// the only call that requires access to proc, it'll be easy to fake
-		// out the specific check that fails.
+		// mounted, and it's not immediately obvious to me how to handle this
+		// without something like AppArmor.
 		"--tmpfs", "/tmp",
 		"--proc", "/proc",
 		"--dev", "/dev",
@@ -304,8 +304,6 @@ func run(cfg *config.Config, cmdPath string, cmdArgs []string, extraBwrapArgs []
 
 	// TODO:
 	// Setup access to pulseaudio in the sandbox.
-
-	// Add the extra files.
 
 	// Create the fd used to pass seccomp arguments.
 	seccompW, err := newSandboxedPipe("seccomp")
@@ -476,7 +474,6 @@ func RunUpdate(cfg *config.Config, mar []byte) error {
 
 	// Setup the bwrap args for `updater`.
 	extraBwrapArgs := []string{
-		// Filesystem stuff.
 		"--bind", realInstallDir, installDir,
 		"--bind", realUpdateDir, updateDir,
 		"--chdir", browserHome, // Required (Step 5.)
