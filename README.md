@@ -31,7 +31,7 @@ Build time dependencies:
 
 Things that the sandbox breaks:
 
- * Audio (Unless allowd via the config)
+ * Audio (Unless allowed via the config)
  * DRI
  * X11 input methods (IBus requires access to the host D-Bus)
  * Installing addons via the browser UI (Unless allowed via the config)
