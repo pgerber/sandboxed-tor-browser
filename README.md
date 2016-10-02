@@ -7,7 +7,12 @@
 
 Tor Browser sandboxed somewhat correctly, requires bubblewrap and a system-wide
 Tor instance.  Obviously only works on Linux, and will NEVER support anything
-else.
+else since sandboxing is OS specific.
+
+There are several unresolved issues that affect security and fingerprinting.
+Do not assume that this is perfect, merely "an improvement over nothing".  If
+you require strong security, consider combining the sandbox with something like
+Qubes or Tails.
 
 Runtime dependencies:
 
@@ -23,81 +28,16 @@ Build time dependencies:
  * gb (https://getgb.io/ Yes I know it's behind fucking cloudflare)
  * Go (Tested with 1.7.x)
 
-Functionality intentionally broken with the sandbox:
+Things that the sandbox breaks:
 
- * Audio
+ * Audio (Will optionally be allowed)
  * DRI
  * X11 input methods (IBus requires access to the host D-Bus)
- * Installing addons via the browser UI, unless allowed via the config.
- * Tor Browser's updater.
- * Tor Browser's circuit display.
+ * Installing addons via the browser UI (Unless allowed via the config)
+ * Tor Browser's updater (launcher handles keeping the bundle up to date)
+ * Tor Browser's circuit display (Will be fixed)
 
-Features:
-
- * Follows the XDG Base Dir specification.
-
- * Configuration via a TOML file.  No it's not documented.  Read the code.
-
- * Download and install Tor Browser.
-
-   * Fetches and installs the latest Tor Browser over Tor.
-   * Validates the PGP signature with a hard coded copy of the PGP key.
-
- * Update Tor Browser.
-
-   * Version check over Tor on launch, validating the `dist.torproject.org`
-     cert with an internal copy.
-   * Download MAR format updates over Tor.
-   * Validates the MAR signature with hard coded copies of the MAR signing
-     key(s).
-   * Apply the MAR updates using the `updater` excutable shipped with Tor,
-     supporting both incremental and complete updates.  This process is in a
-     sandbox that does not allow external network access at all.
-
- * Run a sandboxed instance of Tor Browser.
-
-   * Assumes a system Tor instance.
-   * Sandboxing based around bubblewrap.
-   * A LD_PRELOAD stub is used to force firefox to use AF_LOCAL sockets for
-     the control and SOCKS ports.  This will go away when all released channels
-     of the browser support AF_LOCAL socket access.
-   * Host filesystem access is minimalized to locations holding files required
-     for Tor Browser to function, with read only access unless specified
-     otherwise.  It is worth noting that the user's HOME directory is not
-     exposed in the sandbox, only the `Downloads` directory.
-     * System library directories.
-     * Gtk Theme related directories.
-     * The X11 AF_LOCAL socket.
-     * The browser directory.
-     * The browser caches directory (read/write, might be removed).
-     * The browser profile directory (read/write, extensions sub-dir read only).
-     * The browser downloads directory (read/write)
-     * A runtime directory.
-       * Contains a surrogate control port that gives "fake" responses to Tor
-         Browser.  Does not talk to the real control port.
-       * A re-dispatching SOCKS proxy that allows "New Identity" to work, that
-         talks to the system tor instance.
-
-Sandbox weaknesses:
-
-Basically sandbox escape should require one of a kernel exploit, display server
-exploit, or Tor SOCKS port based exploit in addition to the Firefox exploit, so
-from a security standpoint things are vastly improved.
-
- * (Security) X11 is a huge mess of utter fail.  Since the sandboxed processes
-   get direct access to the host X server, this is an exploitation vector.
-   Using a nested X solution such as Xephyr "just works", so that's a way to
-   mitigate this for those that want that.
- * (Fingerprinting) Firefox requires a `/proc` filesystem, which contains more
-   information than it should have access to.
- * (Fingerprinting) While the user name is re-written in the sandbox to
-   `amnesia`, the UID/GID are not.
- * (Security) The Firefox process still can access the network over Tor to
-   exfiltrate data.
- * (Security) The Firefox process can write bad things to the profile
-   directory if it choses to do so.
-
-Bugs:
+Upstream Bugs:
 
  * Tor Browser still shows update related UI elements.
    (https://bugs.torproject.org/20083)
@@ -106,6 +46,8 @@ Bugs:
 
 Notes:
 
+ * Follows the XDG Base Dir specification.
+ * Configuration via a TOML file.  No it's not documented.  Read the code.
  * It can take a while for the browser window to actually appear because it
    is checking for updates over Tor, and potentially installing/updating the
    bundle (also over Tor).

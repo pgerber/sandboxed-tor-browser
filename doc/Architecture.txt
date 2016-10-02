@@ -1,0 +1,131 @@
+sandboxed-tor-browser Architecture And Design
+Yawning Angel (yawning at schwanenlied dot me)
+
+[Note: This started out as part of an e-mail thread with the Tor Browser
+ developers.]
+
+Design requirements:
+
+ * Modern Linux kernels without USER_NS support MUST be capable of
+   supporting the sandboxed tor browser (basically, use bubblewrap
+   since it's less of a monstrosity than firejail is, both require
+   SUID root or additional capabilities for this use model which
+   complicates the installation process, but that's an orthogonal
+   issue).
+
+   bubblewrap packages are available for Debian and Ubuntu which probably
+   covers the bulk of the user-base, though I am doing development on
+   neither.
+
+ * Proxy bypass MUST BE impossible without a sandbox escape, even if
+   the adversary gets RCE capability.. This is harder than it appears,
+   and influences a few other thoughts.
+
+ * The firefox process's write access to the filesystem MUST be limited
+   to the user preferences, download directory and the bookmarks.  The
+   firefox process's read access to the filesystem SHOULD be limited to
+   the Tor Browser bundle installation directory.
+
+   There is a UX tradeoff here in that, without access to at least the
+   user's home directory, uploading things is difficult, but there's a
+   lot of data a potentially malicious firefox executable can get at
+   if it can read from the entire home directory.
+
+ * The firefox process MUST NOT be responsible for launching the tor
+   instance.  The tor process MUST live in a separate sandbox, with no
+   access to user data (ie: tor MUST only be able to see
+   Browser/Tor-Browser/Data).
+
+ * The firefox process MUST NOT be responsible for updating Tor Browser.
+   The downloads MUST be fetched over tor, and a more permissive
+   sandbox spawned to handle updating.
+
+ * I have no idea how to handle meek, I sort of don't care for the
+   0.0.1 non-shit sandbox implementation.  Something to keep in mind.
+
+ * Audio is a mess.  Could proxy pulseaudio, but not everyone uses
+   that.  Direct access to the device is probably a path to a lot of
+   pain.  I don't care enough about this either.
+
+ * This really needs Wayland, because the X11 security model is a
+   shitfest of total fail, and "firefox owned the X server and got out"
+   is a distinct possibility.
+
+Design:
+
+sandboxed-tor-browser is a Go application that handles:
+
+ * Downloading and installing Tor Browser.
+
+   * Fetches and installs the latest Tor Browser over Tor.
+   * Validates the PGP signature with a hard coded copy of the PGP key.
+
+ * Updating Tor Browser.
+
+   * Version check over Tor on launch, validating the `dist.torproject.org`
+     cert with an internal copy.
+   * Download MAR format updates over Tor.
+   * Validates the MAR signature with hard coded copies of the MAR signing
+     key(s).
+   * Apply the MAR updates using the `updater` excutable shipped with Tor,
+     supporting both incremental and complete updates.  This process is in a
+     sandbox that does not allow external network access at all.
+
+ * Run a sandboxed instance of Tor Browser.
+
+   * (FIXME) Assumes a system Tor instance.
+   * A LD_PRELOAD stub is used to force firefox to use AF_LOCAL sockets for
+     the control and SOCKS ports.  This will go away when all released channels
+     of the browser support AF_LOCAL socket access.
+   * Uses bubblewrap to instantiate a Linux container.
+     * seccomp2 system call filter.
+     * Separate PID table, mount table, etc.
+     * No external communication except via stdio, and path based AF_LOCAL
+       sockets.
+     * Normalized hostname, `/etc/passwd`, `/etc/group`.
+     * Limited view of the host filesystem, all directories read-only unless
+     * otherwise specified.  The sandboxed filesystem layout is normalized
+       as much as possible.
+       * System library directories.
+       * Gtk Theme related directories.
+        * The X11 AF_LOCAL socket.
+        * The browser directory.
+        * The browser caches directory (read/write, might be removed).
+        * The browser profile directory (read/write, extensions sub-dir
+          read-only unless overriden by the user).
+        * The browser downloads directory (read/write)
+        * A runtime directory.
+          * A surrogate control port that gives "fake" responses to Tor
+            Browser.  Does not talk to the real control port.
+          * A re-dispatching SOCKS proxy that allows "New Identity" to work,
+            that talks to the actual tor instance.
+
+Sandbox weaknesses:
+
+Basically sandbox escape should require one of a kernel exploit, display server
+exploit, or Tor SOCKS port based exploit in addition to the Firefox exploit, so
+from a security standpoint things are vastly improved.
+
+ * (Security, Privacy) X11 is a huge mess of utter fail, especially
+   considering the sandboxed processes get direct access to the host X server.
+
+     * Vector for sandbox escape or exploits.
+     * X processes can easily become display server wide keyloggers and other
+       things that threaten user privacy.
+     * Certain applications set X root window properties that leak information
+       about the host system.
+
+   Using a nested X solution such as Xephyr "just works", so that's a way to
+   mitigate this for those that want that.
+
+ * (Security, Privacy) Firefox requires a `/proc` filesystem, which contains more
+   information than it should have access to.
+
+ * (Security) The Firefox process can write bad things to the profile
+   directory if it choses to do so.
+
+ * (Privacy) The Firefox process still can access the network over Tor to
+   exfiltrate data.
+
+ * (Privacy) While the user name is re-written in the sandbox to
+   `amnesia`, the UID/GID are not.
