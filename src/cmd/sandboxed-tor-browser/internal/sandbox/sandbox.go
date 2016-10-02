@@ -60,12 +60,9 @@ func installSeccompRules(fd *os.File) error {
 	}
 
 	// Deny access to a bunch of syscalls that have no business being executed.
-	//
-	// List originally based off the linux-user-chroot v0 profile, which in
-	// turn appears to have stolen it from elsewhere.  Yes this can be improved,
-	// no I don't think it'll really help unless there's kernel bugs.
 	actEPerm := seccomp.ActErrno.SetReturnCode(1)
 	syscallBlacklist := []string{
+		// linux-user-chroot (v0 profile)
 		"syslog",      // Block dmesg
 		"uselib",      // Useless old syscall
 		"personality", // Don't allow you to switch to bsd emulation or whatnot
@@ -93,8 +90,57 @@ func installSeccompRules(fd *os.File) error {
 		"perf_event_open",
 		"ptrace",
 
-		// Extra stuff not in the linux-user-chroot list.
-		"_sysctl", // Use discouraged, the command grovels through proc anyway.
+		// firejail seccomp_filter_64()
+		// mount
+		"umount2",
+		"kexec_load",
+		// ptrace
+		"open_by_handle_at",
+		"name_to_handle_at",
+		"create_module",
+		"init_module",
+		"finit_module",
+		"delete_module",
+		"iopl",
+		"ioperm",
+		"ioprio_set",
+		"swapon",
+		"swapoff",
+		// syslog
+		"process_vm_readv",
+		"process_vm_writev",
+		"sysfs",
+		"_sysctl",
+		"adjtimex",
+		"clock_adjtime",
+		"lookup_dcookie",
+		// perf_event_open
+		"fanotify_init",
+		"kcmp",
+		"add_key",
+		"request_key",
+		"keyctl",
+		// uselib
+		// acct
+		// modify_ldt
+		// pivot_root
+		"io_setup",
+		"io_destroy",
+		"io_getevents",
+		"io_submit",
+		"io_cancel",
+		"remap_file_pages",
+		// mbind
+		// get_mempolicy
+		// set_mempolicy
+		// migrate_pages
+		// move_pages
+		"vmsplice",
+		"chroot", // XXX: Is this ok?
+		"tuxcall",
+		"reboot",
+		"nfsservctl",
+		"get_kernel_syms",
 	}
 	for _, n := range syscallBlacklist {
 		s, err := seccomp.GetSyscallFromName(n)
