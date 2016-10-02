@@ -18,6 +18,7 @@ package installer
 
 import (
 	"bytes"
+	"time"
 
 	"golang.org/x/crypto/openpgp"
 )
@@ -274,4 +275,13 @@ func init() {
 		panic("more than 1 key in hard coded key ring")
 	}
 	tbbPgpKey = keys[0].Entity
+
+	// Ensure that at least one subkey hasn't expired.
+	sigValid := false
+	for _, subKey := range tbbPgpKey.Subkeys {
+		sigValid = sigValid || !subKey.Sig.KeyExpired(time.Now())
+	}
+	if !sigValid {
+		panic("tbb PGP subkeys all expired")
+	}
 }

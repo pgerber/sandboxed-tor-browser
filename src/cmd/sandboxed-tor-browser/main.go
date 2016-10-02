@@ -22,6 +22,7 @@ import (
 	"os/signal"
 	"path"
 	"syscall"
+	"time"
 
 	"cmd/sandboxed-tor-browser/internal/config"
 	"cmd/sandboxed-tor-browser/internal/installer"
@@ -71,6 +72,15 @@ func makeDirectories(cfg *config.Config) (err error) {
 }
 
 func main() {
+	// jwz does this for xwcreensaver and it's a good idea for this,
+	// especially since it's nothing resembling stable, and shouldn't be
+	// packaged in any distribution.
+	//
+	// If you're a random distribution that decided to package this, fuck off.
+	if time.Now().After(time.Date(2017, time.March, 01, 00, 00, 00, 00, time.UTC)) {
+		log.Fatalf("This version is very old!  Please upgrade.")
+	}
+
 	// Load the configuration file.
 	cfg, err := config.Load()
 	if err != nil {

@@ -19,6 +19,7 @@ package installer
 import (
 	"crypto/x509"
 	"encoding/pem"
+	"time"
 )
 
 const (
@@ -107,8 +108,11 @@ func init() {
 		if err != nil {
 			panic("failed to parse certificate:" + err.Error())
 		}
-		distTpoCertChain = append(distTpoCertChain, cert)
+		if time.Now().Before(cert.NotBefore) || time.Now().After(cert.NotAfter) {
+			panic("certificate: " + cert.Subject.CommonName + " expired or not valid yet")
+		}
 
+		distTpoCertChain = append(distTpoCertChain, cert)
 		data = rest
 	}
 
