@@ -403,6 +403,7 @@ func RunTorBrowser(cfg *config.Config) (*exec.Cmd, error) {
 		"--bind", realProfileDir, profileDir,
 		"--bind", realDownloadsDir, downloadsDir, // Optionally allow the user to respecify this.
 		"--bind", realCachesDir, cachesDir, // XXX: Do I need this?
+		"--ro-bind", path.Join(realProfileDir, "preferences"), path.Join(profileDir, "preferences"),
 		"--chdir", browserHome,
 
 		// Env vars taken from start-tor-browser
