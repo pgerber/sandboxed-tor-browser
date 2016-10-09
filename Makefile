@@ -18,6 +18,6 @@ go-bindata:
 
 clean:
 	rm -f ./src/cmd/sandboxed-tor-browser/internal/data/bindata.go
-	rm -Rf ./data
+	rm -f ./data/tbb_stub.so
 	rm -Rf ./bin
 	rm -Rf ./pkg

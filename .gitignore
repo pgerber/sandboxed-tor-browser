@@ -1,5 +1,4 @@
 bin/
 pkg/
-data/
 src/cmd/sandboxed-tor-browser/internal/data/bindata.go
 *.swp
