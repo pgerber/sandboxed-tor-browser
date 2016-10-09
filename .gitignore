@@ -1,4 +1,5 @@
 bin/
 pkg/
-src/cmd/sandboxed-tor-browser/internal/sandbox/stub.go
+data/
+src/cmd/sandboxed-tor-browser/internal/data/bindata.go
 *.swp

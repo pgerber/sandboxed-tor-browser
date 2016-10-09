@@ -3,17 +3,21 @@ GB	:= /usr/bin/gb
 
 all:  sandboxed-tor-browser
 
-sandboxed-tor-browser: tbb_stub
+sandboxed-tor-browser: static-assets
 	gb build
 
-tbb_stub: asset-encoder
-	$(CC) -shared -pthread -fPIC src/tbb_stub/tbb_stub.c -Wall -Werror -Os -o bin/tbb_stub.so
-	./bin/asset-encoder --package sandbox --varName stub bin/tbb_stub.so src/cmd/sandboxed-tor-browser/internal/sandbox/stub.go
+static-assets: go-bindata tbb_stub
+	./bin/go-bindata -nometadata  -pkg data -prefix data -o ./src/cmd/sandboxed-tor-browser/internal/data/bindata.go data/...
 
-asset-encoder:
-	gb build cmd/asset-encoder
+tbb_stub: go-bindata
+	$(CC) -shared -pthread -fPIC src/tbb_stub/tbb_stub.c -Wall -Werror -Os -o data/tbb_stub.so
+
+go-bindata:
+	gb build github.com/jteeuwen/go-bindata/go-bindata
+	mkdir -p data
 
 clean:
-	rm -f ./src/cmd/sandboxed-tor-browser/internal/sandbox/stub.go
+	rm -f ./src/cmd/sandboxed-tor-browser/internal/data/bindata.go
+	rm -Rf ./data
 	rm -Rf ./bin
 	rm -Rf ./pkg

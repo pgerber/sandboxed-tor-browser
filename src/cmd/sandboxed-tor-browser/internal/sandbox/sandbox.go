@@ -33,6 +33,7 @@ import (
 	seccomp "github.com/seccomp/libseccomp-golang"
 
 	"cmd/sandboxed-tor-browser/internal/config"
+	"cmd/sandboxed-tor-browser/internal/data"
 )
 
 const (
@@ -273,17 +274,21 @@ func run(cfg *config.Config, cmdPath string, cmdArgs []string, extraBwrapArgs []
 	// Inject the AF_LOCAL compatibility hack stub into the filesystem, and
 	// append the relevant args required for functionality.
 	if injectStub {
+		const stubPath = "/tmp/tbb_stub.so"
 		ctrlPath := path.Join(runtimeDir(), controlSocket)
 		socksPath := path.Join(runtimeDir(), socksSocket)
 
 		bwrapArgs = append(bwrapArgs, []string{
-			"--setenv", "LD_PRELOAD", "/tmp/tbb_stub.so",
+			"--setenv", "LD_PRELOAD", stubPath,
 			"--bind", path.Join(cfg.RuntimeDir(), controlSocket), ctrlPath,
 			"--bind", path.Join(cfg.RuntimeDir(), socksSocket), socksPath,
 			"--setenv", "TOR_STUB_CONTROL_SOCKET", ctrlPath,
 			"--setenv", "TOR_STUB_SOCKS_SOCKET", socksPath,
 		}...)
-		if err := newFdFile("/tmp/tbb_stub.so", stub); err != nil {
+
+		if stub, err := data.Asset("tbb_stub.so"); err != nil {
+			return nil, err
+		} else if err := newFdFile(stubPath, stub); err != nil {
 			return nil, err
 		}
 	}
