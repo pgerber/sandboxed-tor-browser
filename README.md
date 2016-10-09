@@ -33,6 +33,7 @@ Things that the sandbox breaks:
 
  * Audio (Unless allowed via the config)
  * DRI
+ * HTTPS-Everywhere's SSL Observatory (Upstream bug)
  * X11 input methods (IBus requires access to the host D-Bus)
  * Installing addons via the browser UI (Unless allowed via the config)
  * Tor Browser's updater (launcher handles keeping the bundle up to date)
@@ -44,6 +45,9 @@ Upstream Bugs:
    (https://bugs.torproject.org/20083)
  * The alpha/hardened bundles can't be installed.
    (https://bugs.torproject.org/20219)
+ * HTTPS-Everywhere doesn't use Isolation properly at all, or honor SSL
+   Observatory being disabled.
+   (https://bugs.torproject.org/20195)
 
 Notes:
 
