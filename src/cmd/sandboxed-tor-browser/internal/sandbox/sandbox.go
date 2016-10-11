@@ -219,10 +219,6 @@ func run(cfg *config.Config, cmdPath string, cmdArgs []string, extraBwrapArgs []
 
 		// X11.
 		"--setenv", "DISPLAY", ":0",
-
-		// The UI looks like total shit without these.  When Tor Browser
-		// moves to Gtk-3.0 this will need to be revised.
-		"--ro-bind", "/usr/share/gtk-2.0", "/usr/share/gtk-2.0",
 		"--ro-bind", "/usr/share/themes", "/usr/share/themes",
 		"--ro-bind", "/usr/share/icons", "/usr/share/icons",
 	}
@@ -310,6 +306,12 @@ func run(cfg *config.Config, cmdPath string, cmdArgs []string, extraBwrapArgs []
 		bwrapArgs = append(bwrapArgs, "--setenv", "XAUTHORITY", "/home/amnesia/.Xauthority")
 	}
 	bwrapArgs = append(bwrapArgs, xSockArgs...)
+
+	// Configure GTK+.
+	bwrapArgs = append(bwrapArgs, "--setenv", "GTK2_RC_FILES", "/home/amnesia/.gtkrc-2.0")
+	if err := newFdFile("/home/amnesia/.gtkrc-2.0", []byte("gtk-icon-theme-name = \"Adwaita\"\ngtk-theme-name = \"Adwaita\"")); err != nil {
+		return nil, err
+	}
 
 	// Setup access to PulseAudio in the sandbox.
 	if cfg.Unsafe.EnablePulseAudio {
