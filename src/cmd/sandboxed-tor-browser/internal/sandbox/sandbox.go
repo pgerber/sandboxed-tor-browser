@@ -309,7 +309,9 @@ func run(cfg *config.Config, cmdPath string, cmdArgs []string, extraBwrapArgs []
 
 	// Configure GTK+.
 	bwrapArgs = append(bwrapArgs, "--setenv", "GTK2_RC_FILES", "/home/amnesia/.gtkrc-2.0")
-	if err := newFdFile("/home/amnesia/.gtkrc-2.0", []byte("gtk-icon-theme-name = \"Adwaita\"\ngtk-theme-name = \"Adwaita\"")); err != nil {
+	if gtkrc, err := data.Asset("gtkrc-2.0"); err != nil {
+		return nil, err
+	} else if err := newFdFile("/home/amnesia/.gtkrc-2.0", gtkrc); err != nil {
 		return nil, err
 	}
 
