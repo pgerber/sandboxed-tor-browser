@@ -163,13 +163,26 @@ func prepareSandboxedX11(cfg *config.Config) ([]string, []byte, error) {
 	if !strings.HasPrefix(display, ":") {
 		return nil, nil, fmt.Errorf("non-local X11 displays not supported")
 	}
-	display = strings.TrimLeft(display, ":")
+
+	// Certain multimonitor setups use the form ":0.0" or similar.
+	var d []byte
+	for _, c := range []byte(strings.TrimLeft(display, ":")) {
+		if c < 0x30 || c > 0x39 {
+			break
+		}
+		d = append(d, c)
+	}
+	displayNum := string(d)
+	if len(displayNum) == 0 {
+		return nil, nil, fmt.Errorf("failed to determine X11 display")
+	}
+
 	xSockArgs := []string{
 		"--dir", x11SockDir,
-		"--bind", path.Join(x11SockDir, "X"+display), path.Join(x11SockDir, "X0"),
+		"--bind", path.Join(x11SockDir, "X"+displayNum), path.Join(x11SockDir, "X0"),
 	}
 
 	// Create a Xauthority file contents.
-	xauth, err := x11CraftAuthority(display)
+	xauth, err := x11CraftAuthority(displayNum)
 	return xSockArgs, xauth, err
 }
