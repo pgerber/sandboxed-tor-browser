@@ -401,7 +401,7 @@ func RunTorBrowser(cfg *config.Config) (*exec.Cmd, error) {
 	if cfg.DownloadsDirectory != "" {
 		realDownloadsDir = cfg.DownloadsDirectory
 	}
-	if err := os.MkdirAll(realDesktopDir, os.ModeDir|0700); err != nil { // Allow override.
+	if err := os.MkdirAll(realDesktopDir, os.ModeDir|0700); err != nil { // XXX: Allow override.
 		return nil, err
 	}
 
@@ -429,8 +429,11 @@ func RunTorBrowser(cfg *config.Config) (*exec.Cmd, error) {
 
 		// GNOME systems will puke with a read-only home, so instead of setting
 		// HOME to point to inside the browser bundle, setup a bunch of
-		// symlinks since Tor Browser doesn't appear to honor
-		// `XDG_[DOWNLOAD,DESKTOP]_DIR`.
+		// symlinks.
+		//
+		// `XDG_[DOWNLOAD,DESKTOP]_DIR` appear to be honored if they are in
+		// `~/.config/user-dirs.dirs`, but are ignored if specified as env
+		// vars.  The symlink approach is probably more user friendly anyway.
 		//
 		// "--setenv", "HOME", browserHome,
 		"--symlink", desktopDir, "/home/amnesia/Desktop",
