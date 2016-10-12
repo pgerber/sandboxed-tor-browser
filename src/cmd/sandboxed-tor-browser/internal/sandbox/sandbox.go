@@ -393,6 +393,7 @@ func RunTorBrowser(cfg *config.Config) (*exec.Cmd, error) {
 	realBrowserHome := path.Join(cfg.UserDataDir(), "tor-browser/Browser")
 	realProfileDir := path.Join(realBrowserHome, profileSubDir)
 	realCachesDir := path.Join(realBrowserHome, cachesSubDir)
+	realDesktopDir := path.Join(realBrowserHome, "Desktop")
 	realDownloadsDir := path.Join(realBrowserHome, "Downloads")
 	if err := os.MkdirAll(realDownloadsDir, os.ModeDir|0700); err != nil { // Make mountpoint before overriding.
 		return nil, err
@@ -400,27 +401,40 @@ func RunTorBrowser(cfg *config.Config) (*exec.Cmd, error) {
 	if cfg.DownloadsDirectory != "" {
 		realDownloadsDir = cfg.DownloadsDirectory
 	}
+	if err := os.MkdirAll(realDesktopDir, os.ModeDir|0700); err != nil { // Allow override.
+		return nil, err
+	}
 
 	profileDir := path.Join(browserHome, profileSubDir)
 	cachesDir := path.Join(browserHome, cachesSubDir)
 	downloadsDir := path.Join(browserHome, "Downloads")
+	desktopDir := path.Join(browserHome, "Desktop")
 
 	// Setup the bwrap args to repliccate start-tor-browser.
 	extraBwrapArgs := []string{
 		// Filesystem stuff.
 		"--ro-bind", cfg.UserDataDir(), "/home/amnesia/sandboxed-tor-browser",
 		"--bind", realProfileDir, profileDir,
-		"--bind", realDownloadsDir, downloadsDir, // Optionally allow the user to respecify this.
+		"--bind", realDesktopDir, desktopDir,
+		"--bind", realDownloadsDir, downloadsDir,
 		"--bind", realCachesDir, cachesDir, // XXX: Do I need this?
 		"--ro-bind", path.Join(realProfileDir, "preferences"), path.Join(profileDir, "preferences"),
 		"--chdir", browserHome,
 
 		// Env vars taken from start-tor-browser
-		"--setenv", "HOME", browserHome,
 		"--setenv", "LD_LIBRARY_PATH", browserHome,
 		"--setenv", "FONTCONFIG_PATH", path.Join(browserHome, "TorBrowser/Data/fontconfig"),
 		"--setenv", "FONTCONFIG_FILE", "fonts.conf",
 		"--setenv", "ASAN_OPTIONS", "detect_leaks=0", // For hardened.
+
+		// GNOME systems will puke with a read-only home, so instead of setting
+		// HOME to point to inside the browser bundle, setup a bunch of
+		// symlinks since Tor Browser doesn't appear to honor
+		// `XDG_[DOWNLOAD,DESKTOP]_DIR`.
+		//
+		// "--setenv", "HOME", browserHome,
+		"--symlink", desktopDir, "/home/amnesia/Desktop",
+		"--symlink", downloadsDir, "/home/amnesia/Downloads",
 
 		// This assumes a system Tor instance is in use, because tor-launcher
 		// would be started inside the sandbox, unable to access the net.

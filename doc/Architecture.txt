@@ -94,6 +94,7 @@ sandboxed-tor-browser is a Go application that handles:
         * The browser profile directory (read/write, extensions sub-dir
           read-only unless overriden by the user).
         * The browser downloads directory (read/write)
+        * The browser desktop directory (read/write)
         * A runtime directory.
           * A surrogate control port that gives "fake" responses to Tor
             Browser.  Does not talk to the real control port.
