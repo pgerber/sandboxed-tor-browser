@@ -221,7 +221,7 @@ stub_init(void)
    *
    * See: https://bugzilla.mozilla.org/show_bug.cgi?id=1271100#c20
    */
-  if ((handle = real_dlopen("libXext.so", RTLD_LAZY)) == NULL) {
+  if ((handle = real_dlopen("libXext.so.6", RTLD_LAZY)) == NULL) {
     fprintf(stderr, "ERROR: Failed to dlopen() libXext.so: %s\n", dlerror());
     goto out;
   }
