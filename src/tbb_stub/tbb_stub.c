@@ -128,13 +128,22 @@ socket(int domain, int type, int protocol)
   return real_socket(domain, type, protocol);
 }
 
+static int
+has_prefix(const char *a, const char *b) {
+  return strncmp(a, b, strlen(b)) == 0;
+}
+
 void *
 dlopen(const char *filename, int flags)
 {
   pthread_once(&stub_init_once, stub_init);
 
-  if (filename != NULL && strncmp(filename, "libgconf", 8) == 0)
-    return NULL;
+  if (filename != NULL) {
+    if (has_prefix(filename, "libgnomeui"))
+      return NULL;
+    if (has_prefix(filename, "libgconf"))
+      return NULL;
+  }
 
   return real_dlopen(filename, flags);
 }
@@ -179,9 +188,10 @@ stub_init(void)
   strncpy(control_addr.sun_path, control_path, dest_len);
   control_addr.sun_path[dest_len-1] = '\0';
 
-  /* Tor Browser is built with gconf, which is loaded dynamically via dlopen().
-   * this is fine and all, except that Firefox's idea of handling "ligbconf
-   * present but the service is not running", is to throw up a dialog box.
+  /* Tor Browser is built with GNOME integration, which is loaded dynamically
+   * via dlopen().  This is fine and all, except that Firefox's idea of
+   * handling "GMOME libraries present but the services are not running", is
+   * to throw up a dialog box.
    *
    * There isn't a good way to fix this except via either rebuilding Firefox
    * or making the dlopen() call fail somehow.
