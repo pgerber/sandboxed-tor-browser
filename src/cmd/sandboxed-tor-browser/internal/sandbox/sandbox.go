@@ -423,7 +423,7 @@ func RunTorBrowser(cfg *config.Config) (*exec.Cmd, error) {
 		"--chdir", browserHome,
 
 		// Env vars taken from start-tor-browser
-		"--setenv", "LD_LIBRARY_PATH", browserHome,
+		"--setenv", "LD_LIBRARY_PATH", path.Join(browserHome, "TorBrowser/Tor"),
 		"--setenv", "FONTCONFIG_PATH", path.Join(browserHome, "TorBrowser/Data/fontconfig"),
 		"--setenv", "FONTCONFIG_FILE", "fonts.conf",
 		"--setenv", "ASAN_OPTIONS", "detect_leaks=0", // For hardened.
