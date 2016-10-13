@@ -1,5 +1,4 @@
 CC	:= gcc
-GB	:= /usr/bin/gb
 
 all:  sandboxed-tor-browser
 
