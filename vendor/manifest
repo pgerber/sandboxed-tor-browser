@@ -20,6 +20,12 @@
 			"branch": "master"
 		},
 		{
+			"importpath": "github.com/gotk3/gotk3",
+			"repository": "https://github.com/gotk3/gotk3",
+			"revision": "8fd11268426313eaa4b083519681e7d87f01168b",
+			"branch": "master"
+		},
+		{
 			"importpath": "github.com/jteeuwen/go-bindata",
 			"repository": "https://github.com/jteeuwen/go-bindata",
 			"revision": "a0ff2567cfb70903282db057e799fd826784d41d",
