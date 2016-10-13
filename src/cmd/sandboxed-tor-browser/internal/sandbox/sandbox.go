@@ -195,7 +195,7 @@ func run(cfg *config.Config, cmdPath string, cmdArgs []string, extraBwrapArgs []
 		"--unshare-pid",
 		"--unshare-net",
 		"--unshare-uts",
-		"--unshare-cgroup",
+		"--unshare-cgroup-try",
 
 		// Standard directories required out of any functional U*IX system.
 		//
