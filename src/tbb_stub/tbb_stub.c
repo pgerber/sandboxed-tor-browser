@@ -50,6 +50,7 @@
 static pthread_once_t stub_init_once = PTHREAD_ONCE_INIT;
 static int (*real_connect)(int, const struct sockaddr *, socklen_t) = NULL;
 static int (*real_socket)(int, int, int) = NULL;
+static void *(*real_dlopen)(const char *, int) = NULL;
 static struct sockaddr_un socks_addr;
 static struct sockaddr_un control_addr;
 
@@ -127,6 +128,17 @@ socket(int domain, int type, int protocol)
   return real_socket(domain, type, protocol);
 }
 
+void *
+dlopen(const char *filename, int flags)
+{
+  pthread_once(&stub_init_once, stub_init);
+
+  if (filename != NULL && strncmp(filename, "libgconf", 8) == 0)
+    return NULL;
+
+  return real_dlopen(filename, flags);
+}
+
 /*  Initialize the stub. */
 static void
 stub_init(void)
@@ -166,6 +178,18 @@ stub_init(void)
   control_addr.sun_family = AF_LOCAL;
   strncpy(control_addr.sun_path, control_path, dest_len);
   control_addr.sun_path[dest_len-1] = '\0';
+
+  /* Tor Browser is built with gconf, which is loaded dynamically via dlopen().
+   * this is fine and all, except that Firefox's idea of handling "ligbconf
+   * present but the service is not running", is to throw up a dialog box.
+   *
+   * There isn't a good way to fix this except via either rebuilding Firefox
+   * or making the dlopen() call fail somehow.
+   */
+  if ((real_dlopen = dlsym(RTLD_NEXT, "dlopen")) == NULL) {
+    fprintf(stderr, "ERROR: Failed to find 'dlopen()' symbol: %s\n", dlerror());
+    goto out;
+  }
 
   return;
 
