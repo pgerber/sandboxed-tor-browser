@@ -217,10 +217,11 @@ func run(cfg *config.Config, cmdPath string, cmdArgs []string, extraBwrapArgs []
 		"--dir", runtimeDir(),
 		"--setenv", "XDG_RUNTIME_DIR", runtimeDir(),
 
-		// X11.
+		// X11, Gtk+.
 		"--setenv", "DISPLAY", ":0",
 		"--ro-bind", "/usr/share/themes", "/usr/share/themes",
 		"--ro-bind", "/usr/share/icons", "/usr/share/icons",
+		"--ro-bind", "/usr/share/mime", "/usr/share/mime",
 	}
 
 	// Append architecture specific directories.
