@@ -29,8 +29,8 @@ import (
 )
 
 const (
-	tbbMARReleasePrimaryAsset   = "release_primary.der"
-	tbbMARReleaseSecondaryAsset = "release_secondary.der"
+	tbbMARReleasePrimaryAsset   = "installer/release_primary.der"
+	tbbMARReleaseSecondaryAsset = "installer/release_secondary.der"
 )
 
 var tbbMARCerts []*x509.Certificate

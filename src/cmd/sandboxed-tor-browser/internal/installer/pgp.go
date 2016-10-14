@@ -27,7 +27,7 @@ import (
 
 const (
 	tbbSigningKeyID    = 0x4E2C6E8793298290
-	tbbSigningKeyAsset = "0x4E2C6E8793298290.asc"
+	tbbSigningKeyAsset = "installer/0x4E2C6E8793298290.asc"
 )
 
 var tbbKeyRing openpgp.KeyRing
