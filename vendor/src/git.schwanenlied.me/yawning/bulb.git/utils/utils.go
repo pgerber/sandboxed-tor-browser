@@ -1,8 +1,8 @@
 // utils.go - A grab bag of useful utilitiy functions.
 //
-// To the extent possible under law, Yawning Angel waived all copyright
-// and related or neighboring rights to bulb, using the creative
-// commons "cc0" public domain dedication. See LICENSE or
+// To the extent possible under law, Yawning Angel has waived all copyright
+// and related or neighboring rights to bulb, using the Creative
+// Commons "CC0" public domain dedication. See LICENSE or
 // <http://creativecommons.org/publicdomain/zero/1.0/> for full details.
 
 // Package utils implements useful utilities for dealing with Tor and it's
@@ -14,6 +14,24 @@ import (
 	"net/url"
 	"strconv"
 )
+
+// SplitQuoted splits s by sep if it is found outside substring
+// quoted by quote.
+func SplitQuoted(s string, quote, sep rune) (splitted []string) {
+        quoteFlag := false
+NewSubstring:
+        for i, c := range s {
+                if c == quote {
+                        quoteFlag = !quoteFlag
+                }
+                if c == sep && !quoteFlag {
+                        splitted = append(splitted, s[:i])
+                        s = s[i+1:]
+                        goto NewSubstring
+                }
+        }
+        return append(splitted, s)
+}
 
 // ParseControlPortString parses a string representation of a control port
 // address into a network/address string pair suitable for use with "dial".

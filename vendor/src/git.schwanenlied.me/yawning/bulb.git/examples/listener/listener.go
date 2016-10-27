@@ -1,8 +1,8 @@
 // Listener example.
 //
-// To the extent possible under law, Yawning Angel waived all copyright
-// and related or neighboring rights to bulb, using the creative
-// commons "cc0" public domain dedication. See LICENSE or
+// To the extent possible under law, Yawning Angel has waived all copyright
+// and related or neighboring rights to bulb, using the Creative
+// Commons "CC0" public domain dedication. See LICENSE or
 // <http://creativecommons.org/publicdomain/zero/1.0/> for full details.
 
 package main

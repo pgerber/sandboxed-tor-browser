@@ -1,8 +1,8 @@
 // cmd_protocolinfo.go - PROTOCOLINFO command.
 //
-// To the extent possible under law, Yawning Angel waived all copyright
-// and related or neighboring rights to bulb, using the creative
-// commons "cc0" public domain dedication. See LICENSE or
+// To the extent possible under law, Yawning Angel has waived all copyright
+// and related or neighboring rights to bulb, using the Creative
+// Commons "CC0" public domain dedication. See LICENSE or
 // <http://creativecommons.org/publicdomain/zero/1.0/> for full details.
 
 package bulb
@@ -10,6 +10,8 @@ package bulb
 import (
 	"strconv"
 	"strings"
+
+	"git.schwanenlied.me/yawning/bulb.git/utils"
 )
 
 // ProtocolInfo is the result of the ProtocolInfo command.
@@ -50,7 +52,7 @@ func (c *Conn) ProtocolInfo() (*ProtocolInfo, error) {
 	pi.RawResponse = resp
 	pi.AuthMethods = make(map[string]bool)
 	for i := 1; i < len(resp.Data); i++ {
-		splitLine := strings.Split(resp.Data[i], " ")
+		splitLine := utils.SplitQuoted(resp.Data[i], '"', ' ')
 		switch splitLine[0] {
 		case "AUTH":
 			// Parse an AuthLine detailing how to authenticate.
