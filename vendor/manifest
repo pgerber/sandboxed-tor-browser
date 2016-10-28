@@ -8,6 +8,12 @@
 			"branch": "master"
 		},
 		{
+			"importpath": "git.schwanenlied.me/yawning/grab.git",
+			"repository": "https://git.schwanenlied.me/yawning/grab.git",
+			"revision": "cf971e6a7e16f7fe49b8d69e00db4e41808c45b0",
+			"branch": "master"
+		},
+		{
 			"importpath": "github.com/BurntSushi/toml",
 			"repository": "https://github.com/BurntSushi/toml",
 			"revision": "99064174e013895bbd9b025c31100bd1d9b590ca",
