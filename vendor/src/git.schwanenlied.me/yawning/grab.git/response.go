@@ -223,7 +223,11 @@ func (c *Response) checksum() error {
 		// delete file
 		if c.Request.RemoveOnError {
 			f.Close()
-			os.Remove(c.Filename)
+			if c.Request.Buffer != nil {
+				c.Request.Buffer.Reset()
+			} else {
+				os.Remove(c.Filename)
+			}
 		}
 
 		return newGrabError(errChecksumMismatch, "Checksum mismatch: %v", hex.EncodeToString(sum))
