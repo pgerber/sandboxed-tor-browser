@@ -18,6 +18,7 @@ package installer
 
 import (
 	"bytes"
+	"fmt"
 	"time"
 
 	"golang.org/x/crypto/openpgp"
@@ -32,6 +33,17 @@ const (
 
 var tbbKeyRing openpgp.KeyRing
 var tbbPgpKey *openpgp.Entity
+
+// ValidatePGPSignature validates the bundle and signature pair against the TBB
+// key ring.
+func ValidatePGPSignature(bundle, signature []byte) error {
+	if ent, err := openpgp.CheckArmoredDetachedSignature(tbbKeyRing, bytes.NewReader(bundle), bytes.NewReader(signature)); err != nil {
+		return err
+	} else if ent != tbbPgpKey {
+		return fmt.Errorf("unknown entity signed bundle")
+	}
+	return nil
+}
 
 func init() {
 	var err error

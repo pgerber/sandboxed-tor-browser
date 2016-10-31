@@ -18,16 +18,16 @@
 package installer
 
 import (
-	"archive/tar"
+	_ "archive/tar"
 	"bytes"
 	"fmt"
-	"io"
+	_ "io"
 	"io/ioutil"
 	"log"
 	"os"
 	"path"
 	"runtime"
-	"strings"
+	_ "strings"
 
 	"git.schwanenlied.me/yawning/bulb.git"
 	"github.com/ulikunitz/xz"
@@ -46,6 +46,7 @@ func slurp(ctrl *bulb.Conn, url string) ([]byte, error) {
 	return ioutil.ReadAll(resp.Body)
 }
 
+/*
 func untar(r io.Reader, destDir string) error {
 	if err := os.MkdirAll(destDir, os.ModeDir|0700); err != nil {
 		return err
@@ -108,6 +109,7 @@ func untar(r io.Reader, destDir string) error {
 	}
 	return nil
 }
+*/
 
 func overrideBundlePrefs(cfg *config.Config) error {
 	// Open the user preferences file for append only.
@@ -193,9 +195,13 @@ func doInstall(cfg *config.Config, ctrl *bulb.Conn, onDisk *manifest, bundleDown
 	if err != nil {
 		return fmt.Errorf("failed to initialize xz: %v", err)
 	}
-	if err := untar(xzr, cfg.BundleInstallDir()); err != nil {
-		return fmt.Errorf("failed to untar: %v", err)
-	}
+	_ = xzr
+
+	/*
+		if err := untar(xzr, cfg.BundleInstallDir()); err != nil {
+			return fmt.Errorf("failed to untar: %v", err)
+		}
+	*/
 
 	// Override bundle prefs.
 	if err := overrideBundlePrefs(cfg); err != nil {

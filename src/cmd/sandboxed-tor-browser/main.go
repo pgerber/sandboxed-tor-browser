@@ -20,59 +20,20 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"path"
 	"syscall"
 	"time"
 
-	"cmd/sandboxed-tor-browser/internal/config"
-	"cmd/sandboxed-tor-browser/internal/installer"
-	"cmd/sandboxed-tor-browser/internal/sandbox"
+	"cmd/sandboxed-tor-browser/internal/ui/gtk"
 )
 
-type lockFile struct {
-	f *os.File
-}
-
-func (l *lockFile) unlock() {
-	defer l.f.Close()
-	os.Remove(l.f.Name())
-}
-
-func createLockFile(cfg *config.Config) (*lockFile, error) {
-	const lockFileName = "lock"
-
-	l := new(lockFile)
-	pathName := path.Join(cfg.RuntimeDir(), lockFileName)
-
-	var err error
-	l.f, err = os.OpenFile(pathName, os.O_CREATE|os.O_EXCL, 0600)
-	if err != nil {
-		return nil, err
-	}
-	return l, nil
-}
-
-func makeDirectories(cfg *config.Config) (err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err, _ = r.(error)
-		}
-	}()
-
-	var dirs []string
-	dirs = append(dirs, cfg.UserDataDir())
-	dirs = append(dirs, cfg.RuntimeDir())
-
-	for _, d := range dirs {
-		if err = os.MkdirAll(d, os.ModeDir|0700); err != nil {
-			return
-		}
-	}
-	return nil
-}
-
 func main() {
-	// jwz does this for xwcreensaver and it's a good idea for this,
+	// Disable dumping core and ptrace().
+	if ret, _, err := syscall.Syscall6(syscall.SYS_PRCTL, syscall.PR_SET_DUMPABLE, 0, 0, 0, 0, 0); ret != 0 {
+		log.Fatalf("failed to disable core dumps: %v", err)
+		return
+	}
+
+	// jwz does this for xscreensaver and it's a good idea for this,
 	// especially since it's nothing resembling stable, and shouldn't be
 	// packaged in any distribution.
 	//
@@ -81,43 +42,23 @@ func main() {
 		log.Fatalf("This version is very old!  Please upgrade.")
 	}
 
-	// Load the configuration file.
-	cfg, err := config.Load()
-	if err != nil {
-		log.Fatalf("failed to load configuration: %v", err)
-	}
-
-	// Create all the directories where files are stored if missing.
-	if err = makeDirectories(cfg); err != nil {
-		log.Fatalf("failed to create directories: %v", err)
-	}
-
-	// Install the signal handlers before acquiring the lock.
+	// Install the signal handlers before initializing the UI.
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, os.Kill, syscall.SIGTERM)
 
-	// Aquire the lock file.
-	lock, err := createLockFile(cfg)
+	// Initialize the UI.
+	ui, err := gtk.Init()
 	if err != nil {
-		log.Fatalf("failed to create lock file: %v", err)
+		log.Fatalf("failed to initialize user interface: %v", err)
 	}
-	defer lock.unlock()
+	defer ui.Term()
 
-	// Install/Update in a separage goroutine so cleanup happens.
+	// Launch the UI in a go routine so that clean up happens.
 	doneCh := make(chan interface{})
 	go func() {
 		defer func() { doneCh <- true }()
-		// Install/Update as appropriate.
-		if err := installer.Install(cfg); err != nil {
-			log.Printf("failed to install/update: %v", err)
-			return
-		}
-
-		// Launch sandboxed tor browser.
-		if cmd, err := sandbox.RunTorBrowser(cfg); err != nil {
-			log.Printf("failed to spawn sandbox: %v", err)
-		} else {
-			cmd.Wait()
+		if err := ui.Run(); err != nil {
+			log.Printf("fatal error in the user interface: %v", err)
 		}
 	}()
 
