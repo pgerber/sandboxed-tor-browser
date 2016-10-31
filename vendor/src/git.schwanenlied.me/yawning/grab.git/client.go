@@ -3,7 +3,6 @@ package grab
 import (
 	"bufio"
 	"fmt"
-	"io"
 	"math"
 	"mime"
 	"net/http"
@@ -384,11 +383,11 @@ func computeFilename(req *Request, resp *Response) error {
 }
 
 type stubWriteCloser struct {
-	w io.Writer
+	w *bufio.Writer
 }
 
 func (s *stubWriteCloser) Close() error {
-	return nil
+	return s.w.Flush()
 }
 
 func (s *stubWriteCloser) Write(p []byte) (int, error) {
