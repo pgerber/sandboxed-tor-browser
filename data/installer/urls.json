@@ -4,5 +4,5 @@
     "alpha": "https://aus1.torproject.org/torbrowser/update_2/release/downloads.json" ,
     "hardened": "https://aus1.torproject.org/torbrowser/update_2/release/downloads.json"
   },
-  "updateURLBase": "https://dist.torproject.org/torbrowser/update_2/"
+  "updateURLBase": "https://dist.torproject.org/torbrowser/update_2"
 }

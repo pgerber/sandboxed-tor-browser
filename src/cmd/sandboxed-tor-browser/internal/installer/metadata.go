@@ -70,6 +70,24 @@ func GetDownloadsEntry(cfg *config.Config, b []byte) (string, *DownloadsEntry, e
 	}
 }
 
+// UpdateURL returns the update check URL for the installed bundle.
+func UpdateURL(cfg *config.Config) (string, error) {
+	if cfg.NeedsInstall() {
+		return "", fmt.Errorf("no sensible update URL without installed bundle")
+	}
+
+	arch := ""
+	switch cfg.Installed.Architecture {
+	case "linux64":
+		arch = "Linux_x86_64-gcc3"
+	case "linux32":
+		arch = "Linux_x86-gcc3"
+	default:
+		return "", fmt.Errorf("unsupported architecture for update: %v", cfg.Installed.Architecture)
+	}
+	return fmt.Sprintf("%s/%s/%s/%s/%s", urls.UpdateURLBase, cfg.Installed.Channel, arch, cfg.Installed.Version, cfg.Installed.Locale), nil
+}
+
 func init() {
 	urls = new(installURLs)
 	if b, err := data.Asset("installer/urls.json"); err != nil {

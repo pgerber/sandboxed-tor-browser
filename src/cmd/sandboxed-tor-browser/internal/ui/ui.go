@@ -34,7 +34,6 @@ import (
 	"time"
 
 	"git.schwanenlied.me/yawning/grab.git"
-	xdg "github.com/cep21/xdgbasedir"
 
 	"cmd/sandboxed-tor-browser/internal/data"
 	"cmd/sandboxed-tor-browser/internal/installer"
@@ -136,10 +135,6 @@ type UI interface {
 type Common struct {
 	Cfg *config.Config
 
-	RuntimeDir       string
-	UserDataDir      string
-	BundleInstallDir string
-
 	lock   *lockFile
 	noLock bool
 
@@ -148,35 +143,10 @@ type Common struct {
 
 // Init initializes the common interface state.
 func (c *Common) Init() error {
-	const (
-		envRuntimeDir    = "XDG_RUNTIME_DIR"
-		bundleInstallDir = "tor-browser-2" // XXX: Change this.
-	)
+	var err error
 
 	// Register the common command line flags.
 	flag.BoolVar(&c.noLock, "nolock", false, "Ignore checking the lock file.")
-
-	// Initialize XDG_RUNTIME_DIR.
-	d := os.Getenv(envRuntimeDir)
-	if d == "" {
-		return fmt.Errorf("no `%s` set in the enviornment", envRuntimeDir)
-	}
-	c.RuntimeDir = path.Join(d, config.AppDir)
-
-	// Initialize the data directory.
-	d, err := xdg.DataHomeDirectory()
-	if err != nil {
-		return err
-	}
-	c.UserDataDir = path.Join(d, config.AppDir)
-	c.BundleInstallDir = path.Join(c.UserDataDir, bundleInstallDir)
-
-	// Create the relevant directories.
-	for _, d = range []string{c.RuntimeDir, c.UserDataDir} {
-		if err := os.MkdirAll(d, config.DirMode); err != nil {
-			return err
-		}
-	}
 
 	// Initialize/load the config file.
 	if c.Cfg, err = config.New(); err != nil {
@@ -229,25 +199,11 @@ func (c *Common) DoInstall(async *Async) {
 	}
 
 	// Get the Dial() routine used to reach the external network.
-	// XXX: Make this into a function...
-	dialFn := net.Dial // No system tor, use direct connections.
-	if c.Cfg.UseSystemTor {
-		if c.tor, err = tor.NewSystemTor(c.Cfg.SystemTorControlNet, c.Cfg.SystemTorControlAddr); err != nil {
-			async.Err = err
-			return
-		}
-
-		// Query the socks port, setup the dialer.
-		if dialer, err := c.tor.Dialer(); err != nil {
-			async.Err = err
-			return
-		} else {
-			dialFn = dialer.Dial
-		}
+	dialFn, err := c.launchTor(async, true)
+	if err != nil {
+		return
 	}
-
 	// XXX: Wrap dialFn in a HPKP dialer.
-	_ = dialFn
 
 	// Create the async HTTP client.
 	client := grab.NewClient()
@@ -272,6 +228,7 @@ func (c *Common) DoInstall(async *Async) {
 		async.Err = err
 		return
 	}
+	checkAt := time.Now().Unix()
 
 	log.Printf("install: Version: %v Downloads: %v", version, downloads)
 
@@ -305,7 +262,7 @@ func (c *Common) DoInstall(async *Async) {
 	log.Printf("install: Installing Tor Browser.")
 	async.UpdateProgress("Installing Tor Browser.")
 
-	if err := installer.ExtractBundle(c.BundleInstallDir, bundleTarXz, async.Cancel); err != nil {
+	if err := installer.ExtractBundle(c.Cfg.BundleInstallDir, bundleTarXz, async.Cancel); err != nil {
 		async.Err = err
 		if async.Err == installer.ErrExtractionCanceled {
 			async.Err = ErrCanceled
@@ -321,14 +278,73 @@ func (c *Common) DoInstall(async *Async) {
 
 	// Set the manifest portion of the config.
 	c.Cfg.SetInstalled(&config.Installed{
-		Version:      version,
-		Architecture: c.Cfg.Architecture,
-		Channel:      c.Cfg.Channel,
-		Locale:       c.Cfg.Locale,
+		Version:         version,
+		Architecture:    c.Cfg.Architecture,
+		Channel:         c.Cfg.Channel,
+		Locale:          c.Cfg.Locale,
+		LastUpdateCheck: checkAt,
 	})
 
 	// Sync the config, and return.
 	async.Err = c.Cfg.Sync()
+}
+
+// DoLaunch executes the launch step based on the configured parameters.
+// This is blocking and should be run from a go routine, with the appropriate
+// Async structure used to communicate.
+func (c *Common) DoLaunch(async *Async, checkUpdates bool) {
+	async.Err = nil
+	defer func() {
+		if async.Err != nil {
+			log.Printf("launch: Failing with error: %v", async.Err)
+		} else {
+			log.Printf("launch: Complete.")
+		}
+		runtime.GC()
+		async.Done <- true
+	}()
+
+	log.Printf("launch: Starting.")
+
+	// Ensure that we actually can launch.
+	if c.Cfg.NeedsInstall() {
+		async.Err = fmt.Errorf("launch failed, installation required")
+		return
+	}
+
+	// Start tor if required.
+	log.Printf("launch: Connecting to the Tor network.")
+	async.UpdateProgress("Connecting to the Tor network.")
+	dialFn, err := c.launchTor(async, false)
+	if err != nil {
+		return
+	}
+
+	// If an update check is needed, check for updates.
+	if checkUpdates {
+		log.Printf("launch: Checking for updates.")
+		async.UpdateProgress("Checking for updates.")
+
+		// XXX: Wrap dialFn in a HPKP dialer.
+		_ = dialFn
+
+		// Check for updates.
+
+		// If an update is required do the update.
+
+		// Restart tor if we launched it.
+		if !c.Cfg.UseSystemTor {
+			log.Printf("launch: Reconnecting to the Tor network.")
+			async.UpdateProgress("Reconnecting to the Tor network.")
+			if _, err = c.launchTor(async, false); err != nil {
+				return
+			}
+		}
+	}
+
+	// Launch the sandboxed Tor Browser.
+	log.Printf("launch: Starting Tor Browser.")
+	async.UpdateProgress("Starting Tor Browser.")
 }
 
 // Term handles the common interface state cleanup, prior to termination.
@@ -349,6 +365,48 @@ func (c *Common) Term() {
 	}
 }
 
+type dialFunc func(string, string) (net.Conn, error)
+
+func (c *Common) launchTor(async *Async, onlySystem bool) (dialFunc, error) {
+	var err error
+
+	if c.tor != nil {
+		log.Printf("launchTor: Shutting down old tor.")
+		c.tor.Shutdown()
+		c.tor = nil
+	}
+
+	if c.Cfg.UseSystemTor {
+		// Get the Dial() routine used to reach the external network.
+		if c.tor, err = tor.NewSystemTor(c.Cfg.SystemTorControlNet, c.Cfg.SystemTorControlAddr); err != nil {
+			async.Err = err
+			return nil, err
+		}
+
+		// Query the socks port, setup the dialer.
+		if dialer, err := c.tor.Dialer(); err != nil {
+			async.Err = err
+			return nil, err
+		} else {
+			return dialer.Dial, nil
+		}
+	} else if !onlySystem {
+		// XXX: Launch bundled tor.
+		err = fmt.Errorf("launching tor is not supported yet")
+		async.Err = err
+		return nil, err
+	} else if !c.Cfg.NeedsInstall() {
+		// That's odd, we only asked for a system tor, but we should be capable
+		// of launching tor ourselves.  Don't use a direct connection.
+		err = fmt.Errorf("tor bootstrap would be skipped, when we could launch")
+		async.Err = err
+		return nil, err
+	}
+
+	// We must be installing, without a tor daemon already running.
+	return net.Dial, nil
+}
+
 type lockFile struct {
 	f *os.File
 }
@@ -362,7 +420,7 @@ func newLockFile(c *Common) (*lockFile, error) {
 	const lockFileName = "lock"
 
 	l := new(lockFile)
-	p := path.Join(c.RuntimeDir, lockFileName)
+	p := path.Join(c.Cfg.RuntimeDir, lockFileName)
 
 	var err error
 	if l.f, err = os.OpenFile(p, os.O_CREATE|os.O_EXCL, config.FileMode); err != nil {

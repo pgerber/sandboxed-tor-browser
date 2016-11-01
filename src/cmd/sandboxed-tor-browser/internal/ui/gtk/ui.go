@@ -80,9 +80,20 @@ func (ui *gtkUI) Run() error {
 		}
 	}
 
-	ui.bitch("Placeholder dialog of the whale.")
+	for {
+		// XXX: Configuration.
 
-	return nil
+		// Launch
+		if err := ui.launch(); err != nil {
+			if err != sbui.ErrCanceled {
+				ui.bitch("Failed to launch Tor Browser: %v", err)
+			}
+			continue
+		} else {
+			// XXX: Wait till the child exits.
+			return nil
+		}
+	}
 }
 
 func (ui *gtkUI) Term() {
@@ -142,6 +153,25 @@ func (ui *gtkUI) onDestroy() {
 	ui.Cfg.ResetDirty()
 }
 
+func (ui *gtkUI) launch() error {
+	// If we don't need to update, and would just launch, quash the UI.
+	checkUpdate := ui.Cfg.NeedsUpdateCheck()
+	squelchUI := !checkUpdate && ui.Cfg.UseSystemTor
+
+	async := sbui.NewAsync()
+	if squelchUI {
+		async.UpdateProgress = func(s string) {}
+		go ui.DoLaunch(async, checkUpdate)
+		<-async.Done
+	} else {
+		ui.progressDialog.setTitle("Launching Tor Browser")
+		ui.progressDialog.setText("Initializing startup process...")
+		ui.progressDialog.run(async, func() { ui.DoLaunch(async, checkUpdate) })
+	}
+
+	return async.Err
+}
+
 func (ui *gtkUI) bitch(format string, a ...interface{}) {
 	// XXX: Make this nicer with like, an icon and shit.
 	md := gtk3.MessageDialogNew(ui.mainWindow, gtk3.DIALOG_MODAL, gtk3.MESSAGE_ERROR, gtk3.BUTTONS_OK, format, a...)
@@ -156,7 +186,7 @@ func (ui *gtkUI) pixbufFromAsset(asset string) (*gdk.Pixbuf, error) {
 		// for now since gotk3 doesn't support loading pixbufs from byte
 		// literals yet.  At least this will be used sparingly...
 		_, f := path.Split(asset)
-		f = path.Join(ui.RuntimeDir, f)
+		f = path.Join(ui.Cfg.RuntimeDir, f)
 		if err = ioutil.WriteFile(f, d, config.FileMode); err != nil {
 			return nil, err
 		}

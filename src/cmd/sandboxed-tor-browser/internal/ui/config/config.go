@@ -24,16 +24,13 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"time"
 
 	"git.schwanenlied.me/yawning/bulb.git/utils"
 	xdg "github.com/cep21/xdgbasedir"
 )
 
 const (
-	// AppDir is the subdirectory under which sandboxed-tor-browser files are
-	// kept, relative to the various XDG directories.
-	AppDir = "sandboxed-tor-browser"
-
 	// DirMode is the permissions used when making directories.
 	DirMode = os.ModeDir | 0700
 
@@ -44,24 +41,31 @@ const (
 
 	defaultChannel = "release"
 	defaultLocale  = "en-US"
+	archLinux32    = "linux32"
+	archLinux64    = "linux64"
 
-	archLinux32 = "linux32"
-	archLinux64 = "linux64"
+	appDir           = "sandboxed-tor-browser"
+	bundleInstallDir = "tor-browser-2" // XXX: Change this.
 )
 
 // Config is the sandboxed-tor-browser configuration instance.
 type Config struct {
-	// Architecture is the current architecture derived at runtime.
+	// Architecture is the current architecture derived at runtime ("linux32",
+	// "linux64").
 	Architecture string `json:"-"`
 
-	// Channel is the Tor Browser channel to install.
+	// Channel is the Tor Browser channel to install ("release", "alpha",
+	// "hardened").
 	Channel string `json:"channel,omitempty"`
 
-	// Locale is the Tor Browser locale to install.
+	// Locale is the Tor Browser locale to install ("en-US", "ja").
 	Locale string `json:"locale,omitempty"`
 
 	// Installed is the installed Tor Browser information.
 	Installed *Installed `json:"installed,omitEmpty"`
+
+	// Sandbox is the sandbox configuration.
+	Sandbox Sandbox `json:"sandbox,omitEmpty"`
 
 	// UseSystemTor indicates if a system tor daemon should be used.
 	UseSystemTor bool `json:"-"`
@@ -72,10 +76,20 @@ type Config struct {
 	// SystemTorControlAddr is the system tor daemon control port address.
 	SystemTorControlAddr string `json:"-"`
 
+	// RumtineDir is `$XDG_RUNTIME_DIR/appDir`.
+	RuntimeDir string
+
+	// UserDataDir is `$XDG_USER_DATA_DIR/appDir`.
+	UserDataDir string
+
+	// BundeInstallDir is `UserDataDir/bundleInstallDir`.
+	BundleInstallDir string
+
 	isDirty bool
 	path    string
 }
 
+// Installed contains the installed Tor Browser information.
 type Installed struct {
 	// Version is the installed version.
 	Version string `json:"version,omitEmpty"`
@@ -88,6 +102,24 @@ type Installed struct {
 
 	// Locale is the installed Tor Browser locale.
 	Locale string `json:"locale,omitEmpty"`
+
+	// LastUpdateCheck is the UNIX time when the last update check was
+	// sucessfully completed.
+	LastUpdateCheck int64 `json:"lastUpdateCheck,omitEmpty"`
+}
+
+// Sandbox contains the sandbox specific config options.
+type Sandbox struct {
+	cfg *Config
+
+	// VolatileExtensionsDir mounts the extensions directorey read/write to
+	// allow the installation of addons.  The addon auto-update mechanism is
+	// still left disabled.
+	VolatileExtensionsDir bool `json:"volatileExtensionsDir"`
+
+	// EnablePulseAudio enables access to the host PulseAudio daemon inside the
+	// sandbox.
+	EnablePulseAudio bool `json:"enablePulseAudio"`
 }
 
 // SetLocale sets the configured locale, and marks the config dirty.
@@ -129,6 +161,14 @@ func (cfg *Config) NeedsInstall() bool {
 	return false
 }
 
+// NeedsUpdateCheck returns true if the bundle needs to be checked for updates,
+// and possibly updated.
+func (cfg *Config) NeedsUpdateCheck() bool {
+	const updateInterval = 60 * 60 * 12 // 12 hours.
+	now := time.Now().Unix()
+	return now > cfg.Installed.LastUpdateCheck+updateInterval
+}
+
 // Sync flushes config changes to disk, if the config is dirty.
 func (cfg *Config) Sync() error {
 	if cfg.isDirty {
@@ -154,7 +194,10 @@ func (cfg *Config) ResetDirty() {
 // NewConfig creates a new config object and populates it with the
 // configuration from disk if available, default values otherwise.
 func New() (*Config, error) {
-	const envControlPort = "TOR_CONTROL_PORT"
+	const (
+		envControlPort = "TOR_CONTROL_PORT"
+		envRuntimeDir  = "XDG_RUNTIME_DIR"
+	)
 
 	cfg := new(Config)
 
@@ -180,11 +223,30 @@ func New() (*Config, error) {
 		}
 	}
 
+	// Initialize the directories that have files in them.  The paths are not
+	// serialized but part of the config struct.
+	if d := os.Getenv(envRuntimeDir); d == "" {
+		return nil, fmt.Errorf("no `%s` set in the enviornment", envRuntimeDir)
+	} else {
+		cfg.RuntimeDir = path.Join(d, appDir)
+	}
+	if d, err := xdg.DataHomeDirectory(); err != nil {
+		return nil, err
+	} else {
+		cfg.UserDataDir = path.Join(d, appDir)
+		cfg.BundleInstallDir = path.Join(cfg.UserDataDir, bundleInstallDir)
+	}
+	for _, d := range []string{cfg.RuntimeDir, cfg.UserDataDir} {
+		if err := os.MkdirAll(d, DirMode); err != nil {
+			return nil, err
+		}
+	}
+
 	// Ensure the path used to store the config file exits.
 	if d, err := xdg.ConfigHomeDirectory(); err != nil {
 		return nil, err
 	} else {
-		d = path.Join(d, AppDir)
+		d = path.Join(d, appDir)
 		if err := os.MkdirAll(d, DirMode); err != nil {
 			return nil, err
 		}
@@ -212,6 +274,7 @@ func New() (*Config, error) {
 	if cfg.Locale == "" {
 		cfg.SetLocale(defaultLocale)
 	}
+	cfg.Sandbox.cfg = cfg
 
 	return cfg, nil
 }

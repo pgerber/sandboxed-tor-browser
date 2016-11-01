@@ -41,14 +41,14 @@ func (d *progressDialog) setText(s string) {
 
 func (d *progressDialog) run(async *sbui.Async, runFn func()) {
 	const updateInterval = 100 // ms
-	clickedCancel := false
+	cancel := false
 
-	d.updateCh = make(chan string, 2)
+	d.updateCh = make(chan string, 2) // HACKHACKHACKHACK
 	async.UpdateProgress = func(s string) { d.updateCh <- s }
 
 	var timeoutFn func() bool
 	timeoutFn = func() bool {
-		if clickedCancel {
+		if cancel {
 			return false
 		}
 
@@ -59,6 +59,7 @@ func (d *progressDialog) run(async *sbui.Async, runFn func()) {
 			if async.Err == nil {
 				d.emitOk()
 			} else {
+				cancel = true
 				d.emitCancel()
 			}
 			return false
@@ -75,12 +76,13 @@ func (d *progressDialog) run(async *sbui.Async, runFn func()) {
 
 	defer d.dialog.Hide()
 	if d.dialog.Run() != int(gtk3.RESPONSE_OK) {
-		async.Lock()
-		defer async.Unlock()
-
-		async.Cancel <- true
-		<-async.Done
-		clickedCancel = true
+		if !cancel {
+			async.Lock()
+			defer async.Unlock()
+			cancel = true
+			async.Cancel <- true
+			<-async.Done
+		}
 	}
 }
 
