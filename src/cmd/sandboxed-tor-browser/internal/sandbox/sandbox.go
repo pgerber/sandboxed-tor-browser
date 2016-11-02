@@ -170,7 +170,7 @@ func writeBuffer(w io.WriteCloser, contents []byte) error {
 	return err
 }
 
-func run(cfg *config.Config, cmdPath string, cmdArgs []string, extraBwrapArgs []string, injectStub bool) (*exec.Cmd, error) {
+func run(cfg *config.Config, cmdPath string, cmdArgs []string, extraBwrapArgs []string, x11, injectStub bool) (*exec.Cmd, error) {
 	fdIdx := 4 // Skip stdin, stdout, stderr, and the arg fds.
 	type fileWritersFn func() error
 	var fileWriters []fileWritersFn
@@ -217,12 +217,6 @@ func run(cfg *config.Config, cmdPath string, cmdArgs []string, extraBwrapArgs []
 		// XDG_RUNTIME_DIR.
 		"--dir", runtimeDir(),
 		"--setenv", "XDG_RUNTIME_DIR", runtimeDir(),
-
-		// X11, Gtk+.
-		"--setenv", "DISPLAY", ":0",
-		"--ro-bind", "/usr/share/themes", "/usr/share/themes",
-		"--ro-bind", "/usr/share/icons", "/usr/share/icons",
-		"--ro-bind", "/usr/share/mime", "/usr/share/mime",
 	}
 
 	// Append architecture specific directories.
@@ -291,59 +285,67 @@ func run(cfg *config.Config, cmdPath string, cmdArgs []string, extraBwrapArgs []
 		}
 	}
 
-	// Setup access to X11 in the sandbox.
-	xSockArgs, xauth, err := prepareSandboxedX11(cfg)
-	if err != nil {
-		// Failed to determine the X server socket.
-		if xSockArgs == nil {
-			return nil, err
-		}
-
-		// Failure to proxy auth is non-fatal.
-		log.Printf("failed to configure sandboxed x11: %v", err)
-	} else if xauth != nil {
-		if err := newFdFile("/home/amnesia/.Xauthority", xauth); err != nil {
-			return nil, err
-		}
-		bwrapArgs = append(bwrapArgs, "--setenv", "XAUTHORITY", "/home/amnesia/.Xauthority")
-	}
-	bwrapArgs = append(bwrapArgs, xSockArgs...)
-
-	// Configure GTK+.
-	bwrapArgs = append(bwrapArgs, "--setenv", "GTK2_RC_FILES", "/home/amnesia/.gtkrc-2.0")
-	if gtkrc, err := data.Asset("gtkrc-2.0"); err != nil {
-		return nil, err
-	} else if err := newFdFile("/home/amnesia/.gtkrc-2.0", gtkrc); err != nil {
-		return nil, err
-	}
-
-	// Setup access to PulseAudio in the sandbox.
-	if cfg.Sandbox.EnablePulseAudio {
-		paSock, cookie, err := prepareSandboxedPulseAudio(cfg)
+	if x11 {
+		// Setup access to X11 in the sandbox.
+		bwrapArgs = append(bwrapArgs, []string{
+			"--setenv", "DISPLAY", ":0",
+			"--ro-bind", "/usr/share/themes", "/usr/share/themes",
+			"--ro-bind", "/usr/share/icons", "/usr/share/icons",
+			"--ro-bind", "/usr/share/mime", "/usr/share/mime",
+		}...)
+		xSockArgs, xauth, err := prepareSandboxedX11(cfg)
 		if err != nil {
-			// Failure to configure PulseAudio is non-fatal.
-			log.Printf("failed to configure sandboxed PulseAudio")
-		} else {
-			sandboxPulseSock := path.Join(runtimeDir(), "pulse/native")
-			sandboxPulseCookie := path.Join(runtimeDir(), "pulse/cookie")
-			sandboxPulseConf := path.Join(runtimeDir(), "pulse/client.conf")
-			bwrapArgs = append(bwrapArgs, []string{
-				"--bind", paSock, sandboxPulseSock,
-				"--setenv", pulseServer, "unix:" + sandboxPulseSock,
-			}...)
-
-			// Inject a client config that disables shared memory, since
-			// the sandbox has a new IPC namespace.
-			bwrapArgs = append(bwrapArgs, "--setenv", "PULSE_CLIENTCONFIG", sandboxPulseConf)
-			if err := newFdFile(sandboxPulseConf, []byte("enable-shm=no")); err != nil {
+			// Failed to determine the X server socket.
+			if xSockArgs == nil {
 				return nil, err
 			}
 
-			if cookie != nil {
-				if err := newFdFile(sandboxPulseCookie, cookie); err != nil {
+			// Failure to proxy auth is non-fatal.
+			log.Printf("failed to configure sandboxed x11: %v", err)
+		} else if xauth != nil {
+			if err := newFdFile("/home/amnesia/.Xauthority", xauth); err != nil {
+				return nil, err
+			}
+			bwrapArgs = append(bwrapArgs, "--setenv", "XAUTHORITY", "/home/amnesia/.Xauthority")
+		}
+		bwrapArgs = append(bwrapArgs, xSockArgs...)
+
+		// Configure GTK+.
+		bwrapArgs = append(bwrapArgs, "--setenv", "GTK2_RC_FILES", "/home/amnesia/.gtkrc-2.0")
+		if gtkrc, err := data.Asset("gtkrc-2.0"); err != nil {
+			return nil, err
+		} else if err := newFdFile("/home/amnesia/.gtkrc-2.0", gtkrc); err != nil {
+			return nil, err
+		}
+
+		// Setup access to PulseAudio in the sandbox.
+		if cfg.Sandbox.EnablePulseAudio {
+			paSock, cookie, err := prepareSandboxedPulseAudio(cfg)
+			if err != nil {
+				// Failure to configure PulseAudio is non-fatal.
+				log.Printf("failed to configure sandboxed PulseAudio")
+			} else {
+				sandboxPulseSock := path.Join(runtimeDir(), "pulse/native")
+				sandboxPulseCookie := path.Join(runtimeDir(), "pulse/cookie")
+				sandboxPulseConf := path.Join(runtimeDir(), "pulse/client.conf")
+				bwrapArgs = append(bwrapArgs, []string{
+					"--bind", paSock, sandboxPulseSock,
+					"--setenv", pulseServer, "unix:" + sandboxPulseSock,
+				}...)
+
+				// Inject a client config that disables shared memory, since
+				// the sandbox has a new IPC namespace.
+				bwrapArgs = append(bwrapArgs, "--setenv", "PULSE_CLIENTCONFIG", sandboxPulseConf)
+				if err := newFdFile(sandboxPulseConf, []byte("enable-shm=no")); err != nil {
 					return nil, err
 				}
-				bwrapArgs = append(bwrapArgs, "--setenv", pulseCookie, sandboxPulseCookie)
+
+				if cookie != nil {
+					if err := newFdFile(sandboxPulseCookie, cookie); err != nil {
+						return nil, err
+					}
+					bwrapArgs = append(bwrapArgs, "--setenv", pulseCookie, sandboxPulseCookie)
+				}
 			}
 		}
 	}
@@ -475,7 +477,7 @@ func RunTorBrowser(cfg *config.Config, tor *tor.Tor) (*exec.Cmd, error) {
 		return nil, err
 	}
 
-	return run(cfg, cmdPath, cmdArgs, extraBwrapArgs, true)
+	return run(cfg, cmdPath, cmdArgs, extraBwrapArgs, true, true)
 }
 
 func stageUpdate(updateDir, installDir string, mar []byte) error {
@@ -558,11 +560,9 @@ func RunUpdate(cfg *config.Config, mar []byte) error {
 	// 7. For Firefox 40.x and above run the following from the command prompto
 	//    after adding the path to the existing installation directory to the
 	//    LD_LIBRARY_PATH environment variable.
-	//
-	// XXX: Don't setup X11 in the sandbox.
 	cmdPath := path.Join(updateDir, "updater")
 	cmdArgs := []string{updateDir, browserHome, browserHome}
-	cmd, err := run(cfg, cmdPath, cmdArgs, extraBwrapArgs, false)
+	cmd, err := run(cfg, cmdPath, cmdArgs, extraBwrapArgs, false, false)
 	if err != nil {
 		return err
 	}
