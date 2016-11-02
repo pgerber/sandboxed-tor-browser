@@ -156,6 +156,12 @@ func (cfg *Config) SetInstalled(i *Installed) {
 	cfg.Installed = i
 }
 
+// SetInstalledVersion sets the installed version and marks the config dirty.
+func (cfg *Config) SetInstalledVersion(v string) {
+	cfg.isDirty = true
+	cfg.Installed.Version = v
+}
+
 // NeedsInstall returns true if the bundle needs to be (re)installed.
 func (cfg *Config) NeedsInstall() bool {
 	if cfg.Installed == nil {
@@ -179,6 +185,15 @@ func (cfg *Config) NeedsUpdateCheck() bool {
 	const updateInterval = 60 * 60 * 12 // 12 hours.
 	now := time.Now().Unix()
 	return now > cfg.Installed.LastUpdateCheck+updateInterval
+}
+
+// SetLastUpdateCheck sets the last update check time and marks the config
+// dirty.
+func (cfg *Config) SetLastUpdateCheck(t int64) {
+	if cfg.Installed.LastUpdateCheck != t {
+		cfg.isDirty = true
+	}
+	cfg.Installed.LastUpdateCheck = t
 }
 
 // Sync flushes config changes to disk, if the config is dirty.

@@ -35,7 +35,9 @@ const (
 
 var tbbMARCerts []*x509.Certificate
 
-func verifyTorBrowserMAR(mar []byte) error {
+// VerifyTorBrowserMAR validates the MAR signature against the TBB MAR signing
+// keys.
+func VerifyTorBrowserMAR(mar []byte) error {
 	marLen := len(mar)
 	h := sha512.New()
 

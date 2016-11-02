@@ -20,6 +20,7 @@ package installer
 
 import (
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 
 	"cmd/sandboxed-tor-browser/internal/data"
@@ -70,6 +71,33 @@ func GetDownloadsEntry(cfg *config.Config, b []byte) (string, *DownloadsEntry, e
 	}
 }
 
+type updates struct {
+        XMLName xml.Name       `xml:"updates"`
+        Update  []*UpdateEntry  `xml:"update"`
+}
+
+// UpdateEntry is a MAR update entry.
+type UpdateEntry struct {
+        Type            string        `xml:"type,attr"`
+        DisplayVersion  string        `xml:"displayVersion,attr"`
+        AppVersion      string        `xml:"appVersion,attr"`
+        PlatformVersion string        `xml:"platformVersion,attr"`
+        BuildID         string        `xml:"buildID,attr"`
+        DetailsURL      string        `xml:"detailsURL,attr"`
+        Actions         string        `xml:"actions,attr"`
+        OpenURL         string        `xml:"openURL,attr"`
+        Patch           []Patch       `xml:"patch"`
+}
+
+// Patch is an update patch.
+type Patch struct {
+        Url          string `xml:"URL,attr"`
+        HashFunction string `xml:"hashFunction,attr"`
+        HashValue    string `xml:"hashValue,attr"`
+        Size         int    `xml:"size,attr"`
+        Type         string `xml:"type,attr"`
+}
+
 // UpdateURL returns the update check URL for the installed bundle.
 func UpdateURL(cfg *config.Config) (string, error) {
 	if cfg.NeedsInstall() {
@@ -86,6 +114,22 @@ func UpdateURL(cfg *config.Config) (string, error) {
 		return "", fmt.Errorf("unsupported architecture for update: %v", cfg.Installed.Architecture)
 	}
 	return fmt.Sprintf("%s/%s/%s/%s/%s", urls.UpdateURLBase, cfg.Installed.Channel, arch, cfg.Installed.Version, cfg.Installed.Locale), nil
+}
+
+// GetUpdateEntry parses the xml file and returns the UpdateEntry if any.
+func GetUpdateEntry(b []byte) (*UpdateEntry, error) {
+	u := &updates{}
+	if err := xml.Unmarshal(b, &u); err != nil {
+		return nil, err
+	}
+	if u.Update == nil {
+		return nil, nil
+	}
+
+	if len(u.Update) != 1 {
+		return nil, fmt.Errorf("more than one update listed in XML file")
+	}
+	return u.Update[0], nil
 }
 
 func init() {

@@ -49,6 +49,11 @@ func (d *installDialog) onOk() error {
 		return err
 	}
 
+	// No install to be done.
+	if !d.ui.Cfg.NeedsInstall() {
+		return nil
+	}
+
 	// Configure the progress bar dialog.
 	d.ui.progressDialog.setTitle("Installing Tor Browser")
 	d.ui.progressDialog.setText("Initializing installation process...")

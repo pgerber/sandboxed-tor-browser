@@ -19,7 +19,7 @@
 package sandbox
 
 import (
-	_ "bytes"
+	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -516,9 +516,11 @@ func stageUpdate(updateDir, installDir string, mar []byte) error {
 	if err := copyFile(path.Join(installDir, "Browser", "updater"), path.Join(updateDir, "updater")); err != nil {
 		return err
 	}
+/*
 	if err := copyFile(path.Join(installDir, "Browser", "updater.ini"), path.Join(updateDir, "updater.ini")); err != nil {
 		return err
 	}
+*/
 
 	// 3. Download the appropriate .mar file and put it into the outside
 	//    directory you created (see Where to get a mar file).
@@ -530,16 +532,15 @@ func stageUpdate(updateDir, installDir string, mar []byte) error {
 	return nil
 }
 
-/*
 func RunUpdate(cfg *config.Config, mar []byte) error {
 	// https://wiki.mozilla.org/Software_Update:Manually_Installing_a_MAR_file
 
 	const (
-		installDir = "/home/amnesia/sandboxed-tor-browser/tor-browser"
+		installDir = "/home/amnesia/sandboxed-tor-browser/tor-browser-2"
 		updateDir  = "/home/amnesia/sandboxed-tor-browser/update"
 	)
-	realInstallDir := path.Join(cfg.UserDataDir(), "tor-browser")
-	realUpdateDir := path.Join(cfg.UserDataDir(), "update")
+	realInstallDir := cfg.BundleInstallDir
+	realUpdateDir := path.Join(cfg.UserDataDir, "update")
 
 	// Setup the bwrap args for `updater`.
 	extraBwrapArgs := []string{
@@ -560,6 +561,8 @@ func RunUpdate(cfg *config.Config, mar []byte) error {
 	// 7. For Firefox 40.x and above run the following from the command prompto
 	//    after adding the path to the existing installation directory to the
 	//    LD_LIBRARY_PATH environment variable.
+	//
+	// XXX: Don't setup X11 in the sandbox.
 	cmdPath := path.Join(updateDir, "updater")
 	cmdArgs := []string{updateDir, browserHome, browserHome}
 	cmd, err := run(cfg, cmdPath, cmdArgs, extraBwrapArgs, false)
@@ -584,4 +587,3 @@ func RunUpdate(cfg *config.Config, mar []byte) error {
 
 	return nil
 }
-*/

@@ -18,17 +18,18 @@
 package installer
 
 import (
-	"bytes"
-	"crypto/sha512"
-	"encoding/hex"
+_	"bytes"
+_	"crypto/sha512"
+_	"encoding/hex"
 	"encoding/xml"
-	"fmt"
-	"log"
-	"runtime"
+_	"fmt"
+_	"log"
+
+_	"runtime"
 
 	"git.schwanenlied.me/yawning/bulb.git"
 
-	"cmd/sandboxed-tor-browser/internal/config"
+_	"cmd/sandboxed-tor-browser/internal/config"
 	"cmd/sandboxed-tor-browser/internal/orhttp"
 _	"cmd/sandboxed-tor-browser/internal/sandbox"
 )
@@ -78,6 +79,7 @@ func getMARDownloads(ctrl *bulb.Conn, url string) (*parsedUpdates, error) {
 	return updates, nil
 }
 
+/*
 func doUpdate(cfg *config.Config, ctrl *bulb.Conn, onDisk *manifest, bundleDownloads *parsedDownloads) error {
 	// Obtain the URL pointing to the XML file listing MAR file(s) available
 	//to download.
@@ -153,13 +155,11 @@ func doUpdate(cfg *config.Config, ctrl *bulb.Conn, onDisk *manifest, bundleDownl
 		return fmt.Errorf("failed to verify MAR signature: %v", err)
 	}
 
-/*
 	// Install the MAR using the `updater` executable, in a sandboxed
 	// enviornment.
 	if err := sandbox.RunUpdate(cfg, bin); err != nil {
 		return fmt.Errorf("failed applying update: %v", err)
 	}
-*/
 
 	// Write out the new manifest and return
 	onDisk.Version = update.AppVersion
@@ -169,3 +169,4 @@ func doUpdate(cfg *config.Config, ctrl *bulb.Conn, onDisk *manifest, bundleDownl
 
 	return nil
 }
+*/

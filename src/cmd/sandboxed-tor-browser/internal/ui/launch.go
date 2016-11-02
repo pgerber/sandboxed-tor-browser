@@ -52,27 +52,15 @@ func (c *Common) DoLaunch(async *Async, checkUpdates bool) {
 	async.UpdateProgress("Connecting to the Tor network.")
 	dialFn, err := c.launchTor(async, false)
 	if err != nil {
+		async.Err = err
 		return
 	}
 
 	// If an update check is needed, check for updates.
 	if checkUpdates {
-		// Check for updates.
-		log.Printf("launch: Checking for updates.")
-		async.UpdateProgress("Checking for updates.")
-
-		// XXX: Wrap dialFn in a HPKP dialer.
-		_ = dialFn
-
-		// If an update is required do the update.
-
-		// Restart tor if we launched it.
-		if !c.Cfg.UseSystemTor {
-			log.Printf("launch: Reconnecting to the Tor network.")
-			async.UpdateProgress("Reconnecting to the Tor network.")
-			if _, err = c.launchTor(async, false); err != nil {
-				return
-			}
+		c.doUpdate(async, dialFn)
+		if async.Err != nil {
+			return
 		}
 	}
 

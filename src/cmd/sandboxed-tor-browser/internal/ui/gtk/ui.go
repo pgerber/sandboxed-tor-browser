@@ -68,7 +68,6 @@ func (ui *gtkUI) Run() error {
 				return nil
 			} else {
 				if err := ui.installDialog.onOk(); err != nil {
-					// XXX: Drop back to the installation screen.
 					if err != sbui.ErrCanceled {
 						ui.bitch("Failed to install: %v", err)
 						return err

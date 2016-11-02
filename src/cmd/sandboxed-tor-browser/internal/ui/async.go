@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"net/http"
 	"runtime"
 	"time"
 
@@ -99,4 +100,17 @@ func NewAsync() *Async {
 	async.Done = make(chan interface{})
 	async.ToUI = make(chan interface{})
 	return async
+}
+
+func newHPKPGrabClient(dialFn dialFunc) *grab.Client {
+	// XXX: Wrap dialFn in a HPKP dialer.
+
+	// Create the async HTTP client.
+	client := grab.NewClient()
+	client.UserAgent = ""
+	client.HTTPClient.Transport = &http.Transport{
+		Proxy: nil,
+		Dial:  dialFn,
+	}
+	return client
 }

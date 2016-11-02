@@ -19,21 +19,21 @@ package installer
 
 import (
 	_ "archive/tar"
-	"bytes"
-	"fmt"
+_	"bytes"
+_	"fmt"
 	_ "io"
 	"io/ioutil"
-	"log"
-	"os"
-	"path"
-	"runtime"
+_	"log"
+_	"os"
+_	"path"
+_	"runtime"
 	_ "strings"
 
 	"git.schwanenlied.me/yawning/bulb.git"
-	"github.com/ulikunitz/xz"
-	"golang.org/x/crypto/openpgp"
+_	"github.com/ulikunitz/xz"
+_	"golang.org/x/crypto/openpgp"
 
-	"cmd/sandboxed-tor-browser/internal/config"
+_	"cmd/sandboxed-tor-browser/internal/config"
 	"cmd/sandboxed-tor-browser/internal/orhttp"
 )
 
@@ -109,7 +109,6 @@ func untar(r io.Reader, destDir string) error {
 	}
 	return nil
 }
-*/
 
 func overrideBundlePrefs(cfg *config.Config) error {
 	// Open the user preferences file for append only.
@@ -197,11 +196,9 @@ func doInstall(cfg *config.Config, ctrl *bulb.Conn, onDisk *manifest, bundleDown
 	}
 	_ = xzr
 
-	/*
-		if err := untar(xzr, cfg.BundleInstallDir()); err != nil {
-			return fmt.Errorf("failed to untar: %v", err)
-		}
-	*/
+	if err := untar(xzr, cfg.BundleInstallDir()); err != nil {
+		return fmt.Errorf("failed to untar: %v", err)
+	}
 
 	// Override bundle prefs.
 	if err := overrideBundlePrefs(cfg); err != nil {
@@ -275,3 +272,4 @@ func Install(cfg *config.Config) error {
 	// Installation is required.
 	return doInstall(cfg, ctrl, onDisk, bundleDownloads)
 }
+*/

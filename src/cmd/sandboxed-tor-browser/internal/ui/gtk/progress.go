@@ -79,7 +79,13 @@ func (d *progressDialog) run(async *sbui.Async, runFn func()) {
 
 	go runFn()
 
-	defer d.dialog.Hide()
+	defer func() {
+		// Hide the dialog, and execute the event loop till done.
+		d.dialog.Hide()
+		for gtk3.EventsPending() {
+			gtk3.MainIteration()
+		}
+	}()
 	if d.dialog.Run() != int(gtk3.RESPONSE_OK) {
 		if !cancel {
 			cancel = true
