@@ -42,7 +42,7 @@ const (
 	controlSocket     = "control"
 	socksSocket       = "socks"
 
-	browserHome = "/home/amnesia/sandboxed-tor-browser/tor-browser-2/Browser"
+	browserHome = "/home/amnesia/sandboxed-tor-browser/tor-browser/Browser"
 )
 
 func runtimeDir() string {
@@ -516,11 +516,6 @@ func stageUpdate(updateDir, installDir string, mar []byte) error {
 	if err := copyFile(path.Join(installDir, "Browser", "updater"), path.Join(updateDir, "updater")); err != nil {
 		return err
 	}
-	/*
-		if err := copyFile(path.Join(installDir, "Browser", "updater.ini"), path.Join(updateDir, "updater.ini")); err != nil {
-			return err
-		}
-	*/
 
 	// 3. Download the appropriate .mar file and put it into the outside
 	//    directory you created (see Where to get a mar file).
@@ -536,7 +531,7 @@ func RunUpdate(cfg *config.Config, mar []byte) error {
 	// https://wiki.mozilla.org/Software_Update:Manually_Installing_a_MAR_file
 
 	const (
-		installDir = "/home/amnesia/sandboxed-tor-browser/tor-browser-2"
+		installDir = "/home/amnesia/sandboxed-tor-browser/tor-browser"
 		updateDir  = "/home/amnesia/sandboxed-tor-browser/update"
 	)
 	realInstallDir := cfg.BundleInstallDir

@@ -52,10 +52,7 @@ Upstream Bugs:
 Notes:
 
  * Follows the XDG Base Dir specification.
- * Configuration via a TOML file.  No it's not documented.  Read the code.
- * It can take a while for the browser window to actually appear because it
-   is checking for updates over Tor, and potentially installing/updating the
-   bundle (also over Tor).
+ * Configuration via a JSON file.  No it's not documented.  Read the code.
  * Questions that could be answered by reading the code will be ignored.
  * Unless you're capable of debugging it, don't use it, and don't contact me
    about it.

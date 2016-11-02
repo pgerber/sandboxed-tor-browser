@@ -45,7 +45,7 @@ const (
 	archLinux64    = "linux64"
 
 	appDir           = "sandboxed-tor-browser"
-	bundleInstallDir = "tor-browser-2" // XXX: Change this.
+	bundleInstallDir = "tor-browser"
 )
 
 // Config is the sandboxed-tor-browser configuration instance.
