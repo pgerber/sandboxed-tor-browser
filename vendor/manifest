@@ -14,6 +14,12 @@
 			"branch": "master"
 		},
 		{
+			"importpath": "git.schwanenlied.me/yawning/hpkp.git",
+			"repository": "https://git.schwanenlied.me/yawning/hpkp.git",
+			"revision": "133ec03705a0b006b11a0b6256109a538ba89ac6",
+			"branch": "master"
+		},
+		{
 			"importpath": "github.com/cep21/xdgbasedir",
 			"repository": "https://github.com/cep21/xdgbasedir",
 			"revision": "cd6a71c07e4e43eec22cbf1606ff14c327207445",
