@@ -42,7 +42,7 @@ const (
 	controlSocket     = "control"
 	socksSocket       = "socks"
 
-	browserHome = "/home/amnesia/sandboxed-tor-browser/tor-browser/Browser"
+	browserHome = "/home/amnesia/sandboxed-tor-browser/tor-browser-2/Browser"
 )
 
 func runtimeDir() string {
