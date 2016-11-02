@@ -25,8 +25,9 @@ import (
 type progressDialog struct {
 	ui *gtkUI
 
-	dialog       *gtk3.Dialog
-	progressText *gtk3.Label
+	dialog         *gtk3.Dialog
+	progressText   *gtk3.Label
+	progressCancel *gtk3.Button
 
 	updateCh chan string
 }
@@ -43,6 +44,7 @@ func (d *progressDialog) run(async *sbui.Async, runFn func()) {
 	const updateInterval = 100 // ms
 	cancel := false
 
+	d.progressCancel.SetSensitive(true)
 	d.updateCh = make(chan string, 2) // HACKHACKHACKHACK
 	async.UpdateProgress = func(s string) { d.updateCh <- s }
 
@@ -63,6 +65,9 @@ func (d *progressDialog) run(async *sbui.Async, runFn func()) {
 				d.emitCancel()
 			}
 			return false
+		case t := <-async.ToUI:
+			allowCancel := t.(bool)
+			d.progressCancel.SetSensitive(allowCancel)
 		default:
 		}
 
@@ -77,8 +82,6 @@ func (d *progressDialog) run(async *sbui.Async, runFn func()) {
 	defer d.dialog.Hide()
 	if d.dialog.Run() != int(gtk3.RESPONSE_OK) {
 		if !cancel {
-			async.Lock()
-			defer async.Unlock()
 			cancel = true
 			async.Cancel <- true
 			<-async.Done
@@ -119,10 +122,17 @@ func (ui *gtkUI) initProgressDialog(b *gtk3.Builder) error {
 			img.SetFromPixbuf(ui.iconPixbuf)
 		}
 
-		// Labels.
+		// Label.
 		if obj, err = b.GetObject("progressText"); err != nil {
 			return err
 		} else if d.progressText, ok = obj.(*gtk3.Label); !ok {
+			return err
+		}
+
+		// Button.
+		if obj, err = b.GetObject("progressCancelButton"); err != nil {
+			return err
+		} else if d.progressCancel, ok = obj.(*gtk3.Button); !ok {
 			return err
 		}
 	}

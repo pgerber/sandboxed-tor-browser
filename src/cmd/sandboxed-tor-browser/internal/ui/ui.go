@@ -30,7 +30,6 @@ import (
 	"os"
 	"path"
 	"runtime"
-	"sync"
 	"time"
 
 	"git.schwanenlied.me/yawning/grab.git"
@@ -55,13 +54,14 @@ var ErrCanceled = errors.New("async operation canceled")
 // Async is the structure containing the bits needed to communicate from
 // a long running async task back to the UI (eg: Installation).
 type Async struct {
-	sync.Mutex
-
 	// Cancel is used to signal cancelation to the task.
 	Cancel chan interface{}
 
 	// Done is used to signal completion to the UI.
 	Done chan interface{}
+
+	// ToUI is used to pass data from the task.
+	ToUI chan interface{}
 
 	// Err is the final completion status.
 	Err error
@@ -119,6 +119,7 @@ func NewAsync() *Async {
 	async := new(Async)
 	async.Cancel = make(chan interface{})
 	async.Done = make(chan interface{})
+	async.ToUI = make(chan interface{})
 	return async
 }
 
@@ -271,8 +272,7 @@ func (c *Common) DoInstall(async *Async) {
 	}
 
 	// Lock out and ignore cancelation, since things are basically done.
-	async.Lock()
-	defer async.Unlock()
+	async.ToUI <- false
 
 	// XXX: Install the autoconfig stuff.
 
