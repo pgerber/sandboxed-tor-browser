@@ -18,13 +18,16 @@ package ui
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
+	"path"
 	"runtime"
 	"time"
 
 	"git.schwanenlied.me/yawning/grab.git"
 
+	"cmd/sandboxed-tor-browser/internal/data"
 	"cmd/sandboxed-tor-browser/internal/installer"
 	"cmd/sandboxed-tor-browser/internal/ui/config"
 )
@@ -128,7 +131,10 @@ func (c *Common) DoInstall(async *Async) {
 	// Lock out and ignore cancelation, since things are basically done.
 	async.ToUI <- false
 
-	// XXX: Install the autoconfig stuff.
+	// Install the autoconfig stuff.
+	if async.Err = writeAutoconfig(c.Cfg); async.Err != nil {
+		return
+	}
 
 	// Set the manifest portion of the config.
 	c.Cfg.SetInstalled(&config.Installed{
@@ -141,4 +147,22 @@ func (c *Common) DoInstall(async *Async) {
 
 	// Sync the config, and return.
 	async.Err = c.Cfg.Sync()
+}
+
+func writeAutoconfig(cfg *config.Config) error {
+	autoconfigFile := path.Join(cfg.BundleInstallDir, "Browser", "defaults", "pref", "autoconfig.js")
+	if b, err := data.Asset("installer/autoconfig.js"); err != nil {
+		return err
+	} else if err = ioutil.WriteFile(autoconfigFile, b, config.FileMode); err != nil {
+		return err
+	}
+
+	mozillacfgFile := path.Join(cfg.BundleInstallDir, "Browser", "mozilla.cfg")
+	if b, err := data.Asset("installer/mozilla.cfg"); err != nil {
+		return err
+	} else if err = ioutil.WriteFile(mozillacfgFile, b, config.FileMode); err != nil {
+		return err
+	}
+
+	return nil
 }
