@@ -397,16 +397,21 @@ func RunTorBrowser(cfg *config.Config, tor *tor.Tor) (*exec.Cmd, error) {
 	realCachesDir := path.Join(realBrowserHome, cachesSubDir)
 	realDesktopDir := path.Join(realBrowserHome, "Desktop")
 	realDownloadsDir := path.Join(realBrowserHome, "Downloads")
-	if err := os.MkdirAll(realDownloadsDir, os.ModeDir|0700); err != nil { // Make mountpoint before overriding.
+
+	// Ensure that the `Downloads` and `Desktop` mount points exist.
+	if err := os.MkdirAll(realDesktopDir, os.ModeDir|0700); err != nil {
 		return nil, err
 	}
-/*
-	if cfg.DownloadsDirectory != "" {
-		realDownloadsDir = cfg.DownloadsDirectory
-	}
-*/
-	if err := os.MkdirAll(realDesktopDir, os.ModeDir|0700); err != nil { // XXX: Allow override.
+	if err := os.MkdirAll(realDownloadsDir, os.ModeDir|0700); err != nil {
 		return nil, err
+	}
+
+	// Apply directory overrides.
+	if cfg.Sandbox.DesktopDir != "" {
+		realDesktopDir = cfg.Sandbox.DesktopDir
+	}
+	if cfg.Sandbox.DownloadsDir != "" {
+		realDownloadsDir = cfg.Sandbox.DownloadsDir
 	}
 
 	profileDir := path.Join(browserHome, profileSubDir)

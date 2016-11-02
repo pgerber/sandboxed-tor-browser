@@ -77,13 +77,13 @@ type Config struct {
 	SystemTorControlAddr string `json:"-"`
 
 	// RumtineDir is `$XDG_RUNTIME_DIR/appDir`.
-	RuntimeDir string
+	RuntimeDir string `json:"-"`
 
 	// UserDataDir is `$XDG_USER_DATA_DIR/appDir`.
-	UserDataDir string
+	UserDataDir string `json:"-"`
 
 	// BundeInstallDir is `UserDataDir/bundleInstallDir`.
-	BundleInstallDir string
+	BundleInstallDir string `json:"-"`
 
 	isDirty bool
 	path    string
@@ -124,6 +124,14 @@ type Sandbox struct {
 	// EnablePulseAudio enables access to the host PulseAudio daemon inside the
 	// sandbox.
 	EnablePulseAudio bool `json:"enablePulseAudio"`
+
+	// DesktopDir is the directory to be bind mounted instead of the default
+	// bundle Desktop directory.
+	DesktopDir string `json:"desktopDir,omitEmpty"`
+
+	// DownloadsDir is the directory to be bind mounted instead of the default
+	// bundle Downloads directory.
+	DownloadsDir string `json:"downloadsDir,omitEmpty"`
 }
 
 // SetLocale sets the configured locale, and marks the config dirty.
