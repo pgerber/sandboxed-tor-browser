@@ -338,12 +338,10 @@ func (c *ctrlProxyConn) onCmdSignal(splitCmd []string, raw []byte) error {
 		_, err := c.appConnWrite([]byte(respStr))
 		return err
 	} else {
-		// XXX: This is wrong, we need to issue a NEWNYM or unexpected things.
-		// happen with hidden service state.
-		//
-		// Since we are appending our own nonce to the SOCKS auth, we can
-		// entirely omit the NEWNYM as long as we refresh the nonce.
 		if err := c.socks.newTag(); err != nil {
+			return c.sendErrUnspecifiedTor()
+		}
+		if err := c.tor.Newnym(); err != nil {
 			return c.sendErrUnspecifiedTor()
 		}
 		_, err := c.appConnWrite([]byte(responseOk))

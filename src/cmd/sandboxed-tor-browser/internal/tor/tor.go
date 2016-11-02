@@ -75,6 +75,18 @@ func (t *Tor) SocksPort() (net, addr string, err error) {
 	return t.ctrl.SocksPort()
 }
 
+// Newnym issues a `SIGNAL NWENYM`.
+func (t *Tor) Newnym() error {
+	t.Lock()
+	defer t.Unlock()
+
+	if t.ctrl == nil {
+		return ErrTorNotRunning
+	}
+	_, err := t.ctrl.Request("SIGNAL NEWNYM")
+	return err
+}
+
 // Shutdown attempts to gracefully clean up the Tor instance.  If it is a
 // system tor, only the control port connection will be closed.  Otherwise,
 // the tor daemon will be SIGTERMed.
