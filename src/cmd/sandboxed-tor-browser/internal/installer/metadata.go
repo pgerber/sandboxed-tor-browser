@@ -72,30 +72,30 @@ func GetDownloadsEntry(cfg *config.Config, b []byte) (string, *DownloadsEntry, e
 }
 
 type updates struct {
-        XMLName xml.Name       `xml:"updates"`
-        Update  []*UpdateEntry  `xml:"update"`
+	XMLName xml.Name       `xml:"updates"`
+	Update  []*UpdateEntry `xml:"update"`
 }
 
 // UpdateEntry is a MAR update entry.
 type UpdateEntry struct {
-        Type            string        `xml:"type,attr"`
-        DisplayVersion  string        `xml:"displayVersion,attr"`
-        AppVersion      string        `xml:"appVersion,attr"`
-        PlatformVersion string        `xml:"platformVersion,attr"`
-        BuildID         string        `xml:"buildID,attr"`
-        DetailsURL      string        `xml:"detailsURL,attr"`
-        Actions         string        `xml:"actions,attr"`
-        OpenURL         string        `xml:"openURL,attr"`
-        Patch           []Patch       `xml:"patch"`
+	Type            string  `xml:"type,attr"`
+	DisplayVersion  string  `xml:"displayVersion,attr"`
+	AppVersion      string  `xml:"appVersion,attr"`
+	PlatformVersion string  `xml:"platformVersion,attr"`
+	BuildID         string  `xml:"buildID,attr"`
+	DetailsURL      string  `xml:"detailsURL,attr"`
+	Actions         string  `xml:"actions,attr"`
+	OpenURL         string  `xml:"openURL,attr"`
+	Patch           []Patch `xml:"patch"`
 }
 
 // Patch is an update patch.
 type Patch struct {
-        Url          string `xml:"URL,attr"`
-        HashFunction string `xml:"hashFunction,attr"`
-        HashValue    string `xml:"hashValue,attr"`
-        Size         int    `xml:"size,attr"`
-        Type         string `xml:"type,attr"`
+	Url          string `xml:"URL,attr"`
+	HashFunction string `xml:"hashFunction,attr"`
+	HashValue    string `xml:"hashValue,attr"`
+	Size         int    `xml:"size,attr"`
+	Type         string `xml:"type,attr"`
 }
 
 // UpdateURL returns the update check URL for the installed bundle.

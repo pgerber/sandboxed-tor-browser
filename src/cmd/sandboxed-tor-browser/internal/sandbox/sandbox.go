@@ -516,11 +516,11 @@ func stageUpdate(updateDir, installDir string, mar []byte) error {
 	if err := copyFile(path.Join(installDir, "Browser", "updater"), path.Join(updateDir, "updater")); err != nil {
 		return err
 	}
-/*
-	if err := copyFile(path.Join(installDir, "Browser", "updater.ini"), path.Join(updateDir, "updater.ini")); err != nil {
-		return err
-	}
-*/
+	/*
+		if err := copyFile(path.Join(installDir, "Browser", "updater.ini"), path.Join(updateDir, "updater.ini")); err != nil {
+			return err
+		}
+	*/
 
 	// 3. Download the appropriate .mar file and put it into the outside
 	//    directory you created (see Where to get a mar file).
