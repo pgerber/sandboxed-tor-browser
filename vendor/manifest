@@ -14,12 +14,6 @@
 			"branch": "master"
 		},
 		{
-			"importpath": "github.com/BurntSushi/toml",
-			"repository": "https://github.com/BurntSushi/toml",
-			"revision": "99064174e013895bbd9b025c31100bd1d9b590ca",
-			"branch": "master"
-		},
-		{
 			"importpath": "github.com/cep21/xdgbasedir",
 			"repository": "https://github.com/cep21/xdgbasedir",
 			"revision": "cd6a71c07e4e43eec22cbf1606ff14c327207445",
