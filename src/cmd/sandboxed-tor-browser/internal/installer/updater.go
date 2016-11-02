@@ -30,7 +30,7 @@ import (
 
 	"cmd/sandboxed-tor-browser/internal/config"
 	"cmd/sandboxed-tor-browser/internal/orhttp"
-	"cmd/sandboxed-tor-browser/internal/sandbox"
+_	"cmd/sandboxed-tor-browser/internal/sandbox"
 )
 
 type parsedUpdates struct {
@@ -153,11 +153,13 @@ func doUpdate(cfg *config.Config, ctrl *bulb.Conn, onDisk *manifest, bundleDownl
 		return fmt.Errorf("failed to verify MAR signature: %v", err)
 	}
 
+/*
 	// Install the MAR using the `updater` executable, in a sandboxed
 	// enviornment.
 	if err := sandbox.RunUpdate(cfg, bin); err != nil {
 		return fmt.Errorf("failed applying update: %v", err)
 	}
+*/
 
 	// Write out the new manifest and return
 	onDisk.Version = update.AppVersion

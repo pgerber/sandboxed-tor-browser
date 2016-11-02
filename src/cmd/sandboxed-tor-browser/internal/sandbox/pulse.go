@@ -25,7 +25,7 @@ import (
 
 	xdg "github.com/cep21/xdgbasedir"
 
-	"cmd/sandboxed-tor-browser/internal/config"
+	"cmd/sandboxed-tor-browser/internal/ui/config"
 )
 
 const (
@@ -35,6 +35,10 @@ const (
 
 func prepareSandboxedPulseAudio(cfg *config.Config) (string, []byte, error) {
 	const unixPrefix = "unix:"
+
+	if !cfg.Sandbox.EnablePulseAudio {
+		return "", nil, fmt.Errorf("bug: PulseAudio prepared when not configured")
+	}
 
 	// TODO: PulseAudio can optionally store information regarding the location
 	// of the socket and the cookie contents as X11 root window properties.

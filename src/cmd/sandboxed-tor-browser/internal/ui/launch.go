@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"log"
 	"runtime"
+
+	"cmd/sandboxed-tor-browser/internal/sandbox"
 )
 
 // DoLaunch executes the launch step based on the configured parameters.
@@ -55,13 +57,12 @@ func (c *Common) DoLaunch(async *Async, checkUpdates bool) {
 
 	// If an update check is needed, check for updates.
 	if checkUpdates {
+		// Check for updates.
 		log.Printf("launch: Checking for updates.")
 		async.UpdateProgress("Checking for updates.")
 
 		// XXX: Wrap dialFn in a HPKP dialer.
 		_ = dialFn
-
-		// Check for updates.
 
 		// If an update is required do the update.
 
@@ -78,4 +79,6 @@ func (c *Common) DoLaunch(async *Async, checkUpdates bool) {
 	// Launch the sandboxed Tor Browser.
 	log.Printf("launch: Starting Tor Browser.")
 	async.UpdateProgress("Starting Tor Browser.")
+
+	c.Sandbox, async.Err = sandbox.RunTorBrowser(c.Cfg, c.tor)
 }

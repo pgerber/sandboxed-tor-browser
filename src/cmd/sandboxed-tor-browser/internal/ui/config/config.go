@@ -112,6 +112,10 @@ type Installed struct {
 type Sandbox struct {
 	cfg *Config
 
+	// Display is the X11 DISPLAY to use in the sandbox.  If omitted, the
+	// host system DISPLAY from the env var will be used.
+	Display string `json:"display,omitEmpty"`
+
 	// VolatileExtensionsDir mounts the extensions directorey read/write to
 	// allow the installation of addons.  The addon auto-update mechanism is
 	// still left disabled.

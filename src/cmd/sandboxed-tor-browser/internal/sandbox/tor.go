@@ -32,8 +32,9 @@ import (
 	"strings"
 	"sync"
 
-	"cmd/sandboxed-tor-browser/internal/config"
 	"cmd/sandboxed-tor-browser/internal/socks5"
+	"cmd/sandboxed-tor-browser/internal/tor"
+	"cmd/sandboxed-tor-browser/internal/ui/config"
 )
 
 const (
@@ -163,24 +164,19 @@ func (p *socksProxy) copyLoop(upConn, downConn net.Conn) {
 	wg.Wait()
 }
 
-func launchSocksProxy(cfg *config.Config) (*socksProxy, error) {
+func launchSocksProxy(cfg *config.Config, tor *tor.Tor) (*socksProxy, error) {
 	p := new(socksProxy)
 	if err := p.newTag(); err != nil {
 		return nil, err
 	}
 
-	ctrl, err := cfg.DialControlPort()
-	if err != nil {
-		return nil, err
-	}
-	defer ctrl.Close()
-
-	p.sNet, p.sAddr, err = ctrl.SocksPort()
+	var err error
+	p.sNet, p.sAddr, err = tor.SocksPort()
 	if err != nil {
 		return nil, err
 	}
 
-	sPath := path.Join(cfg.RuntimeDir(), socksSocket)
+	sPath := path.Join(cfg.RuntimeDir, socksSocket)
 	os.Remove(sPath)
 	p.l, err = net.Listen("unix", sPath)
 	if err != nil {
@@ -193,8 +189,8 @@ func launchSocksProxy(cfg *config.Config) (*socksProxy, error) {
 }
 
 type ctrlProxyConn struct {
-	cfg           *config.Config
 	socks         *socksProxy
+	tor           *tor.Tor
 	appConn       net.Conn
 	appConnReader *bufio.Reader
 	isPreAuth     bool
@@ -342,6 +338,9 @@ func (c *ctrlProxyConn) onCmdSignal(splitCmd []string, raw []byte) error {
 		_, err := c.appConnWrite([]byte(respStr))
 		return err
 	} else {
+		// XXX: This is wrong, we need to issue a NEWNYM or unexpected things.
+		// happen with hidden service state.
+		//
 		// Since we are appending our own nonce to the SOCKS auth, we can
 		// entirely omit the NEWNYM as long as we refresh the nonce.
 		if err := c.socks.newTag(); err != nil {
@@ -365,8 +364,8 @@ func (c *ctrlProxyConn) handle() {
 }
 
 type ctrlProxy struct {
-	cfg   *config.Config
 	socks *socksProxy
+	tor   *tor.Tor
 
 	l net.Listener
 }
@@ -389,24 +388,21 @@ func (p *ctrlProxy) acceptLoop() {
 
 func (p *ctrlProxy) handleConn(conn net.Conn) {
 	c := &ctrlProxyConn{
-		cfg:           p.cfg,
 		socks:         p.socks,
+		tor:           p.tor,
 		appConn:       conn,
 		appConnReader: bufio.NewReader(conn),
 	}
 	go c.handle()
 }
 
-func launchCtrlProxy(cfg *config.Config, socks *socksProxy) error {
+func launchCtrlProxy(cfg *config.Config, socks *socksProxy, tor *tor.Tor) error {
 	p := new(ctrlProxy)
-	p.cfg = cfg
 	p.socks = socks
-
-	// XXX: Connect to the upstream control port, and start the circuit
-	// monitor.
+	p.tor = tor
 
 	var err error
-	cPath := path.Join(cfg.RuntimeDir(), controlSocket)
+	cPath := path.Join(cfg.RuntimeDir, controlSocket)
 	os.Remove(cPath)
 	p.l, err = net.Listen("unix", cPath)
 	if err != nil {

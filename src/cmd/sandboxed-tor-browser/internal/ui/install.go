@@ -1,4 +1,4 @@
-// install.go - Install/Update logic.
+// install.go - Install logic.
 // Copyright (C) 2016  Yawning Angel.
 //
 // This program is free software: you can redistribute it and/or modify

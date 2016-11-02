@@ -19,7 +19,7 @@
 package sandbox
 
 import (
-	"bytes"
+	_ "bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -32,8 +32,9 @@ import (
 
 	seccomp "github.com/seccomp/libseccomp-golang"
 
-	"cmd/sandboxed-tor-browser/internal/config"
 	"cmd/sandboxed-tor-browser/internal/data"
+	"cmd/sandboxed-tor-browser/internal/tor"
+	"cmd/sandboxed-tor-browser/internal/ui/config"
 )
 
 const (
@@ -277,8 +278,8 @@ func run(cfg *config.Config, cmdPath string, cmdArgs []string, extraBwrapArgs []
 
 		bwrapArgs = append(bwrapArgs, []string{
 			"--setenv", "LD_PRELOAD", stubPath,
-			"--bind", path.Join(cfg.RuntimeDir(), controlSocket), ctrlPath,
-			"--bind", path.Join(cfg.RuntimeDir(), socksSocket), socksPath,
+			"--bind", path.Join(cfg.RuntimeDir, controlSocket), ctrlPath,
+			"--bind", path.Join(cfg.RuntimeDir, socksSocket), socksPath,
 			"--setenv", "TOR_STUB_CONTROL_SOCKET", ctrlPath,
 			"--setenv", "TOR_STUB_SOCKS_SOCKET", socksPath,
 		}...)
@@ -317,7 +318,7 @@ func run(cfg *config.Config, cmdPath string, cmdArgs []string, extraBwrapArgs []
 	}
 
 	// Setup access to PulseAudio in the sandbox.
-	if cfg.Unsafe.EnablePulseAudio {
+	if cfg.Sandbox.EnablePulseAudio {
 		paSock, cookie, err := prepareSandboxedPulseAudio(cfg)
 		if err != nil {
 			// Failure to configure PulseAudio is non-fatal.
@@ -385,13 +386,13 @@ func run(cfg *config.Config, cmdPath string, cmdArgs []string, extraBwrapArgs []
 	return cmd, nil
 }
 
-func RunTorBrowser(cfg *config.Config) (*exec.Cmd, error) {
+func RunTorBrowser(cfg *config.Config, tor *tor.Tor) (*exec.Cmd, error) {
 	const (
 		profileSubDir = "TorBrowser/Data/Browser/profile.default"
 		cachesSubDir  = "TorBrowser/Data/Browser/Caches"
 	)
 
-	realBrowserHome := path.Join(cfg.UserDataDir(), "tor-browser/Browser")
+	realBrowserHome := path.Join(cfg.BundleInstallDir, "Browser")
 	realProfileDir := path.Join(realBrowserHome, profileSubDir)
 	realCachesDir := path.Join(realBrowserHome, cachesSubDir)
 	realDesktopDir := path.Join(realBrowserHome, "Desktop")
@@ -399,9 +400,11 @@ func RunTorBrowser(cfg *config.Config) (*exec.Cmd, error) {
 	if err := os.MkdirAll(realDownloadsDir, os.ModeDir|0700); err != nil { // Make mountpoint before overriding.
 		return nil, err
 	}
+/*
 	if cfg.DownloadsDirectory != "" {
 		realDownloadsDir = cfg.DownloadsDirectory
 	}
+*/
 	if err := os.MkdirAll(realDesktopDir, os.ModeDir|0700); err != nil { // XXX: Allow override.
 		return nil, err
 	}
@@ -414,7 +417,7 @@ func RunTorBrowser(cfg *config.Config) (*exec.Cmd, error) {
 	// Setup the bwrap args to repliccate start-tor-browser.
 	extraBwrapArgs := []string{
 		// Filesystem stuff.
-		"--ro-bind", cfg.UserDataDir(), "/home/amnesia/sandboxed-tor-browser",
+		"--ro-bind", cfg.UserDataDir, "/home/amnesia/sandboxed-tor-browser",
 		"--bind", realProfileDir, profileDir,
 		"--bind", realDesktopDir, desktopDir,
 		"--bind", realDownloadsDir, downloadsDir,
@@ -447,7 +450,7 @@ func RunTorBrowser(cfg *config.Config) (*exec.Cmd, error) {
 		"--setenv", "TOR_SKIP_LAUNCH", "1",
 		"--setenv", "TOR_NO_DISPLAY_NETWORK_SETTINGS", "1",
 	}
-	if !cfg.Unsafe.VolatileExtensionsDir {
+	if !cfg.Sandbox.VolatileExtensionsDir {
 		// Unless overridden, the extensions directory should be mounted
 		// read-only.
 		extraBwrapArgs = append(extraBwrapArgs, "--ro-bind", path.Join(realProfileDir, "extensions"), path.Join(profileDir, "extensions"))
@@ -456,13 +459,13 @@ func RunTorBrowser(cfg *config.Config) (*exec.Cmd, error) {
 	cmdArgs := []string{"--class", "Tor Browser", "-profile", profileDir}
 
 	// Proxy the SOCKS port into the sandbox.
-	socks, err := launchSocksProxy(cfg)
+	socks, err := launchSocksProxy(cfg, tor)
 	if err != nil {
 		return nil, err
 	}
 
 	// Proxy a restricted control port into the sandbox.
-	if err := launchCtrlProxy(cfg, socks); err != nil {
+	if err := launchCtrlProxy(cfg, socks, tor); err != nil {
 		return nil, err
 	}
 
@@ -522,6 +525,7 @@ func stageUpdate(updateDir, installDir string, mar []byte) error {
 	return nil
 }
 
+/*
 func RunUpdate(cfg *config.Config, mar []byte) error {
 	// https://wiki.mozilla.org/Software_Update:Manually_Installing_a_MAR_file
 
@@ -575,3 +579,4 @@ func RunUpdate(cfg *config.Config, mar []byte) error {
 
 	return nil
 }
+*/

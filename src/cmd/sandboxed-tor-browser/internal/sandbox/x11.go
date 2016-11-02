@@ -25,7 +25,7 @@ import (
 	"path"
 	"strings"
 
-	"cmd/sandboxed-tor-browser/internal/config"
+	"cmd/sandboxed-tor-browser/internal/ui/config"
 )
 
 func x11CraftAuthority(realDisplay string) ([]byte, error) {
@@ -156,7 +156,13 @@ func prepareSandboxedX11(cfg *config.Config) ([]string, []byte, error) {
 	const x11SockDir = "/tmp/.X11-unix"
 
 	// Figure out the X11 display number and socket path.
-	display := cfg.Display
+	display := ""
+	for _, d := range []string{cfg.Sandbox.Display, os.Getenv("DISPLAY")} {
+		if d != "" {
+			display = d
+			break
+		}
+	}
 	if display == "" {
 		return nil, nil, fmt.Errorf("no DISPLAY env var set")
 	}

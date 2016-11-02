@@ -90,8 +90,8 @@ func (ui *gtkUI) Run() error {
 			}
 			continue
 		} else {
-			// XXX: Wait till the child exits.
-			return nil
+			// Wait till the sandboxed process finishes.
+			return ui.Sandbox.Wait()
 		}
 	}
 }

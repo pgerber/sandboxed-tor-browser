@@ -25,6 +25,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/exec"
 	"path"
 
 	"cmd/sandboxed-tor-browser/internal/data"
@@ -51,7 +52,8 @@ type UI interface {
 
 // Common holds ui implementation agnostic state.
 type Common struct {
-	Cfg *config.Config
+	Cfg     *config.Config
+	Sandbox *exec.Cmd
 
 	lock   *lockFile
 	noLock bool
