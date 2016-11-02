@@ -25,6 +25,9 @@ import (
 	"time"
 
 	"git.schwanenlied.me/yawning/grab.git"
+	"git.schwanenlied.me/yawning/hpkp.git"
+
+	"cmd/sandboxed-tor-browser/internal/installer"
 )
 
 // ErrCanceled is the error set when an async operation was canceled.
@@ -102,15 +105,24 @@ func NewAsync() *Async {
 	return async
 }
 
-func newHPKPGrabClient(dialFn dialFunc) *grab.Client {
-	// XXX: Wrap dialFn in a HPKP dialer.
-
+func newGrabClient(dialFn dialFunc, dialTLSFn dialFunc) *grab.Client {
 	// Create the async HTTP client.
 	client := grab.NewClient()
 	client.UserAgent = ""
 	client.HTTPClient.Transport = &http.Transport{
-		Proxy: nil,
-		Dial:  dialFn,
+		Proxy:   nil,
+		Dial:    dialFn,
+		DialTLS: dialTLSFn,
 	}
 	return client
+}
+
+func newHPKPGrabClient(dialFn dialFunc) *grab.Client {
+	dialConf := &hpkp.DialerConfig{
+		Storage:   installer.StaticHPKPPins,
+		PinOnly:   false,
+		TLSConfig: nil,
+		Dial:      dialFn,
+	}
+	return newGrabClient(dialFn, dialConf.NewDialer())
 }
