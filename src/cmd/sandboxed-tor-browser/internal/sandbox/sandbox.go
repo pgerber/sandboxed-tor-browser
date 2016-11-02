@@ -446,7 +446,7 @@ func RunTorBrowser(cfg *config.Config, tor *tor.Tor) (*exec.Cmd, error) {
 		// This assumes a system Tor instance is in use, because tor-launcher
 		// would be started inside the sandbox, unable to access the net.
 		"--setenv", "TOR_SOCKS_PORT", "9150",
-		"--setenv", "TOR_CONTROLPORT", "9151",
+		"--setenv", "TOR_CONTROL_PORT", "9151",
 		"--setenv", "TOR_SKIP_LAUNCH", "1",
 		"--setenv", "TOR_NO_DISPLAY_NETWORK_SETTINGS", "1",
 	}
