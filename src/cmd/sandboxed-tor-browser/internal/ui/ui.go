@@ -37,7 +37,7 @@ var (
 	// BundleChannels is the map of Tor Browser architectures to channels.
 	BundleChannels map[string][]string
 
-	// BundleLocals is the map of Tor Browser channels to lcoales.
+	// BundleLocales is the map of Tor Browser channels to locales.
 	BundleLocales map[string][]string
 )
 

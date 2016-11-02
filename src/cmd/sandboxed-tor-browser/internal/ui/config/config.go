@@ -138,16 +138,16 @@ type Sandbox struct {
 func (cfg *Config) SetLocale(l string) {
 	if l != cfg.Locale {
 		cfg.isDirty = true
+		cfg.Locale = l
 	}
-	cfg.Locale = l
 }
 
 // SetChannel sets the configured channel, and marks the config dirty.
 func (cfg *Config) SetChannel(c string) {
 	if c != cfg.Channel {
 		cfg.isDirty = true
+		cfg.Channel = c
 	}
-	cfg.Channel = c
 }
 
 // SetInstalled sets the installed Tor Browser, and marks the config dirty.
@@ -218,8 +218,8 @@ func (cfg *Config) ResetDirty() {
 	cfg.isDirty = false
 }
 
-// NewConfig creates a new config object and populates it with the
-// configuration from disk if available, default values otherwise.
+// New creates a new config object and populates it with the configuration
+// from disk if available, default values otherwise.
 func New() (*Config, error) {
 	const (
 		envControlPort = "TOR_CONTROL_PORT"

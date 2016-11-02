@@ -386,6 +386,7 @@ func run(cfg *config.Config, cmdPath string, cmdArgs []string, extraBwrapArgs []
 	return cmd, nil
 }
 
+// RunTorBrowser launches sandboxed Tor Browser.
 func RunTorBrowser(cfg *config.Config, tor *tor.Tor) (*exec.Cmd, error) {
 	const (
 		profileSubDir = "TorBrowser/Data/Browser/profile.default"
@@ -527,6 +528,7 @@ func stageUpdate(updateDir, installDir string, mar []byte) error {
 	return nil
 }
 
+// RunUpdate launches sandboxed Tor Browser update.
 func RunUpdate(cfg *config.Config, mar []byte) error {
 	// https://wiki.mozilla.org/Software_Update:Manually_Installing_a_MAR_file
 
