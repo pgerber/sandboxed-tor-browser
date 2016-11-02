@@ -175,6 +175,8 @@ func (ui *gtkUI) bitch(format string, a ...interface{}) {
 	// XXX: Make this nicer with like, an icon and shit.
 	md := gtk3.MessageDialogNew(ui.mainWindow, gtk3.DIALOG_MODAL, gtk3.MESSAGE_ERROR, gtk3.BUTTONS_OK, format, a...)
 	md.Run()
+	md.Hide()
+	ui.forceRedraw()
 }
 
 func (ui *gtkUI) pixbufFromAsset(asset string) (*gdk.Pixbuf, error) {
@@ -192,5 +194,11 @@ func (ui *gtkUI) pixbufFromAsset(asset string) (*gdk.Pixbuf, error) {
 		defer os.Remove(f)
 
 		return gdk.PixbufNewFromFile(f)
+	}
+}
+
+func (ui *gtkUI) forceRedraw() {
+	for gtk3.EventsPending() {
+		gtk3.MainIteration()
 	}
 }
