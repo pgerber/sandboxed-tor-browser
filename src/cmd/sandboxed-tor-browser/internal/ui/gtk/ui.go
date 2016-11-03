@@ -61,7 +61,7 @@ func (ui *gtkUI) Run() error {
 		return err
 	}
 
-	if ui.Cfg.NeedsInstall() {
+	if ui.Cfg.NeedsInstall() || ui.ForceInstall {
 		for {
 			if !ui.installDialog.run() {
 				ui.onDestroy()
@@ -74,6 +74,7 @@ func (ui *gtkUI) Run() error {
 					}
 					continue
 				}
+				ui.ForceInstall = false
 				break
 			}
 		}

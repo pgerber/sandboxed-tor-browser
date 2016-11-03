@@ -54,11 +54,12 @@ type UI interface {
 type Common struct {
 	Cfg     *config.Config
 	Sandbox *exec.Cmd
+	tor     *tor.Tor
 
 	lock   *lockFile
 	noLock bool
 
-	tor *tor.Tor
+	ForceInstall bool
 }
 
 // Init initializes the common interface state.
@@ -67,6 +68,7 @@ func (c *Common) Init() error {
 
 	// Register the common command line flags.
 	flag.BoolVar(&c.noLock, "nolock", false, "Ignore checking the lock file.")
+	flag.BoolVar(&c.ForceInstall, "forceInstall", false, "Force (re)installation.")
 
 	// Initialize/load the config file.
 	if c.Cfg, err = config.New(); err != nil {
