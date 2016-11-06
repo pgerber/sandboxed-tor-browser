@@ -67,6 +67,9 @@ type Config struct {
 	// Sandbox is the sandbox configuration.
 	Sandbox Sandbox `json:"sandbox,omitEmpty"`
 
+	// FirstLuach is set for the first launch post install.
+	FirstLaunch bool `json:"firstLaunch"`
+
 	// UseSystemTor indicates if a system tor daemon should be used.
 	UseSystemTor bool `json:"-"`
 
@@ -179,7 +182,15 @@ func (cfg *Config) NeedsInstall() bool {
 	return false
 }
 
-// SetSandboxEnablePulseAudio sets the sandbox pulse audo enable, and marks the
+// SetFirstLaunch sets the first launch flag and marks the config dirty.
+func (cfg *Config) SetFirstLaunch(b bool) {
+	if cfg.FirstLaunch != b {
+		cfg.FirstLaunch = b
+		cfg.isDirty = true
+	}
+}
+
+// SetSandboxEnablePulseAudio sets the sandbox pulse audo enable and marks the
 // config dirty.
 func (cfg *Config) SetSandboxEnablePulseAudio(b bool) {
 	if cfg.Sandbox.EnablePulseAudio != b {
@@ -188,7 +199,7 @@ func (cfg *Config) SetSandboxEnablePulseAudio(b bool) {
 	}
 }
 
-// SetVolatileExtensionsDir sets the sandbox extension directory write enable,
+// SetVolatileExtensionsDir sets the sandbox extension directory write enable
 // and marks the config dirty.
 func (cfg *Config) SetSandboxVolatileExtensionsDir(b bool) {
 	if cfg.Sandbox.VolatileExtensionsDir != b {
@@ -197,7 +208,7 @@ func (cfg *Config) SetSandboxVolatileExtensionsDir(b bool) {
 	}
 }
 
-// SetSandboxDownloadsDir sets the sandbox `~/Downloads` bind mount source,
+// SetSandboxDownloadsDir sets the sandbox `~/Downloads` bind mount source
 // and makrs the config dirty.
 func (cfg *Config) SetSandboxDownloadsDir(s string) {
 	if cfg.Sandbox.DownloadsDir != s {
@@ -206,7 +217,7 @@ func (cfg *Config) SetSandboxDownloadsDir(s string) {
 	}
 }
 
-// SetSandboxDesktopDir sets the sandbox `~/Desktop` bind mount source,
+// SetSandboxDesktopDir sets the sandbox `~/Desktop` bind mount source
 // and marks the config dirty.
 func (cfg *Config) SetSandboxDesktopDir(s string) {
 	if cfg.Sandbox.DesktopDir != s {

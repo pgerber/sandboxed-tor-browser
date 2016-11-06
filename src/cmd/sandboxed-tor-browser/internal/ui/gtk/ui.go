@@ -83,13 +83,16 @@ func (ui *gtkUI) Run() error {
 
 	for {
 		// Configuration.
-		if !ui.configDialog.run() {
-			ui.onDestroy()
-			return nil
-		} else if err := ui.configDialog.onOk(); err != nil {
-			ui.bitch("Failed to write config: %v", err)
-			continue
+		if ui.ForceConfig || ui.Cfg.FirstLaunch {
+			if !ui.configDialog.run() {
+				ui.onDestroy()
+				return nil
+			} else if err := ui.configDialog.onOk(); err != nil {
+				ui.bitch("Failed to write config: %v", err)
+				continue
+			}
 		}
+		ui.ForceConfig = true
 
 		// Launch
 		if err := ui.launch(); err != nil {
@@ -99,6 +102,8 @@ func (ui *gtkUI) Run() error {
 			continue
 		} else {
 			// Wait till the sandboxed process finishes.
+			ui.Cfg.SetFirstLaunch(false)
+			ui.Cfg.Sync()
 			return ui.Sandbox.Wait()
 		}
 	}

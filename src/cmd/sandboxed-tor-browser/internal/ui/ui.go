@@ -60,6 +60,7 @@ type Common struct {
 	noLock bool
 
 	ForceInstall   bool
+	ForceConfig    bool
 	AdvancedConfig bool
 }
 
@@ -69,7 +70,8 @@ func (c *Common) Init() error {
 
 	// Register the common command line flags.
 	flag.BoolVar(&c.noLock, "nolock", false, "Ignore checking the lock file.")
-	flag.BoolVar(&c.ForceInstall, "forceInstall", false, "Force (re)installation.")
+	flag.BoolVar(&c.ForceInstall, "install", false, "Force (re)installation.")
+	flag.BoolVar(&c.ForceConfig, "config", false, "Force (re)configuration.")
 	flag.BoolVar(&c.AdvancedConfig, "advanced", false, "Show advanced config options")
 
 	// Initialize/load the config file.

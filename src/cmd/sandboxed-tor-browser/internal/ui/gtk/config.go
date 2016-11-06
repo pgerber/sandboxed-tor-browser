@@ -52,15 +52,6 @@ func (d *configDialog) reset() {
 	for _, w := range []*gtk3.Box{d.downloadsDirBox, d.desktopDirBox} {
 		w.SetVisible(d.ui.AdvancedConfig || forceAdv)
 	}
-	/*
-		if d.ui.AdvancedConfig || forceAdv {
-			d.downloadsDirBox.Show()
-			d.desktopDirBox.Show()
-		} else {
-			d.downloadsDirBox.Hide()
-			d.desktopDirBox.Hide()
-		}
-	*/
 }
 
 func (d *configDialog) onOk() error {

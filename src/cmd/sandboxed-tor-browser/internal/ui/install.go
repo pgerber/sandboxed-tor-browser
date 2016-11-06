@@ -139,6 +139,7 @@ func (c *Common) DoInstall(async *Async) {
 		Locale:          c.Cfg.Locale,
 		LastUpdateCheck: checkAt,
 	})
+	c.Cfg.SetFirstLaunch(true)
 
 	// Sync the config, and return.
 	async.Err = c.Cfg.Sync()
