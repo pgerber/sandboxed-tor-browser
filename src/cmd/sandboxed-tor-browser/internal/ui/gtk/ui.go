@@ -52,6 +52,7 @@ type gtkUI struct {
 	mainWindow *gtk3.Window // Always hidden.
 
 	installDialog  *installDialog
+	configDialog   *configDialog
 	progressDialog *progressDialog
 }
 
@@ -81,7 +82,14 @@ func (ui *gtkUI) Run() error {
 	}
 
 	for {
-		// XXX: Configuration.
+		// Configuration.
+		if !ui.configDialog.run() {
+			ui.onDestroy()
+			return nil
+		} else if err := ui.configDialog.onOk(); err != nil {
+			ui.bitch("Failed to write config: %v", err)
+			continue
+		}
 
 		// Launch
 		if err := ui.launch(); err != nil {
@@ -139,6 +147,9 @@ func Init() (sbui.UI, error) {
 		}
 
 		// Configuration dialog.
+		if err := ui.initConfigDialog(b); err != nil {
+			return nil, err
+		}
 
 		// Progress bar dialog.
 		if err := ui.initProgressDialog(b); err != nil {

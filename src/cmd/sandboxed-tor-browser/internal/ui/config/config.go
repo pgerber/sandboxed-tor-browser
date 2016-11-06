@@ -125,9 +125,15 @@ type Sandbox struct {
 	// sandbox.
 	EnablePulseAudio bool `json:"enablePulseAudio"`
 
+	// OverrideDesktopDir configures if DesktopDir is applied.
+	OverrideDesktopDir bool `json:"overrideDesktopDir"`
+
 	// DesktopDir is the directory to be bind mounted instead of the default
 	// bundle Desktop directory.
 	DesktopDir string `json:"desktopDir,omitEmpty"`
+
+	// OverrideDownloadsDir configures if DownloadsDir is applied.
+	OverrideDownloadsDir bool `json:"overrideDownloadsDir"`
 
 	// DownloadsDir is the directory to be bind mounted instead of the default
 	// bundle Downloads directory.
@@ -177,6 +183,24 @@ func (cfg *Config) NeedsInstall() bool {
 		return true
 	}
 	return false
+}
+
+// SetSandboxEnablePulseAudio sets the sandbox pulse audo enable, and marks the
+// config dirty.
+func (cfg *Config) SetSandboxEnablePulseAudio(b bool) {
+	if cfg.Sandbox.EnablePulseAudio != b {
+		cfg.Sandbox.EnablePulseAudio = b
+		cfg.isDirty = true
+	}
+}
+
+// SetVolatileExtensionsDir sets the sandbox extension directory write enable,
+// and marks the config dirty.
+func (cfg *Config) SetSandboxVolatileExtensionsDir(b bool) {
+	if cfg.Sandbox.VolatileExtensionsDir != b {
+		cfg.Sandbox.VolatileExtensionsDir = b
+		cfg.isDirty = true
+	}
 }
 
 // NeedsUpdateCheck returns true if the bundle needs to be checked for updates,
