@@ -199,8 +199,8 @@ func (cfg *Config) SetSandboxEnablePulseAudio(b bool) {
 	}
 }
 
-// SetVolatileExtensionsDir sets the sandbox extension directory write enable
-// and marks the config dirty.
+// SetSandboxVolatileExtensionsDir sets the sandbox extension directory write
+// enable and marks the config dirty.
 func (cfg *Config) SetSandboxVolatileExtensionsDir(b bool) {
 	if cfg.Sandbox.VolatileExtensionsDir != b {
 		cfg.Sandbox.VolatileExtensionsDir = b
@@ -231,7 +231,7 @@ func (cfg *Config) SetSandboxDesktopDir(s string) {
 func (cfg *Config) NeedsUpdateCheck() bool {
 	const updateInterval = 60 * 60 * 12 // 12 hours.
 	now := time.Now().Unix()
-	return now > cfg.Installed.LastUpdateCheck+updateInterval
+	return (now > cfg.Installed.LastUpdateCheck+updateInterval) || cfg.Installed.LastUpdateCheck > now
 }
 
 // SetLastUpdateCheck sets the last update check time and marks the config
