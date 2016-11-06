@@ -25,20 +25,49 @@ type configDialog struct {
 	ui *gtkUI
 
 	dialog                   *gtk3.Dialog
+	pulseAudioBox            *gtk3.Box
 	pulseAudioSwitch         *gtk3.Switch
 	volatileExtensionsSwitch *gtk3.Switch
+	downloadsDirBox          *gtk3.Box
+	downloadsDirChooser      *gtk3.FileChooserButton
+	desktopDirBox            *gtk3.Box
+	desktopDirChooser        *gtk3.FileChooserButton
 }
 
 func (d *configDialog) reset() {
 	// XXX: Hide PulseAudio option if not available.
+	forceAdv := false
 	d.pulseAudioSwitch.SetActive(d.ui.Cfg.Sandbox.EnablePulseAudio)
 	d.volatileExtensionsSwitch.SetActive(d.ui.Cfg.Sandbox.VolatileExtensionsDir)
+	if d.ui.Cfg.Sandbox.DownloadsDir != "" {
+		d.downloadsDirChooser.SetCurrentFolder(d.ui.Cfg.Sandbox.DownloadsDir)
+		forceAdv = true
+	}
+	if d.ui.Cfg.Sandbox.DesktopDir != "" {
+		d.desktopDirChooser.SetCurrentFolder(d.ui.Cfg.Sandbox.DesktopDir)
+		forceAdv = true
+	}
+
+	// Hide certain options from the masses, that are probably confusing.
+	for _, w := range []*gtk3.Box{d.downloadsDirBox, d.desktopDirBox} {
+		w.SetVisible(d.ui.AdvancedConfig || forceAdv)
+	}
+	/*
+		if d.ui.AdvancedConfig || forceAdv {
+			d.downloadsDirBox.Show()
+			d.desktopDirBox.Show()
+		} else {
+			d.downloadsDirBox.Hide()
+			d.desktopDirBox.Hide()
+		}
+	*/
 }
 
 func (d *configDialog) onOk() error {
 	d.ui.Cfg.SetSandboxEnablePulseAudio(d.pulseAudioSwitch.GetActive())
 	d.ui.Cfg.SetSandboxVolatileExtensionsDir(d.volatileExtensionsSwitch.GetActive())
-
+	d.ui.Cfg.SetSandboxDownloadsDir(d.downloadsDirChooser.GetFilename())
+	d.ui.Cfg.SetSandboxDesktopDir(d.desktopDirChooser.GetFilename())
 	return d.ui.Cfg.Sync()
 }
 
@@ -69,6 +98,11 @@ func (ui *gtkUI) initConfigDialog(b *gtk3.Builder) error {
 		}
 
 		// Sandbox config elements.
+		if obj, err = b.GetObject("pulseAudioBox"); err != nil {
+			return err
+		} else if d.pulseAudioBox, ok = obj.(*gtk3.Box); !ok {
+			return newInvalidBuilderObject(obj)
+		}
 		if obj, err = b.GetObject("pulseAudioSwitch"); err != nil {
 			return err
 		} else if d.pulseAudioSwitch, ok = obj.(*gtk3.Switch); !ok {
@@ -79,11 +113,28 @@ func (ui *gtkUI) initConfigDialog(b *gtk3.Builder) error {
 		} else if d.volatileExtensionsSwitch, ok = obj.(*gtk3.Switch); !ok {
 			return newInvalidBuilderObject(obj)
 		}
+		if obj, err = b.GetObject("downloadsDirBox"); err != nil {
+			return err
+		} else if d.downloadsDirBox, ok = obj.(*gtk3.Box); !ok {
+			return newInvalidBuilderObject(obj)
+		}
+		if obj, err = b.GetObject("downloadsDirChooser"); err != nil {
+			return err
+		} else if d.downloadsDirChooser, ok = obj.(*gtk3.FileChooserButton); !ok {
+			return newInvalidBuilderObject(obj)
+		}
+		if obj, err = b.GetObject("desktopDirBox"); err != nil {
+			return err
+		} else if d.desktopDirBox, ok = obj.(*gtk3.Box); !ok {
+			return newInvalidBuilderObject(obj)
+		}
+		if obj, err = b.GetObject("desktopDirChooser"); err != nil {
+			return err
+		} else if d.desktopDirChooser, ok = obj.(*gtk3.FileChooserButton); !ok {
+			return newInvalidBuilderObject(obj)
+		}
 	}
 
-	// Apply the configured values.
-	d.reset()
 	ui.configDialog = d
-
 	return nil
 }

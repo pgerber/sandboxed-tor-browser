@@ -410,10 +410,10 @@ func RunTorBrowser(cfg *config.Config, tor *tor.Tor) (*exec.Cmd, error) {
 	}
 
 	// Apply directory overrides.
-	if cfg.Sandbox.OverrideDesktopDir && cfg.Sandbox.DesktopDir != "" {
+	if cfg.Sandbox.DesktopDir != "" {
 		realDesktopDir = cfg.Sandbox.DesktopDir
 	}
-	if cfg.Sandbox.OverrideDownloadsDir && cfg.Sandbox.DownloadsDir != "" {
+	if cfg.Sandbox.DownloadsDir != "" {
 		realDownloadsDir = cfg.Sandbox.DownloadsDir
 	}
 

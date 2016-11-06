@@ -125,15 +125,9 @@ type Sandbox struct {
 	// sandbox.
 	EnablePulseAudio bool `json:"enablePulseAudio"`
 
-	// OverrideDesktopDir configures if DesktopDir is applied.
-	OverrideDesktopDir bool `json:"overrideDesktopDir"`
-
 	// DesktopDir is the directory to be bind mounted instead of the default
 	// bundle Desktop directory.
 	DesktopDir string `json:"desktopDir,omitEmpty"`
-
-	// OverrideDownloadsDir configures if DownloadsDir is applied.
-	OverrideDownloadsDir bool `json:"overrideDownloadsDir"`
 
 	// DownloadsDir is the directory to be bind mounted instead of the default
 	// bundle Downloads directory.
@@ -203,6 +197,24 @@ func (cfg *Config) SetSandboxVolatileExtensionsDir(b bool) {
 	}
 }
 
+// SetSandboxDownloadsDir sets the sandbox `~/Downloads` bind mount source,
+// and makrs the config dirty.
+func (cfg *Config) SetSandboxDownloadsDir(s string) {
+	if cfg.Sandbox.DownloadsDir != s {
+		cfg.Sandbox.DownloadsDir = s
+		cfg.isDirty = true
+	}
+}
+
+// SetSandboxDesktopDir sets the sandbox `~/Desktop` bind mount source,
+// and marks the config dirty.
+func (cfg *Config) SetSandboxDesktopDir(s string) {
+	if cfg.Sandbox.DesktopDir != s {
+		cfg.Sandbox.DesktopDir = s
+		cfg.isDirty = true
+	}
+}
+
 // NeedsUpdateCheck returns true if the bundle needs to be checked for updates,
 // and possibly updated.
 func (cfg *Config) NeedsUpdateCheck() bool {
@@ -218,6 +230,29 @@ func (cfg *Config) SetLastUpdateCheck(t int64) {
 		cfg.isDirty = true
 	}
 	cfg.Installed.LastUpdateCheck = t
+}
+
+// Sanitize validates the config, and brings it inline with reality.
+func (cfg *Config) Sanitize() {
+	dirExists := func(d string) bool {
+		if d == "" {
+			return false
+		}
+		fi, err := os.Lstat(d)
+		if err != nil {
+			return false
+		}
+		return fi.IsDir()
+	}
+	if !dirExists(cfg.Sandbox.DownloadsDir) {
+		cfg.SetSandboxDownloadsDir("")
+	}
+	if !dirExists(cfg.Sandbox.DesktopDir) {
+		cfg.SetSandboxDesktopDir("")
+	}
+	if !dirExists(cfg.BundleInstallDir) {
+		cfg.SetInstalled(nil)
+	}
 }
 
 // Sync flushes config changes to disk, if the config is dirty.

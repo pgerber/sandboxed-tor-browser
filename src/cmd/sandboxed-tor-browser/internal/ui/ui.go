@@ -59,7 +59,8 @@ type Common struct {
 	lock   *lockFile
 	noLock bool
 
-	ForceInstall bool
+	ForceInstall   bool
+	AdvancedConfig bool
 }
 
 // Init initializes the common interface state.
@@ -69,15 +70,15 @@ func (c *Common) Init() error {
 	// Register the common command line flags.
 	flag.BoolVar(&c.noLock, "nolock", false, "Ignore checking the lock file.")
 	flag.BoolVar(&c.ForceInstall, "forceInstall", false, "Force (re)installation.")
+	flag.BoolVar(&c.AdvancedConfig, "advanced", false, "Show advanced config options")
 
 	// Initialize/load the config file.
 	if c.Cfg, err = config.New(); err != nil {
 		return err
 	}
+	c.Cfg.Sanitize()
 
-	// XXX: Validate that the config is somewhat sane.
-
-	return nil
+	return c.Cfg.Sync()
 }
 
 // Run handles initiailzing the at-runtime state.
