@@ -101,19 +101,14 @@ func (ui *gtkUI) initInstallDialog(b *gtk3.Builder) error {
 		}
 
 		// Images.
-		if obj, err = b.GetObject("installLogo"); err != nil {
-			return err
-		} else if img, ok := obj.(*gtk3.Image); !ok {
+		if img, err := getImage(b, "installLogo"); err != nil {
 			return err
 		} else {
 			img.SetFromPixbuf(ui.logoPixbuf)
 		}
 
-		// Selectors.
-		if obj, err = b.GetObject("channelSelector"); err != nil {
+		if d.channelSelector, err = getComboBoxText(b, "channelSelector"); err != nil {
 			return err
-		} else if d.channelSelector, ok = obj.(*gtk3.ComboBoxText); !ok {
-			return newInvalidBuilderObject(obj)
 		} else {
 			id := 0
 			for i, v := range sbui.BundleChannels[ui.Cfg.Architecture] {
@@ -125,23 +120,14 @@ func (ui *gtkUI) initInstallDialog(b *gtk3.Builder) error {
 			d.channelSelector.SetActive(id)
 			d.channelSelector.Connect("changed", func() { d.onChannelChanged() })
 		}
-		if obj, err = b.GetObject("localeSelector"); err != nil {
+		if d.localeSelector, err = getComboBoxText(b, "localeSelector"); err != nil {
 			return err
-		} else if d.localeSelector, ok = obj.(*gtk3.ComboBoxText); !ok {
-			return newInvalidBuilderObject(obj)
-		} else {
-			// Populate the initial locale dropdown.
-			d.onChannelChanged()
 		}
-
-		// Indicator.
-		if obj, err = b.GetObject("systemTorIndicator"); err != nil {
+		d.onChannelChanged()
+		if d.systemTorIndicator, err = getBox(b, "systemTorIndicator"); err != nil {
 			return err
-		} else if d.systemTorIndicator, ok = obj.(*gtk3.Box); !ok {
-			return newInvalidBuilderObject(obj)
-		} else {
-			d.systemTorIndicator.SetVisible(ui.Cfg.UseSystemTor)
 		}
+		d.systemTorIndicator.SetVisible(ui.Cfg.UseSystemTor)
 	}
 
 	ui.installDialog = d

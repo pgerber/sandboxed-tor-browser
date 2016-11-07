@@ -18,31 +18,17 @@
 package gtk
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
 
 	"github.com/gotk3/gotk3/gdk"
-	"github.com/gotk3/gotk3/glib"
 	gtk3 "github.com/gotk3/gotk3/gtk"
 
 	"cmd/sandboxed-tor-browser/internal/data"
 	sbui "cmd/sandboxed-tor-browser/internal/ui"
 	"cmd/sandboxed-tor-browser/internal/ui/config"
 )
-
-type errorInvalidBuilderObject struct {
-	obj glib.IObject
-}
-
-func (e *errorInvalidBuilderObject) Error() string {
-	return fmt.Sprintf("unexpected GtkBuilder object: %v", e.obj)
-}
-
-func newInvalidBuilderObject(obj glib.IObject) error {
-	return &errorInvalidBuilderObject{obj}
-}
 
 type gtkUI struct {
 	sbui.Common

@@ -118,25 +118,16 @@ func (ui *gtkUI) initProgressDialog(b *gtk3.Builder) error {
 		}
 
 		// Images.
-		if obj, err = b.GetObject("progressIcon"); err != nil {
-			return err
-		} else if img, ok := obj.(*gtk3.Image); !ok {
+		if img, err := getImage(b, "progressIcon"); err != nil {
 			return err
 		} else {
 			img.SetFromPixbuf(ui.iconPixbuf)
 		}
 
-		// Label.
-		if obj, err = b.GetObject("progressText"); err != nil {
-			return err
-		} else if d.progressText, ok = obj.(*gtk3.Label); !ok {
+		if d.progressText, err = getLabel(b, "progressText"); err != nil {
 			return err
 		}
-
-		// Button.
-		if obj, err = b.GetObject("progressCancelButton"); err != nil {
-			return err
-		} else if d.progressCancel, ok = obj.(*gtk3.Button); !ok {
+		if d.progressCancel, err = getButton(b, "progressCancelButton"); err != nil {
 			return err
 		}
 	}

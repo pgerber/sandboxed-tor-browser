@@ -25,7 +25,9 @@ import (
 type configDialog struct {
 	ui *gtkUI
 
-	dialog                   *gtk3.Dialog
+	dialog *gtk3.Dialog
+
+	// Sandbox config elements.
 	pulseAudioBox            *gtk3.Box
 	pulseAudioSwitch         *gtk3.Switch
 	volatileExtensionsSwitch *gtk3.Switch
@@ -38,6 +40,8 @@ type configDialog struct {
 }
 
 func (d *configDialog) reset() {
+	const optionalText = "(Optional)"
+
 	// XXX: Hide PulseAudio option if not available.
 	forceAdv := false
 	d.pulseAudioSwitch.SetActive(d.ui.Cfg.Sandbox.EnablePulseAudio)
@@ -45,7 +49,7 @@ func (d *configDialog) reset() {
 	if d.ui.Cfg.Sandbox.Display != "" {
 		d.displayEntry.SetText(d.ui.Cfg.Sandbox.Display)
 	} else {
-		d.displayEntry.SetPlaceholderText("(Optional)")
+		d.displayEntry.SetPlaceholderText(optionalText)
 	}
 	if d.ui.Cfg.Sandbox.DownloadsDir != "" {
 		d.downloadsDirChooser.SetCurrentFolder(d.ui.Cfg.Sandbox.DownloadsDir)
@@ -102,52 +106,32 @@ func (ui *gtkUI) initConfigDialog(b *gtk3.Builder) error {
 		}
 
 		// Sandbox config elements.
-		if obj, err = b.GetObject("pulseAudioBox"); err != nil {
+		if d.pulseAudioBox, err = getBox(b, "pulseAudioBox"); err != nil {
 			return err
-		} else if d.pulseAudioBox, ok = obj.(*gtk3.Box); !ok {
-			return newInvalidBuilderObject(obj)
 		}
-		if obj, err = b.GetObject("pulseAudioSwitch"); err != nil {
+		if d.pulseAudioSwitch, err = getSwitch(b, "pulseAudioSwitch"); err != nil {
 			return err
-		} else if d.pulseAudioSwitch, ok = obj.(*gtk3.Switch); !ok {
-			return newInvalidBuilderObject(obj)
 		}
-		if obj, err = b.GetObject("volatileExtensionsSwitch"); err != nil {
+		if d.volatileExtensionsSwitch, err = getSwitch(b, "volatileExtensionsSwitch"); err != nil {
 			return err
-		} else if d.volatileExtensionsSwitch, ok = obj.(*gtk3.Switch); !ok {
-			return newInvalidBuilderObject(obj)
 		}
-		if obj, err = b.GetObject("displayBox"); err != nil {
+		if d.displayBox, err = getBox(b, "displayBox"); err != nil {
 			return err
-		} else if d.displayBox, ok = obj.(*gtk3.Box); !ok {
-			return newInvalidBuilderObject(obj)
 		}
-		if obj, err = b.GetObject("displayEntry"); err != nil {
+		if d.displayEntry, err = getEntry(b, "displayEntry"); err != nil {
 			return err
-		} else if d.displayEntry, ok = obj.(*gtk3.Entry); !ok {
-			return newInvalidBuilderObject(obj)
-		} else {
-			d.displayEntry.SetPlaceholderText("(Optional)")
 		}
-		if obj, err = b.GetObject("downloadsDirBox"); err != nil {
+		if d.downloadsDirBox, err = getBox(b, "downloadsDirBox"); err != nil {
 			return err
-		} else if d.downloadsDirBox, ok = obj.(*gtk3.Box); !ok {
-			return newInvalidBuilderObject(obj)
 		}
-		if obj, err = b.GetObject("downloadsDirChooser"); err != nil {
+		if d.downloadsDirChooser, err = getFChooser(b, "downloadsDirChooser"); err != nil {
 			return err
-		} else if d.downloadsDirChooser, ok = obj.(*gtk3.FileChooserButton); !ok {
-			return newInvalidBuilderObject(obj)
 		}
-		if obj, err = b.GetObject("desktopDirBox"); err != nil {
+		if d.desktopDirBox, err = getBox(b, "desktopDirBox"); err != nil {
 			return err
-		} else if d.desktopDirBox, ok = obj.(*gtk3.Box); !ok {
-			return newInvalidBuilderObject(obj)
 		}
-		if obj, err = b.GetObject("desktopDirChooser"); err != nil {
+		if d.desktopDirChooser, err = getFChooser(b, "desktopDirChooser"); err != nil {
 			return err
-		} else if d.desktopDirChooser, ok = obj.(*gtk3.FileChooserButton); !ok {
-			return newInvalidBuilderObject(obj)
 		}
 	}
 
