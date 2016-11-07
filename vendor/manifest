@@ -28,7 +28,7 @@
 		{
 			"importpath": "github.com/gotk3/gotk3",
 			"repository": "https://github.com/gotk3/gotk3",
-			"revision": "8fd11268426313eaa4b083519681e7d87f01168b",
+			"revision": "e1c63f37d60933d70a453726eaf931bdd125c55b",
 			"branch": "master"
 		},
 		{
