@@ -1,5 +1,5 @@
 # sandboxed-tor-browser
-### Yanwnig Angel (yawning at schwanenlied dot me)
+### Yawning Angel (yawning at schwanenlied dot me)
 
 > I would build a great sandbox.  And nobody builds sandboxes better than me,
 > believe me.  I will build a great, great sandbox on our application border.
@@ -20,6 +20,7 @@ Runtime dependencies:
  * tor running as a daemon with the SOCKS and control ports accessible
  * bubblewrap >= 0.1.2 (https://github.com/projectatomic/bubblewrap)
  * libseccomp2
+ * Gtk+ 3.0
  * (Optional) PulseAudio
 
 Build time dependencies:
