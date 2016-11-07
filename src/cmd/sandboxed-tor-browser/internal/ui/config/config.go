@@ -190,6 +190,15 @@ func (cfg *Config) SetFirstLaunch(b bool) {
 	}
 }
 
+// SetSandboxDisplay sets the sandbox `DISPLAY` override and marks the config
+// dirty.
+func (cfg *Config) SetSandboxDisplay(s string) {
+	if cfg.Sandbox.Display != s {
+		cfg.Sandbox.Display = s
+		cfg.isDirty = true
+	}
+}
+
 // SetSandboxEnablePulseAudio sets the sandbox pulse audo enable and marks the
 // config dirty.
 func (cfg *Config) SetSandboxEnablePulseAudio(b bool) {

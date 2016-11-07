@@ -17,8 +17,9 @@
 package gtk
 
 import (
+	"strings"
+
 	gtk3 "github.com/gotk3/gotk3/gtk"
-	//sbui "cmd/sandboxed-tor-browser/internal/ui"
 )
 
 type configDialog struct {
@@ -28,6 +29,8 @@ type configDialog struct {
 	pulseAudioBox            *gtk3.Box
 	pulseAudioSwitch         *gtk3.Switch
 	volatileExtensionsSwitch *gtk3.Switch
+	displayBox               *gtk3.Box
+	displayEntry             *gtk3.Entry
 	downloadsDirBox          *gtk3.Box
 	downloadsDirChooser      *gtk3.FileChooserButton
 	desktopDirBox            *gtk3.Box
@@ -39,6 +42,11 @@ func (d *configDialog) reset() {
 	forceAdv := false
 	d.pulseAudioSwitch.SetActive(d.ui.Cfg.Sandbox.EnablePulseAudio)
 	d.volatileExtensionsSwitch.SetActive(d.ui.Cfg.Sandbox.VolatileExtensionsDir)
+	if d.ui.Cfg.Sandbox.Display != "" {
+		d.displayEntry.SetText(d.ui.Cfg.Sandbox.Display)
+	} else {
+		d.displayEntry.SetPlaceholderText("(Optional)")
+	}
 	if d.ui.Cfg.Sandbox.DownloadsDir != "" {
 		d.downloadsDirChooser.SetCurrentFolder(d.ui.Cfg.Sandbox.DownloadsDir)
 		forceAdv = true
@@ -49,7 +57,7 @@ func (d *configDialog) reset() {
 	}
 
 	// Hide certain options from the masses, that are probably confusing.
-	for _, w := range []*gtk3.Box{d.downloadsDirBox, d.desktopDirBox} {
+	for _, w := range []*gtk3.Box{d.displayBox, d.downloadsDirBox, d.desktopDirBox} {
 		w.SetVisible(d.ui.AdvancedConfig || forceAdv)
 	}
 }
@@ -57,6 +65,11 @@ func (d *configDialog) reset() {
 func (d *configDialog) onOk() error {
 	d.ui.Cfg.SetSandboxEnablePulseAudio(d.pulseAudioSwitch.GetActive())
 	d.ui.Cfg.SetSandboxVolatileExtensionsDir(d.volatileExtensionsSwitch.GetActive())
+	if s, err := d.displayEntry.GetText(); err != nil {
+		return err
+	} else {
+		d.ui.Cfg.SetSandboxDisplay(strings.TrimSpace(s))
+	}
 	d.ui.Cfg.SetSandboxDownloadsDir(d.downloadsDirChooser.GetFilename())
 	d.ui.Cfg.SetSandboxDesktopDir(d.desktopDirChooser.GetFilename())
 	return d.ui.Cfg.Sync()
@@ -103,6 +116,18 @@ func (ui *gtkUI) initConfigDialog(b *gtk3.Builder) error {
 			return err
 		} else if d.volatileExtensionsSwitch, ok = obj.(*gtk3.Switch); !ok {
 			return newInvalidBuilderObject(obj)
+		}
+		if obj, err = b.GetObject("displayBox"); err != nil {
+			return err
+		} else if d.displayBox, ok = obj.(*gtk3.Box); !ok {
+			return newInvalidBuilderObject(obj)
+		}
+		if obj, err = b.GetObject("displayEntry"); err != nil {
+			return err
+		} else if d.displayEntry, ok = obj.(*gtk3.Entry); !ok {
+			return newInvalidBuilderObject(obj)
+		} else {
+			d.displayEntry.SetPlaceholderText("(Optional)")
 		}
 		if obj, err = b.GetObject("downloadsDirBox"); err != nil {
 			return err
