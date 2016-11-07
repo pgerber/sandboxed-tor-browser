@@ -18,16 +18,14 @@
 package gtk
 
 import (
-	"io/ioutil"
-	"os"
 	"path"
+	"strings"
 
 	"github.com/gotk3/gotk3/gdk"
 	gtk3 "github.com/gotk3/gotk3/gtk"
 
 	"cmd/sandboxed-tor-browser/internal/data"
 	sbui "cmd/sandboxed-tor-browser/internal/ui"
-	"cmd/sandboxed-tor-browser/internal/ui/config"
 )
 
 type gtkUI struct {
@@ -183,21 +181,26 @@ func (ui *gtkUI) bitch(format string, a ...interface{}) {
 }
 
 func (ui *gtkUI) pixbufFromAsset(asset string) (*gdk.Pixbuf, error) {
-	if d, err := data.Asset(asset); err != nil {
+	d, err := data.Asset(asset)
+	if err != nil {
 		return nil, err
-	} else {
-		// This is kind of kludgy and terrible, but somewhat unavoidable
-		// for now since gotk3 doesn't support loading pixbufs from byte
-		// literals yet.  At least this will be used sparingly...
-		_, f := path.Split(asset)
-		f = path.Join(ui.Cfg.RuntimeDir, f)
-		if err = ioutil.WriteFile(f, d, config.FileMode); err != nil {
+	}
+
+	l, err := gdk.PixbufLoaderNewWithType(strings.TrimLeft(path.Ext(asset), "."))
+	if err != nil {
+		return nil, err
+	}
+	for i := 0; i < len(d); {
+		n, err := l.Write(d)
+		if err != nil {
 			return nil, err
 		}
-		defer os.Remove(f)
-
-		return gdk.PixbufNewFromFile(f)
+		d = d[n:]
+		i += n
 	}
+	l.Close()
+
+	return l.GetPixbuf()
 }
 
 func (ui *gtkUI) forceRedraw() {
