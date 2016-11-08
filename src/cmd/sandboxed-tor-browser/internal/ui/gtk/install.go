@@ -88,47 +88,48 @@ func (ui *gtkUI) initInstallDialog(b *gtk3.Builder) error {
 	d := new(installDialog)
 	d.ui = ui
 
-	if obj, err := b.GetObject("installDialog"); err != nil {
+	obj, err := b.GetObject("installDialog")
+	if err != nil {
+		return err
+	}
+
+	ok := false
+	if d.dialog, ok = obj.(*gtk3.Dialog); !ok {
+		return newInvalidBuilderObject(obj)
+	} else {
+		d.dialog.SetDefaultResponse(gtk3.RESPONSE_CANCEL)
+		d.dialog.SetIcon(ui.iconPixbuf)
+		d.dialog.SetTransientFor(ui.mainWindow)
+	}
+
+	// Images.
+	if img, err := getImage(b, "installLogo"); err != nil {
 		return err
 	} else {
-		ok := false
-		if d.dialog, ok = obj.(*gtk3.Dialog); !ok {
-			return newInvalidBuilderObject(obj)
-		} else {
-			d.dialog.SetDefaultResponse(gtk3.RESPONSE_CANCEL)
-			d.dialog.SetIcon(ui.iconPixbuf)
-			d.dialog.SetTransientFor(ui.mainWindow)
-		}
-
-		// Images.
-		if img, err := getImage(b, "installLogo"); err != nil {
-			return err
-		} else {
-			img.SetFromPixbuf(ui.logoPixbuf)
-		}
-
-		if d.channelSelector, err = getComboBoxText(b, "channelSelector"); err != nil {
-			return err
-		} else {
-			id := 0
-			for i, v := range sbui.BundleChannels[ui.Cfg.Architecture] {
-				if v == ui.Cfg.Channel {
-					id = i
-				}
-				d.channelSelector.AppendText(v)
-			}
-			d.channelSelector.SetActive(id)
-			d.channelSelector.Connect("changed", func() { d.onChannelChanged() })
-		}
-		if d.localeSelector, err = getComboBoxText(b, "localeSelector"); err != nil {
-			return err
-		}
-		d.onChannelChanged()
-		if d.systemTorIndicator, err = getBox(b, "installSystemTorIndicator"); err != nil {
-			return err
-		}
-		d.systemTorIndicator.SetVisible(ui.Cfg.UseSystemTor)
+		img.SetFromPixbuf(ui.logoPixbuf)
 	}
+
+	if d.channelSelector, err = getComboBoxText(b, "channelSelector"); err != nil {
+		return err
+	} else {
+		id := 0
+		for i, v := range sbui.BundleChannels[ui.Cfg.Architecture] {
+			if v == ui.Cfg.Channel {
+				id = i
+			}
+			d.channelSelector.AppendText(v)
+		}
+		d.channelSelector.SetActive(id)
+		d.channelSelector.Connect("changed", func() { d.onChannelChanged() })
+	}
+	if d.localeSelector, err = getComboBoxText(b, "localeSelector"); err != nil {
+		return err
+	}
+	d.onChannelChanged()
+	if d.systemTorIndicator, err = getBox(b, "installSystemTorIndicator"); err != nil {
+		return err
+	}
+	d.systemTorIndicator.SetVisible(ui.Cfg.UseSystemTor)
 
 	ui.installDialog = d
 	return nil

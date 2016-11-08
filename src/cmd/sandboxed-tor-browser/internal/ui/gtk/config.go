@@ -33,16 +33,25 @@ type configDialog struct {
 	dialog *gtk3.Dialog
 
 	// Tor config elements.
-	torConfigBox       *gtk3.Box
-	torProxyToggle     *gtk3.CheckButton
-	torProxyConfigBox  *gtk3.Box
-	torProxyType       *gtk3.ComboBoxText
-	torProxyAddress    *gtk3.Entry
-	torProxyPort       *gtk3.Entry
-	torProxyAuthBox    *gtk3.Box
-	torProxyUsername   *gtk3.Entry
-	torProxyPassword   *gtk3.Entry
-	torBridgeToggle    *gtk3.CheckButton
+	torConfigBox      *gtk3.Box
+	torProxyToggle    *gtk3.CheckButton
+	torProxyConfigBox *gtk3.Box
+	torProxyType      *gtk3.ComboBoxText
+	torProxyAddress   *gtk3.Entry
+	torProxyPort      *gtk3.Entry
+	torProxyAuthBox   *gtk3.Box
+	torProxyUsername  *gtk3.Entry
+	torProxyPassword  *gtk3.Entry
+
+	torBridgeToggle       *gtk3.CheckButton
+	torBridgeConfigBox    *gtk3.Box
+	torBridgeInternal     *gtk3.RadioButton
+	torBridgeInternalBox  *gtk3.Box
+	torBridgeInternalType *gtk3.ComboBoxText
+	torBridgeCustom       *gtk3.RadioButton
+	torBridgeCustomFrame  *gtk3.Frame
+	torBridgeCustomEntry  *gtk3.TextView
+
 	torSystemIndicator *gtk3.Box
 
 	// Sandbox config elements.
@@ -74,10 +83,13 @@ func (d *configDialog) reset() {
 	if d.ui.Cfg.Tor.ProxyPassword != "" {
 		d.torProxyPassword.SetText(d.ui.Cfg.Tor.ProxyPassword)
 	}
+
 	d.torBridgeToggle.SetActive(d.ui.Cfg.Tor.UseBridges)
+	d.onBridgeTypeChanged()
 
 	// Set the sensitivity based on the toggles.
 	d.torProxyConfigBox.SetSensitive(d.torProxyToggle.GetActive())
+	d.torBridgeConfigBox.SetSensitive(d.torBridgeToggle.GetActive())
 	d.torConfigBox.SetSensitive(!d.ui.Cfg.UseSystemTor)
 	d.torSystemIndicator.SetVisible(d.ui.Cfg.UseSystemTor)
 
@@ -178,94 +190,135 @@ func (d *configDialog) onProxyTypeChanged() {
 	d.torProxyAuthBox.SetSensitive(d.torProxyType.GetActiveText() != "SOCKS 4")
 }
 
+func (d *configDialog) onBridgeTypeChanged() {
+	isInternal := d.torBridgeInternal.GetActive()
+	d.torBridgeInternalBox.SetSensitive(isInternal)
+	d.torBridgeCustomFrame.SetSensitive(!isInternal)
+}
+
 func (ui *gtkUI) initConfigDialog(b *gtk3.Builder) error {
 	d := new(configDialog)
 	d.ui = ui
 
-	if obj, err := b.GetObject("configDialog"); err != nil {
+	obj, err := b.GetObject("configDialog")
+	if err != nil {
+		return err
+	}
+
+	ok := false
+	if d.dialog, ok = obj.(*gtk3.Dialog); !ok {
+		return newInvalidBuilderObject(obj)
+	} else {
+		d.dialog.SetDefaultResponse(gtk3.RESPONSE_CANCEL)
+		d.dialog.SetIcon(ui.iconPixbuf)
+		d.dialog.SetTransientFor(ui.mainWindow)
+	}
+
+	if d.torConfigBox, err = getBox(b, "torConfigBox"); err != nil {
+		return err
+	}
+	if d.torSystemIndicator, err = getBox(b, "cfgSystemTorIndicator"); err != nil {
+		return err
+	}
+
+	// Tor Proxy config elements.
+	if d.torProxyToggle, err = getCheckButton(b, "torProxyToggle"); err != nil {
 		return err
 	} else {
-		ok := false
-		if d.dialog, ok = obj.(*gtk3.Dialog); !ok {
-			return newInvalidBuilderObject(obj)
-		} else {
-			d.dialog.SetDefaultResponse(gtk3.RESPONSE_CANCEL)
-			d.dialog.SetIcon(ui.iconPixbuf)
-			d.dialog.SetTransientFor(ui.mainWindow)
+		d.torProxyToggle.Connect("toggled", func() {
+			d.torProxyConfigBox.SetSensitive(d.torProxyToggle.GetActive())
+		})
+	}
+	if d.torProxyConfigBox, err = getBox(b, "torProxyConfigBox"); err != nil {
+		return err
+	}
+	if d.torProxyType, err = getComboBoxText(b, "torProxyType"); err != nil {
+		return err
+	} else {
+		for _, v := range config.TorProxyTypes {
+			d.torProxyType.AppendText(v)
 		}
+		d.torProxyType.Connect("changed", func() { d.onProxyTypeChanged() })
+	}
+	if d.torProxyAddress, err = getEntry(b, "torProxyAddress"); err != nil {
+		return err
+	}
+	if d.torProxyPort, err = getEntry(b, "torProxyPort"); err != nil {
+		return err
+	}
+	if d.torProxyAuthBox, err = getBox(b, "torProxyAuthBox"); err != nil {
+		return err
+	}
+	if d.torProxyUsername, err = getEntry(b, "torProxyUsername"); err != nil {
+		return err
+	}
+	if d.torProxyPassword, err = getEntry(b, "torProxyPassword"); err != nil {
+		return err
+	}
 
-		// Tor config elements.
-		if d.torConfigBox, err = getBox(b, "torConfigBox"); err != nil {
-			return err
-		}
-		if d.torSystemIndicator, err = getBox(b, "cfgSystemTorIndicator"); err != nil {
-			return err
-		}
-		if d.torProxyToggle, err = getCheckButton(b, "torProxyToggle"); err != nil {
-			return err
-		} else {
-			d.torProxyToggle.Connect("toggled", func() {
-				d.torProxyConfigBox.SetSensitive(d.torProxyToggle.GetActive())
-			})
-		}
-		if d.torProxyConfigBox, err = getBox(b, "torProxyConfigBox"); err != nil {
-			return err
-		}
-		if d.torProxyType, err = getComboBoxText(b, "torProxyType"); err != nil {
-			return err
-		} else {
-			for _, v := range config.TorProxyTypes {
-				d.torProxyType.AppendText(v)
-			}
-			d.torProxyType.Connect("changed", func() { d.onProxyTypeChanged() })
-		}
-		if d.torProxyAddress, err = getEntry(b, "torProxyAddress"); err != nil {
-			return err
-		}
-		if d.torProxyPort, err = getEntry(b, "torProxyPort"); err != nil {
-			return err
-		}
-		if d.torProxyAuthBox, err = getBox(b, "torProxyAuthBox"); err != nil {
-			return err
-		}
-		if d.torProxyUsername, err = getEntry(b, "torProxyUsername"); err != nil {
-			return err
-		}
-		if d.torProxyPassword, err = getEntry(b, "torProxyPassword"); err != nil {
-			return err
-		}
-		if d.torBridgeToggle, err = getCheckButton(b, "torBridgeToggle"); err != nil {
-			return err
-		}
+	// Tor Bridge config elements.
+	if d.torBridgeToggle, err = getCheckButton(b, "torBridgeToggle"); err != nil {
+		return err
+	} else {
+		d.torBridgeToggle.Connect("toggled", func() {
+			d.torBridgeConfigBox.SetSensitive(d.torBridgeToggle.GetActive())
+		})
+	}
+	if d.torBridgeConfigBox, err = getBox(b, "torBridgeConfigBox"); err != nil {
+		return err
+	}
+	if d.torBridgeInternal, err = getRadioButton(b, "torBridgeInternal"); err != nil {
+		return err
+	} else {
+		d.torBridgeInternal.Connect("toggled", func() { d.onBridgeTypeChanged() })
+	}
+	if d.torBridgeInternalBox, err = getBox(b, "torBridgeInternalBox"); err != nil {
+		return err
+	}
+	if d.torBridgeInternalType, err = getComboBoxText(b, "torBridgeInternalType"); err != nil {
+		return err
+	} else {
+		// XXX: Populate
+	}
+	if d.torBridgeCustom, err = getRadioButton(b, "torBridgeCustom"); err != nil {
+		return err
+	} else {
+		d.torBridgeCustom.Connect("toggled", func() { d.onBridgeTypeChanged() })
+	}
+	if d.torBridgeCustomFrame, err = getFrame(b, "torBridgeCustomFrame"); err != nil {
+		return err
+	}
+	if d.torBridgeCustomEntry, err = getTextView(b, "torBridgeCustomEntry"); err != nil {
+		return err
+	}
 
-		// Sandbox config elements.
-		if d.pulseAudioBox, err = getBox(b, "pulseAudioBox"); err != nil {
-			return err
-		}
-		if d.pulseAudioSwitch, err = getSwitch(b, "pulseAudioSwitch"); err != nil {
-			return err
-		}
-		if d.volatileExtensionsSwitch, err = getSwitch(b, "volatileExtensionsSwitch"); err != nil {
-			return err
-		}
-		if d.displayBox, err = getBox(b, "displayBox"); err != nil {
-			return err
-		}
-		if d.displayEntry, err = getEntry(b, "displayEntry"); err != nil {
-			return err
-		}
-		if d.downloadsDirBox, err = getBox(b, "downloadsDirBox"); err != nil {
-			return err
-		}
-		if d.downloadsDirChooser, err = getFChooser(b, "downloadsDirChooser"); err != nil {
-			return err
-		}
-		if d.desktopDirBox, err = getBox(b, "desktopDirBox"); err != nil {
-			return err
-		}
-		if d.desktopDirChooser, err = getFChooser(b, "desktopDirChooser"); err != nil {
-			return err
-		}
+	// Sandbox config elements.
+	if d.pulseAudioBox, err = getBox(b, "pulseAudioBox"); err != nil {
+		return err
+	}
+	if d.pulseAudioSwitch, err = getSwitch(b, "pulseAudioSwitch"); err != nil {
+		return err
+	}
+	if d.volatileExtensionsSwitch, err = getSwitch(b, "volatileExtensionsSwitch"); err != nil {
+		return err
+	}
+	if d.displayBox, err = getBox(b, "displayBox"); err != nil {
+		return err
+	}
+	if d.displayEntry, err = getEntry(b, "displayEntry"); err != nil {
+		return err
+	}
+	if d.downloadsDirBox, err = getBox(b, "downloadsDirBox"); err != nil {
+		return err
+	}
+	if d.downloadsDirChooser, err = getFChooser(b, "downloadsDirChooser"); err != nil {
+		return err
+	}
+	if d.desktopDirBox, err = getBox(b, "desktopDirBox"); err != nil {
+		return err
+	}
+	if d.desktopDirChooser, err = getFChooser(b, "desktopDirChooser"); err != nil {
+		return err
 	}
 
 	ui.configDialog = d

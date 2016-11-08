@@ -105,31 +105,32 @@ func (ui *gtkUI) initProgressDialog(b *gtk3.Builder) error {
 	d := new(progressDialog)
 	d.ui = ui
 
-	if obj, err := b.GetObject("progressDialog"); err != nil {
+	obj, err := b.GetObject("progressDialog")
+	if err != nil {
+		return err
+	}
+
+	ok := false
+	if d.dialog, ok = obj.(*gtk3.Dialog); !ok {
+		return newInvalidBuilderObject(obj)
+	} else {
+		d.dialog.SetDefaultResponse(gtk3.RESPONSE_CANCEL)
+		d.dialog.SetIcon(ui.iconPixbuf)
+		d.dialog.SetTransientFor(ui.mainWindow)
+	}
+
+	// Images.
+	if img, err := getImage(b, "progressIcon"); err != nil {
 		return err
 	} else {
-		ok := false
-		if d.dialog, ok = obj.(*gtk3.Dialog); !ok {
-			return newInvalidBuilderObject(obj)
-		} else {
-			d.dialog.SetDefaultResponse(gtk3.RESPONSE_CANCEL)
-			d.dialog.SetIcon(ui.iconPixbuf)
-			d.dialog.SetTransientFor(ui.mainWindow)
-		}
+		img.SetFromPixbuf(ui.iconPixbuf)
+	}
 
-		// Images.
-		if img, err := getImage(b, "progressIcon"); err != nil {
-			return err
-		} else {
-			img.SetFromPixbuf(ui.iconPixbuf)
-		}
-
-		if d.progressText, err = getLabel(b, "progressText"); err != nil {
-			return err
-		}
-		if d.progressCancel, err = getButton(b, "progressCancelButton"); err != nil {
-			return err
-		}
+	if d.progressText, err = getLabel(b, "progressText"); err != nil {
+		return err
+	}
+	if d.progressCancel, err = getButton(b, "progressCancelButton"); err != nil {
+		return err
 	}
 
 	ui.progressDialog = d

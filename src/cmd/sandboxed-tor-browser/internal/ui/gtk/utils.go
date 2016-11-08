@@ -144,3 +144,39 @@ func getCheckButton(b *gtk3.Builder, id string) (*gtk3.CheckButton, error) {
 	}
 	return v, nil
 }
+
+func getRadioButton(b *gtk3.Builder, id string) (*gtk3.RadioButton, error) {
+	obj, err := b.GetObject(id)
+	if err != nil {
+		return nil, err
+	}
+	v, ok := obj.(*gtk3.RadioButton)
+	if !ok {
+		return nil, newInvalidBuilderObject(obj)
+	}
+	return v, nil
+}
+
+func getFrame(b *gtk3.Builder, id string) (*gtk3.Frame, error) {
+	obj, err := b.GetObject(id)
+	if err != nil {
+		return nil, err
+	}
+	v, ok := obj.(*gtk3.Frame)
+	if !ok {
+		return nil, newInvalidBuilderObject(obj)
+	}
+	return v, nil
+}
+
+func getTextView(b *gtk3.Builder, id string) (*gtk3.TextView, error) {
+	obj, err := b.GetObject(id)
+	if err != nil {
+		return nil, err
+	}
+	v, ok := obj.(*gtk3.TextView)
+	if !ok {
+		return nil, newInvalidBuilderObject(obj)
+	}
+	return v, nil
+}

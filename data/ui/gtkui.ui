@@ -5,7 +5,7 @@
   <object class="GtkDialog" id="configDialog">
     <property name="can_focus">False</property>
     <property name="default_width">480</property>
-    <property name="default_height">360</property>
+    <property name="default_height">460</property>
     <property name="type_hint">dialog</property>
     <child internal-child="vbox">
       <object class="GtkBox">
@@ -281,12 +281,158 @@
                       </packing>
                     </child>
                     <child>
-                      <object class="GtkBox">
+                      <object class="GtkFrame">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
-                        <property name="margin_bottom">6</property>
-                        <property name="orientation">vertical</property>
+                        <property name="margin_left">12</property>
+                        <property name="margin_top">6</property>
+                        <property name="label_xalign">0</property>
+                        <property name="shadow_type">in</property>
                         <child>
+                          <object class="GtkAlignment">
+                            <property name="visible">True</property>
+                            <property name="can_focus">False</property>
+                            <property name="left_padding">12</property>
+                            <child>
+                              <object class="GtkBox" id="torBridgeConfigBox">
+                                <property name="name">torBridgeConfigBox</property>
+                                <property name="visible">True</property>
+                                <property name="can_focus">False</property>
+                                <property name="margin_right">3</property>
+                                <property name="margin_top">3</property>
+                                <property name="margin_bottom">3</property>
+                                <property name="orientation">vertical</property>
+                                <child>
+                                  <object class="GtkBox">
+                                    <property name="visible">True</property>
+                                    <property name="can_focus">False</property>
+                                    <property name="orientation">vertical</property>
+                                    <child>
+                                      <object class="GtkRadioButton" id="torBridgeInternal">
+                                        <property name="label" translatable="yes">Connect with provided bridges.</property>
+                                        <property name="visible">True</property>
+                                        <property name="can_focus">True</property>
+                                        <property name="receives_default">False</property>
+                                        <property name="active">True</property>
+                                        <property name="draw_indicator">True</property>
+                                      </object>
+                                      <packing>
+                                        <property name="expand">False</property>
+                                        <property name="fill">True</property>
+                                        <property name="position">0</property>
+                                      </packing>
+                                    </child>
+                                    <child>
+                                      <object class="GtkBox" id="torBridgeInternalBox">
+                                        <property name="visible">True</property>
+                                        <property name="can_focus">False</property>
+                                        <property name="margin_left">3</property>
+                                        <property name="margin_top">3</property>
+                                        <child>
+                                          <object class="GtkLabel">
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">False</property>
+                                            <property name="margin_right">3</property>
+                                            <property name="label" translatable="yes">Transport Type:</property>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">0</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkComboBoxText" id="torBridgeInternalType">
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">False</property>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">1</property>
+                                          </packing>
+                                        </child>
+                                      </object>
+                                      <packing>
+                                        <property name="expand">False</property>
+                                        <property name="fill">True</property>
+                                        <property name="position">1</property>
+                                      </packing>
+                                    </child>
+                                  </object>
+                                  <packing>
+                                    <property name="expand">False</property>
+                                    <property name="fill">True</property>
+                                    <property name="position">0</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkBox">
+                                    <property name="visible">True</property>
+                                    <property name="can_focus">False</property>
+                                    <property name="orientation">vertical</property>
+                                    <child>
+                                      <object class="GtkRadioButton" id="torBridgeCustom">
+                                        <property name="label" translatable="yes">Enter custom bridges</property>
+                                        <property name="visible">True</property>
+                                        <property name="can_focus">True</property>
+                                        <property name="receives_default">False</property>
+                                        <property name="margin_top">3</property>
+                                        <property name="active">True</property>
+                                        <property name="draw_indicator">True</property>
+                                        <property name="group">torBridgeInternal</property>
+                                      </object>
+                                      <packing>
+                                        <property name="expand">False</property>
+                                        <property name="fill">True</property>
+                                        <property name="position">0</property>
+                                      </packing>
+                                    </child>
+                                    <child>
+                                      <object class="GtkFrame" id="torBridgeCustomFrame">
+                                        <property name="visible">True</property>
+                                        <property name="can_focus">False</property>
+                                        <property name="margin_left">3</property>
+                                        <property name="margin_right">3</property>
+                                        <property name="margin_top">3</property>
+                                        <property name="label_xalign">0</property>
+                                        <property name="shadow_type">in</property>
+                                        <child>
+                                          <object class="GtkAlignment">
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">False</property>
+                                            <property name="left_padding">12</property>
+                                            <child>
+                                              <object class="GtkTextView" id="torBridgeCustomEntry">
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">True</property>
+                                                <property name="monospace">True</property>
+                                              </object>
+                                            </child>
+                                          </object>
+                                        </child>
+                                        <child type="label_item">
+                                          <placeholder/>
+                                        </child>
+                                      </object>
+                                      <packing>
+                                        <property name="expand">True</property>
+                                        <property name="fill">True</property>
+                                        <property name="position">1</property>
+                                      </packing>
+                                    </child>
+                                  </object>
+                                  <packing>
+                                    <property name="expand">True</property>
+                                    <property name="fill">True</property>
+                                    <property name="position">1</property>
+                                  </packing>
+                                </child>
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                        <child type="label">
                           <object class="GtkCheckButton" id="torBridgeToggle">
                             <property name="label" translatable="yes">Use bridges to access the Tor network.</property>
                             <property name="visible">True</property>
@@ -294,25 +440,17 @@
                             <property name="receives_default">False</property>
                             <property name="draw_indicator">True</property>
                           </object>
-                          <packing>
-                            <property name="expand">False</property>
-                            <property name="fill">True</property>
-                            <property name="position">0</property>
-                          </packing>
-                        </child>
-                        <child>
-                          <placeholder/>
                         </child>
                       </object>
                       <packing>
-                        <property name="expand">False</property>
+                        <property name="expand">True</property>
                         <property name="fill">True</property>
                         <property name="position">1</property>
                       </packing>
                     </child>
                   </object>
                   <packing>
-                    <property name="expand">False</property>
+                    <property name="expand">True</property>
                     <property name="fill">True</property>
                     <property name="position">0</property>
                   </packing>
