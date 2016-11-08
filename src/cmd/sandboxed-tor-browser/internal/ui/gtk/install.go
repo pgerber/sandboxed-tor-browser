@@ -124,7 +124,7 @@ func (ui *gtkUI) initInstallDialog(b *gtk3.Builder) error {
 			return err
 		}
 		d.onChannelChanged()
-		if d.systemTorIndicator, err = getBox(b, "systemTorIndicator"); err != nil {
+		if d.systemTorIndicator, err = getBox(b, "installSystemTorIndicator"); err != nil {
 			return err
 		}
 		d.systemTorIndicator.SetVisible(ui.Cfg.UseSystemTor)

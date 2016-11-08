@@ -48,6 +48,168 @@ const (
 	bundleInstallDir = "tor-browser"
 )
 
+// TorProxyTypes are the proxy protocols supported by tor.
+var TorProxyTypes = []string{"SOCKS 4", "SOCKS 5", "HTTP(S)"}
+
+// Tor contains the Tor network config options.
+type Tor struct {
+	cfg *Config
+
+	// UseProxy is if the Tor network should be reached via a local proxy.
+	UseProxy bool `json:"useProxy"`
+
+	// ProxyType is the proxy protocol that should be used.
+	ProxyType string `json:"proxyType,omitEmpty"`
+
+	// ProxyAddress is the proxy address that should be used.
+	ProxyAddress string `json:"proxyAddress,omitEmpty"`
+
+	// ProxyPort is the proxy port that should be used.
+	ProxyPort string `json:"proxyPort,omitEmtpy"`
+
+	// ProxyUsername is the optional proxy username.
+	ProxyUsername string `json:"proxyUsername,omitEmpty"`
+
+	// ProxyPassword is the optional proxy password.
+	ProxyPassword string `json:"proxyPassword,omitEmpty"`
+
+	// UseBridges is if the Tor network should be reached via a bridge.
+	UseBridges bool `json:"useBridges"`
+}
+
+// SetUseProxy sets if the Tor network should be reached via a local proxy and
+// marks the config dirty.
+func (t *Tor) SetUseProxy(b bool) {
+	if t.UseProxy != b {
+		t.UseProxy = b
+		t.cfg.isDirty = true
+	}
+}
+
+// SetProxyType sets the proxy protocol to be used by tor and marks the config
+// dirty.
+func (t *Tor) SetProxyType(s string) {
+	if t.ProxyType != s {
+		t.ProxyType = s
+		t.cfg.isDirty = true
+	}
+}
+
+// SetProxyAddress sets the proxy address to be used by tor and marks the
+// config dirty.
+func (t *Tor) SetProxyAddress(s string) {
+	if t.ProxyAddress != s {
+		t.ProxyAddress = s
+		t.cfg.isDirty = true
+	}
+}
+
+// SetProxyPort sets the proxy port to be used by tor and marks the config
+// dirty.
+func (t *Tor) SetProxyPort(s string) {
+	if t.ProxyPort != s {
+		t.ProxyPort = s
+		t.cfg.isDirty = true
+	}
+}
+
+// SetProxyUsername sets the proxy username to be used by tor and marks the
+// config dirty.
+func (t *Tor) SetProxyUsername(s string) {
+	if t.ProxyUsername != s {
+		t.ProxyUsername = s
+		t.cfg.isDirty = true
+	}
+}
+
+// SetProxyPassword sets the proxy password to be used by tor and marks the
+// config dirty.
+func (t *Tor) SetProxyPassword(s string) {
+	if t.ProxyPassword != s {
+		t.ProxyPassword = s
+		t.cfg.isDirty = true
+	}
+}
+
+// SetUseBridges sets if the Tor network should be reached via a Bridge and
+// marks the config dirty.
+func (t *Tor) SetUseBridges(b bool) {
+	if t.UseBridges != b {
+		t.UseBridges = b
+		t.cfg.isDirty = true
+	}
+}
+
+// Sandbox contains the sandbox specific config options.
+type Sandbox struct {
+	cfg *Config
+
+	// Display is the X11 DISPLAY to use in the sandbox.  If omitted, the
+	// host system DISPLAY from the env var will be used.
+	Display string `json:"display,omitEmpty"`
+
+	// VolatileExtensionsDir mounts the extensions directorey read/write to
+	// allow the installation of addons.  The addon auto-update mechanism is
+	// still left disabled.
+	VolatileExtensionsDir bool `json:"volatileExtensionsDir"`
+
+	// EnablePulseAudio enables access to the host PulseAudio daemon inside the
+	// sandbox.
+	EnablePulseAudio bool `json:"enablePulseAudio"`
+
+	// DesktopDir is the directory to be bind mounted instead of the default
+	// bundle Desktop directory.
+	DesktopDir string `json:"desktopDir,omitEmpty"`
+
+	// DownloadsDir is the directory to be bind mounted instead of the default
+	// bundle Downloads directory.
+	DownloadsDir string `json:"downloadsDir,omitEmpty"`
+}
+
+// SetDisplay sets the sandbox `DISPLAY` override and marks the config dirty.
+func (sb *Sandbox) SetDisplay(s string) {
+	if sb.Display != s {
+		sb.Display = s
+		sb.cfg.isDirty = true
+	}
+}
+
+// SetEnablePulseAudio sets the sandbox pulse audo enable and marks the config
+// dirty.
+func (sb *Sandbox) SetEnablePulseAudio(b bool) {
+	if sb.EnablePulseAudio != b {
+		sb.EnablePulseAudio = b
+		sb.cfg.isDirty = true
+	}
+}
+
+// SetVolatileExtensionsDir sets the sandbox extension directory write enable
+// and marks the config dirty.
+func (sb *Sandbox) SetVolatileExtensionsDir(b bool) {
+	if sb.VolatileExtensionsDir != b {
+		sb.VolatileExtensionsDir = b
+		sb.cfg.isDirty = true
+	}
+}
+
+// SetDownloadsDir sets the sandbox `~/Downloads` bind mount source and marks
+// the config dirty.
+func (sb *Sandbox) SetDownloadsDir(s string) {
+	if sb.DownloadsDir != s {
+		sb.DownloadsDir = s
+		sb.cfg.isDirty = true
+	}
+}
+
+// SetDesktopDir sets the sandbox `~/Desktop` bind mount source and marks the
+// config dirty.
+func (sb *Sandbox) SetDesktopDir(s string) {
+	if sb.DesktopDir != s {
+		sb.DesktopDir = s
+		sb.cfg.isDirty = true
+	}
+}
+
 // Config is the sandboxed-tor-browser configuration instance.
 type Config struct {
 	// Architecture is the current architecture derived at runtime ("linux32",
@@ -63,6 +225,9 @@ type Config struct {
 
 	// Installed is the installed Tor Browser information.
 	Installed *Installed `json:"installed,omitEmpty"`
+
+	// Tor is the Tor network configuration.
+	Tor Tor `json:"tor,omitEmpty"`
 
 	// Sandbox is the sandbox configuration.
 	Sandbox Sandbox `json:"sandbox,omitEmpty"`
@@ -109,32 +274,6 @@ type Installed struct {
 	// LastUpdateCheck is the UNIX time when the last update check was
 	// sucessfully completed.
 	LastUpdateCheck int64 `json:"lastUpdateCheck,omitEmpty"`
-}
-
-// Sandbox contains the sandbox specific config options.
-type Sandbox struct {
-	cfg *Config
-
-	// Display is the X11 DISPLAY to use in the sandbox.  If omitted, the
-	// host system DISPLAY from the env var will be used.
-	Display string `json:"display,omitEmpty"`
-
-	// VolatileExtensionsDir mounts the extensions directorey read/write to
-	// allow the installation of addons.  The addon auto-update mechanism is
-	// still left disabled.
-	VolatileExtensionsDir bool `json:"volatileExtensionsDir"`
-
-	// EnablePulseAudio enables access to the host PulseAudio daemon inside the
-	// sandbox.
-	EnablePulseAudio bool `json:"enablePulseAudio"`
-
-	// DesktopDir is the directory to be bind mounted instead of the default
-	// bundle Desktop directory.
-	DesktopDir string `json:"desktopDir,omitEmpty"`
-
-	// DownloadsDir is the directory to be bind mounted instead of the default
-	// bundle Downloads directory.
-	DownloadsDir string `json:"downloadsDir,omitEmpty"`
 }
 
 // SetLocale sets the configured locale, and marks the config dirty.
@@ -190,51 +329,6 @@ func (cfg *Config) SetFirstLaunch(b bool) {
 	}
 }
 
-// SetSandboxDisplay sets the sandbox `DISPLAY` override and marks the config
-// dirty.
-func (cfg *Config) SetSandboxDisplay(s string) {
-	if cfg.Sandbox.Display != s {
-		cfg.Sandbox.Display = s
-		cfg.isDirty = true
-	}
-}
-
-// SetSandboxEnablePulseAudio sets the sandbox pulse audo enable and marks the
-// config dirty.
-func (cfg *Config) SetSandboxEnablePulseAudio(b bool) {
-	if cfg.Sandbox.EnablePulseAudio != b {
-		cfg.Sandbox.EnablePulseAudio = b
-		cfg.isDirty = true
-	}
-}
-
-// SetSandboxVolatileExtensionsDir sets the sandbox extension directory write
-// enable and marks the config dirty.
-func (cfg *Config) SetSandboxVolatileExtensionsDir(b bool) {
-	if cfg.Sandbox.VolatileExtensionsDir != b {
-		cfg.Sandbox.VolatileExtensionsDir = b
-		cfg.isDirty = true
-	}
-}
-
-// SetSandboxDownloadsDir sets the sandbox `~/Downloads` bind mount source
-// and makrs the config dirty.
-func (cfg *Config) SetSandboxDownloadsDir(s string) {
-	if cfg.Sandbox.DownloadsDir != s {
-		cfg.Sandbox.DownloadsDir = s
-		cfg.isDirty = true
-	}
-}
-
-// SetSandboxDesktopDir sets the sandbox `~/Desktop` bind mount source
-// and marks the config dirty.
-func (cfg *Config) SetSandboxDesktopDir(s string) {
-	if cfg.Sandbox.DesktopDir != s {
-		cfg.Sandbox.DesktopDir = s
-		cfg.isDirty = true
-	}
-}
-
 // NeedsUpdateCheck returns true if the bundle needs to be checked for updates,
 // and possibly updated.
 func (cfg *Config) NeedsUpdateCheck() bool {
@@ -265,10 +359,10 @@ func (cfg *Config) Sanitize() {
 		return fi.IsDir()
 	}
 	if !dirExists(cfg.Sandbox.DownloadsDir) {
-		cfg.SetSandboxDownloadsDir("")
+		cfg.Sandbox.SetDownloadsDir("")
 	}
 	if !dirExists(cfg.Sandbox.DesktopDir) {
-		cfg.SetSandboxDesktopDir("")
+		cfg.Sandbox.SetDesktopDir("")
 	}
 	if !dirExists(cfg.BundleInstallDir) {
 		cfg.SetInstalled(nil)
@@ -380,6 +474,7 @@ func New() (*Config, error) {
 	if cfg.Locale == "" {
 		cfg.SetLocale(defaultLocale)
 	}
+	cfg.Tor.cfg = cfg
 	cfg.Sandbox.cfg = cfg
 
 	return cfg, nil

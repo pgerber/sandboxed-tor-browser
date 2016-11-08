@@ -132,3 +132,15 @@ func getButton(b *gtk3.Builder, id string) (*gtk3.Button, error) {
 	}
 	return v, nil
 }
+
+func getCheckButton(b *gtk3.Builder, id string) (*gtk3.CheckButton, error) {
+	obj, err := b.GetObject(id)
+	if err != nil {
+		return nil, err
+	}
+	v, ok := obj.(*gtk3.CheckButton)
+	if !ok {
+		return nil, newInvalidBuilderObject(obj)
+	}
+	return v, nil
+}

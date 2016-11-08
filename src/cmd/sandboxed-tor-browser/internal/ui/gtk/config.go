@@ -17,15 +17,33 @@
 package gtk
 
 import (
+	"fmt"
+	"net"
+	"strconv"
 	"strings"
 
 	gtk3 "github.com/gotk3/gotk3/gtk"
+
+	"cmd/sandboxed-tor-browser/internal/ui/config"
 )
 
 type configDialog struct {
 	ui *gtkUI
 
 	dialog *gtk3.Dialog
+
+	// Tor config elements.
+	torConfigBox       *gtk3.Box
+	torProxyToggle     *gtk3.CheckButton
+	torProxyConfigBox  *gtk3.Box
+	torProxyType       *gtk3.ComboBoxText
+	torProxyAddress    *gtk3.Entry
+	torProxyPort       *gtk3.Entry
+	torProxyAuthBox    *gtk3.Box
+	torProxyUsername   *gtk3.Entry
+	torProxyPassword   *gtk3.Entry
+	torBridgeToggle    *gtk3.CheckButton
+	torSystemIndicator *gtk3.Box
 
 	// Sandbox config elements.
 	pulseAudioBox            *gtk3.Box
@@ -40,7 +58,28 @@ type configDialog struct {
 }
 
 func (d *configDialog) reset() {
-	const optionalText = "(Optional)"
+	// Propagate the state from the config to the UI.
+
+	d.torProxyToggle.SetActive(d.ui.Cfg.Tor.UseProxy)
+	d.proxyTypeFromCfg()
+	if d.ui.Cfg.Tor.ProxyAddress != "" {
+		d.torProxyAddress.SetText(d.ui.Cfg.Tor.ProxyAddress)
+	}
+	if d.ui.Cfg.Tor.ProxyPort != "" {
+		d.torProxyPort.SetText(d.ui.Cfg.Tor.ProxyPort)
+	}
+	if d.ui.Cfg.Tor.ProxyUsername != "" {
+		d.torProxyUsername.SetText(d.ui.Cfg.Tor.ProxyUsername)
+	}
+	if d.ui.Cfg.Tor.ProxyPassword != "" {
+		d.torProxyPassword.SetText(d.ui.Cfg.Tor.ProxyPassword)
+	}
+	d.torBridgeToggle.SetActive(d.ui.Cfg.Tor.UseBridges)
+
+	// Set the sensitivity based on the toggles.
+	d.torProxyConfigBox.SetSensitive(d.torProxyToggle.GetActive())
+	d.torConfigBox.SetSensitive(!d.ui.Cfg.UseSystemTor)
+	d.torSystemIndicator.SetVisible(d.ui.Cfg.UseSystemTor)
 
 	// XXX: Hide PulseAudio option if not available.
 	forceAdv := false
@@ -48,8 +87,6 @@ func (d *configDialog) reset() {
 	d.volatileExtensionsSwitch.SetActive(d.ui.Cfg.Sandbox.VolatileExtensionsDir)
 	if d.ui.Cfg.Sandbox.Display != "" {
 		d.displayEntry.SetText(d.ui.Cfg.Sandbox.Display)
-	} else {
-		d.displayEntry.SetPlaceholderText(optionalText)
 	}
 	if d.ui.Cfg.Sandbox.DownloadsDir != "" {
 		d.downloadsDirChooser.SetCurrentFolder(d.ui.Cfg.Sandbox.DownloadsDir)
@@ -67,15 +104,51 @@ func (d *configDialog) reset() {
 }
 
 func (d *configDialog) onOk() error {
-	d.ui.Cfg.SetSandboxEnablePulseAudio(d.pulseAudioSwitch.GetActive())
-	d.ui.Cfg.SetSandboxVolatileExtensionsDir(d.volatileExtensionsSwitch.GetActive())
+	d.ui.Cfg.Tor.SetUseProxy(d.torProxyToggle.GetActive())
+	d.ui.Cfg.Tor.SetProxyType(d.torProxyType.GetActiveText())
+	if s, err := d.torProxyAddress.GetText(); err != nil {
+		return err
+	} else if s = strings.TrimSpace(s); s == "" {
+		d.ui.Cfg.Tor.SetProxyAddress(s)
+	} else if net.ParseIP(s) == nil {
+		return fmt.Errorf("Malformed proxy address: '%v'", s)
+	} else {
+		d.ui.Cfg.Tor.SetProxyAddress(s)
+	}
+	if s, err := d.torProxyPort.GetText(); err != nil {
+		return err
+	} else if s = strings.TrimSpace(s); s == "" {
+		d.ui.Cfg.Tor.SetProxyPort(s)
+	} else if _, err := strconv.ParseUint(s, 10, 16); err != nil {
+		return fmt.Errorf("Malformed proxy port: '%v'", s)
+	} else {
+		d.ui.Cfg.Tor.SetProxyPort(s)
+	}
+	if s, err := d.torProxyUsername.GetText(); err != nil {
+		return err
+	} else {
+		d.ui.Cfg.Tor.SetProxyUsername(strings.TrimSpace(s))
+	}
+	if s, err := d.torProxyPassword.GetText(); err != nil {
+		return err
+	} else {
+		d.ui.Cfg.Tor.SetProxyPassword(strings.TrimSpace(s))
+	}
+	if d.ui.Cfg.Tor.ProxyAddress == "" || d.ui.Cfg.Tor.ProxyPort == "" {
+		d.ui.Cfg.Tor.SetUseProxy(false)
+	}
+
+	d.ui.Cfg.Tor.SetUseBridges(d.torBridgeToggle.GetActive())
+
+	d.ui.Cfg.Sandbox.SetEnablePulseAudio(d.pulseAudioSwitch.GetActive())
+	d.ui.Cfg.Sandbox.SetVolatileExtensionsDir(d.volatileExtensionsSwitch.GetActive())
 	if s, err := d.displayEntry.GetText(); err != nil {
 		return err
 	} else {
-		d.ui.Cfg.SetSandboxDisplay(strings.TrimSpace(s))
+		d.ui.Cfg.Sandbox.SetDisplay(strings.TrimSpace(s))
 	}
-	d.ui.Cfg.SetSandboxDownloadsDir(d.downloadsDirChooser.GetFilename())
-	d.ui.Cfg.SetSandboxDesktopDir(d.desktopDirChooser.GetFilename())
+	d.ui.Cfg.Sandbox.SetDownloadsDir(d.downloadsDirChooser.GetFilename())
+	d.ui.Cfg.Sandbox.SetDesktopDir(d.desktopDirChooser.GetFilename())
 	return d.ui.Cfg.Sync()
 }
 
@@ -87,6 +160,22 @@ func (d *configDialog) run() bool {
 	}()
 
 	return d.dialog.Run() == int(gtk3.RESPONSE_OK)
+}
+
+func (d *configDialog) proxyTypeFromCfg() {
+	id := 0
+	for i, v := range config.TorProxyTypes {
+		if v == d.ui.Cfg.Tor.ProxyType {
+			id = i
+			break
+		}
+	}
+	d.torProxyType.SetActive(id)
+	d.onProxyTypeChanged()
+}
+
+func (d *configDialog) onProxyTypeChanged() {
+	d.torProxyAuthBox.SetSensitive(d.torProxyType.GetActiveText() != "SOCKS 4")
 }
 
 func (ui *gtkUI) initConfigDialog(b *gtk3.Builder) error {
@@ -103,6 +192,50 @@ func (ui *gtkUI) initConfigDialog(b *gtk3.Builder) error {
 			d.dialog.SetDefaultResponse(gtk3.RESPONSE_CANCEL)
 			d.dialog.SetIcon(ui.iconPixbuf)
 			d.dialog.SetTransientFor(ui.mainWindow)
+		}
+
+		// Tor config elements.
+		if d.torConfigBox, err = getBox(b, "torConfigBox"); err != nil {
+			return err
+		}
+		if d.torSystemIndicator, err = getBox(b, "cfgSystemTorIndicator"); err != nil {
+			return err
+		}
+		if d.torProxyToggle, err = getCheckButton(b, "torProxyToggle"); err != nil {
+			return err
+		} else {
+			d.torProxyToggle.Connect("toggled", func() {
+				d.torProxyConfigBox.SetSensitive(d.torProxyToggle.GetActive())
+			})
+		}
+		if d.torProxyConfigBox, err = getBox(b, "torProxyConfigBox"); err != nil {
+			return err
+		}
+		if d.torProxyType, err = getComboBoxText(b, "torProxyType"); err != nil {
+			return err
+		} else {
+			for _, v := range config.TorProxyTypes {
+				d.torProxyType.AppendText(v)
+			}
+			d.torProxyType.Connect("changed", func() { d.onProxyTypeChanged() })
+		}
+		if d.torProxyAddress, err = getEntry(b, "torProxyAddress"); err != nil {
+			return err
+		}
+		if d.torProxyPort, err = getEntry(b, "torProxyPort"); err != nil {
+			return err
+		}
+		if d.torProxyAuthBox, err = getBox(b, "torProxyAuthBox"); err != nil {
+			return err
+		}
+		if d.torProxyUsername, err = getEntry(b, "torProxyUsername"); err != nil {
+			return err
+		}
+		if d.torProxyPassword, err = getEntry(b, "torProxyPassword"); err != nil {
+			return err
+		}
+		if d.torBridgeToggle, err = getCheckButton(b, "torBridgeToggle"); err != nil {
+			return err
 		}
 
 		// Sandbox config elements.
