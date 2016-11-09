@@ -27,6 +27,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"strings"
 
 	"cmd/sandboxed-tor-browser/internal/data"
 	"cmd/sandboxed-tor-browser/internal/tor"
@@ -39,7 +40,14 @@ var (
 
 	// BundleLocales is the map of Tor Browser channels to locales.
 	BundleLocales map[string][]string
+
+	// Bridges is the map of transports to Bridge lines.
+	Bridges map[string][]string
 )
+
+// DefaultBridgeTransport is the decault bridge transport when using internal
+// bridges.
+const DefaultBridgeTransport = "obfs4"
 
 // UI is a user interface implementation.
 type UI interface {
@@ -181,6 +189,54 @@ func newLockFile(c *Common) (*lockFile, error) {
 	return l, nil
 }
 
+// ValidateBridgeLines validates and sanitizes bridge lines.
+func ValidateBridgeLines(ls string) (string, error) {
+	var ret []string
+
+	for _, l := range strings.Split(ls, "\n") {
+		l = strings.TrimSpace(l)
+		if len(l) == 0 {
+			continue
+		}
+		sp := strings.Split(l, " ")
+		if len(sp) == 0 {
+			continue
+		}
+		if strings.ToLower(sp[0]) == "bridge" { // Assume well formed...
+			ret = append(ret, l)
+			continue
+		}
+
+		// XXX: This obliterates the user's changes if there's an error,
+		// which is probably likely somewhat obnoxious.
+
+		// Validate that there is at least either:
+		if ip, _, err := net.SplitHostPort(sp[0]); err != nil {
+			if net.ParseIP(sp[0]) != nil {
+				return "", fmt.Errorf("invalid Bridge: '%v', missing port", l)
+			}
+			if Bridges[sp[0]] == nil {
+				return "", fmt.Errorf("invalid Bridge: '%v', unknown transport: %v", l, sp[0])
+			}
+			if len(sp) < 2 {
+				return "", fmt.Errorf("invalid Bridge: '%v', missing IP", l)
+			}
+			if ip, _, err = net.SplitHostPort(sp[1]); err != nil {
+				return "", fmt.Errorf("invalid Bridge: '%v', bad IP/port", l)
+			} else if net.ParseIP(ip) == nil {
+				return "", fmt.Errorf("invalid Bridge: '%v'", l)
+			}
+		} else if net.ParseIP(ip) == nil { // Or a host:port.
+			return "", fmt.Errorf("invalid Bridge IP/port: %v", sp[0])
+		}
+
+		// BridgeDB entries lack the "Bridge".
+		ret = append(ret, "Bridge "+l)
+	}
+
+	return strings.Join(ret, "\n"), nil
+}
+
 func init() {
 	BundleChannels = make(map[string][]string)
 	if d, err := data.Asset("ui/channels.json"); err != nil {
@@ -194,5 +250,19 @@ func init() {
 		panic(err)
 	} else if err = json.Unmarshal(d, &BundleLocales); err != nil {
 		panic(err)
+	}
+
+	Bridges = make(map[string][]string)
+	if d, err := data.Asset("bridges.json"); err != nil {
+		panic(err)
+	} else if err = json.Unmarshal(d, &Bridges); err != nil {
+		panic(err)
+	}
+
+	// Fixup all the bridge lines to be well formed.
+	for _, bridges := range Bridges {
+		for i, v := range bridges {
+			bridges[i] = "Bridge " + v
+		}
 	}
 }

@@ -24,6 +24,7 @@ import (
 
 	gtk3 "github.com/gotk3/gotk3/gtk"
 
+	sbui "cmd/sandboxed-tor-browser/internal/ui"
 	"cmd/sandboxed-tor-browser/internal/ui/config"
 )
 
@@ -51,6 +52,8 @@ type configDialog struct {
 	torBridgeCustom       *gtk3.RadioButton
 	torBridgeCustomFrame  *gtk3.Frame
 	torBridgeCustomEntry  *gtk3.TextView
+
+	defaultTransportIdx int
 
 	torSystemIndicator *gtk3.Box
 
@@ -85,6 +88,14 @@ func (d *configDialog) reset() {
 	}
 
 	d.torBridgeToggle.SetActive(d.ui.Cfg.Tor.UseBridges)
+	d.torBridgeInternal.SetActive(!d.ui.Cfg.Tor.UseCustomBridges)
+	d.internalBridgeTypeFromCfg()
+	d.torBridgeCustom.SetActive(d.ui.Cfg.Tor.UseCustomBridges)
+	if buf, err := d.torBridgeCustomEntry.GetBuffer(); err != nil {
+		panic(err)
+	} else {
+		buf.SetText(d.ui.Cfg.Tor.CustomBridges)
+	}
 	d.onBridgeTypeChanged()
 
 	// Set the sensitivity based on the toggles.
@@ -116,6 +127,8 @@ func (d *configDialog) reset() {
 }
 
 func (d *configDialog) onOk() error {
+	// Validate and propagate the UI entries to the config.
+
 	d.ui.Cfg.Tor.SetUseProxy(d.torProxyToggle.GetActive())
 	d.ui.Cfg.Tor.SetProxyType(d.torProxyType.GetActiveText())
 	if s, err := d.torProxyAddress.GetText(); err != nil {
@@ -151,6 +164,17 @@ func (d *configDialog) onOk() error {
 	}
 
 	d.ui.Cfg.Tor.SetUseBridges(d.torBridgeToggle.GetActive())
+	d.ui.Cfg.Tor.SetInternalBridgeType(d.torBridgeInternalType.GetActiveText())
+	d.ui.Cfg.Tor.SetUseCustomBridges(d.torBridgeCustom.GetActive())
+	if buf, err := d.torBridgeCustomEntry.GetBuffer(); err != nil {
+		return err
+	} else if s, err := buf.GetText(buf.GetStartIter(), buf.GetEndIter(), false); err != nil {
+		return err
+	} else if s, err = sbui.ValidateBridgeLines(s); err != nil {
+		return err
+	} else {
+		d.ui.Cfg.Tor.SetCustomBridges(s)
+	}
 
 	d.ui.Cfg.Sandbox.SetEnablePulseAudio(d.pulseAudioSwitch.GetActive())
 	d.ui.Cfg.Sandbox.SetVolatileExtensionsDir(d.volatileExtensionsSwitch.GetActive())
@@ -186,6 +210,19 @@ func (d *configDialog) proxyTypeFromCfg() {
 	d.onProxyTypeChanged()
 }
 
+func (d *configDialog) internalBridgeTypeFromCfg() {
+	id := d.defaultTransportIdx
+	i := 0
+	for transport, _ := range sbui.Bridges {
+		if transport == d.ui.Cfg.Tor.InternalBridgeType {
+			id = i
+			break
+		}
+		i++
+	}
+	d.torBridgeInternalType.SetActive(id)
+}
+
 func (d *configDialog) onProxyTypeChanged() {
 	d.torProxyAuthBox.SetSensitive(d.torProxyType.GetActiveText() != "SOCKS 4")
 }
@@ -194,6 +231,7 @@ func (d *configDialog) onBridgeTypeChanged() {
 	isInternal := d.torBridgeInternal.GetActive()
 	d.torBridgeInternalBox.SetSensitive(isInternal)
 	d.torBridgeCustomFrame.SetSensitive(!isInternal)
+	// XXX: Figure out how to make the entry grey on insensitive...
 }
 
 func (ui *gtkUI) initConfigDialog(b *gtk3.Builder) error {
@@ -278,7 +316,14 @@ func (ui *gtkUI) initConfigDialog(b *gtk3.Builder) error {
 	if d.torBridgeInternalType, err = getComboBoxText(b, "torBridgeInternalType"); err != nil {
 		return err
 	} else {
-		// XXX: Populate
+		i := 0
+		for transport, _ := range sbui.Bridges {
+			if transport == sbui.DefaultBridgeTransport {
+				d.defaultTransportIdx = i
+			}
+			i++
+			d.torBridgeInternalType.AppendText(transport)
+		}
 	}
 	if d.torBridgeCustom, err = getRadioButton(b, "torBridgeCustom"); err != nil {
 		return err

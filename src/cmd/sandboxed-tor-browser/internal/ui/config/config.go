@@ -59,22 +59,32 @@ type Tor struct {
 	UseProxy bool `json:"useProxy"`
 
 	// ProxyType is the proxy protocol that should be used.
-	ProxyType string `json:"proxyType,omitEmpty"`
+	ProxyType string `json:"proxyType"`
 
 	// ProxyAddress is the proxy address that should be used.
-	ProxyAddress string `json:"proxyAddress,omitEmpty"`
+	ProxyAddress string `json:"proxyAddress"`
 
 	// ProxyPort is the proxy port that should be used.
-	ProxyPort string `json:"proxyPort,omitEmtpy"`
+	ProxyPort string `json:"proxyPort"`
 
 	// ProxyUsername is the optional proxy username.
-	ProxyUsername string `json:"proxyUsername,omitEmpty"`
+	ProxyUsername string `json:"proxyUsername"`
 
 	// ProxyPassword is the optional proxy password.
-	ProxyPassword string `json:"proxyPassword,omitEmpty"`
+	ProxyPassword string `json:"proxyPassword"`
 
 	// UseBridges is if the Tor network should be reached via a bridge.
 	UseBridges bool `json:"useBridges"`
+
+	// InternalBridgeType is the bridge transport to use when using built in
+	// bridges.
+	InternalBridgeType string `json:"internalBridgeType"`
+
+	// UseCustomBridges is if the user provided bridges should be used.
+	UseCustomBridges bool `json:"useCustomBridges"`
+
+	// CustomBridges is the user provided bridge lines.
+	CustomBridges string `json:"customBridges"`
 }
 
 // SetUseProxy sets if the Tor network should be reached via a local proxy and
@@ -136,6 +146,33 @@ func (t *Tor) SetProxyPassword(s string) {
 func (t *Tor) SetUseBridges(b bool) {
 	if t.UseBridges != b {
 		t.UseBridges = b
+		t.cfg.isDirty = true
+	}
+}
+
+// SetInternalBridgeType sets the transport to be used when using built in
+// bridges and marks the config dirty.
+func (t *Tor) SetInternalBridgeType(s string) {
+	if t.InternalBridgeType != s {
+		t.InternalBridgeType = s
+		t.cfg.isDirty = true
+	}
+}
+
+// SetCustomBridges sets the user provided custom bridge lines, and maarks the
+// config dirty.
+func (t *Tor) SetCustomBridges(s string) {
+	if t.CustomBridges != s {
+		t.CustomBridges = s
+		t.cfg.isDirty = true
+	}
+}
+
+// SetUseCustomBridges sets if the user provided custom bridges should be used
+// and marks the config dirty.
+func (t *Tor) SetUseCustomBridges(b bool) {
+	if t.UseCustomBridges != b {
+		t.UseCustomBridges = b
 		t.cfg.isDirty = true
 	}
 }
