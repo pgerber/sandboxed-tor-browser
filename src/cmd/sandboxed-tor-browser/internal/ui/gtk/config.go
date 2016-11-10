@@ -44,15 +44,17 @@ type configDialog struct {
 	torProxyUsername  *gtk3.Entry
 	torProxyPassword  *gtk3.Entry
 
-	torBridgeToggle       *gtk3.CheckButton
-	torBridgeConfigBox    *gtk3.Box
-	torBridgeInternal     *gtk3.RadioButton
-	torBridgeInternalBox  *gtk3.Box
-	torBridgeInternalType *gtk3.ComboBoxText
-	torBridgeCustom       *gtk3.RadioButton
-	torBridgeCustomFrame  *gtk3.Frame
-	torBridgeCustomEntry  *gtk3.TextView
+	torBridgeToggle         *gtk3.CheckButton
+	torBridgeConfigBox      *gtk3.Box
+	torBridgeInternal       *gtk3.RadioButton
+	torBridgeInternalBox    *gtk3.Box
+	torBridgeInternalType   *gtk3.ComboBoxText
+	torBridgeCustom         *gtk3.RadioButton
+	torBridgeCustomFrame    *gtk3.Frame
+	torBridgeCustomEntry    *gtk3.TextView
+	torBridgeCustomEntryBuf *gtk3.TextBuffer
 
+	entryInsensitive    *gtk3.TextTag
 	defaultTransportIdx int
 
 	torSystemIndicator *gtk3.Box
@@ -91,11 +93,7 @@ func (d *configDialog) loadFromConfig() {
 	d.torBridgeInternal.SetActive(!d.ui.Cfg.Tor.UseCustomBridges)
 	d.internalBridgeTypeFromCfg()
 	d.torBridgeCustom.SetActive(d.ui.Cfg.Tor.UseCustomBridges)
-	if buf, err := d.torBridgeCustomEntry.GetBuffer(); err != nil {
-		panic(err)
-	} else {
-		buf.SetText(d.ui.Cfg.Tor.CustomBridges)
-	}
+	d.torBridgeCustomEntryBuf.SetText(d.ui.Cfg.Tor.CustomBridges)
 	d.onBridgeTypeChanged()
 
 	// Set the sensitivity based on the toggles.
@@ -166,9 +164,10 @@ func (d *configDialog) onOk() error {
 	d.ui.Cfg.Tor.SetUseBridges(d.torBridgeToggle.GetActive())
 	d.ui.Cfg.Tor.SetInternalBridgeType(d.torBridgeInternalType.GetActiveText())
 	d.ui.Cfg.Tor.SetUseCustomBridges(d.torBridgeCustom.GetActive())
-	if buf, err := d.torBridgeCustomEntry.GetBuffer(); err != nil {
-		return err
-	} else if s, err := buf.GetText(buf.GetStartIter(), buf.GetEndIter(), false); err != nil {
+
+	start := d.torBridgeCustomEntryBuf.GetStartIter()
+	end := d.torBridgeCustomEntryBuf.GetEndIter()
+	if s, err := d.torBridgeCustomEntryBuf.GetText(start, end, false); err != nil {
 		return err
 	} else if s, err = sbui.ValidateBridgeLines(s); err != nil {
 		return err
@@ -230,7 +229,19 @@ func (d *configDialog) onBridgeTypeChanged() {
 	isInternal := d.torBridgeInternal.GetActive()
 	d.torBridgeInternalBox.SetSensitive(isInternal)
 	d.torBridgeCustomFrame.SetSensitive(!isInternal)
-	// XXX: Figure out how to make the entry grey on insensitive...
+	d.updateBridgeEntrySensitive()
+}
+
+func (d *configDialog) updateBridgeEntrySensitive() {
+	isInternal := d.torBridgeInternal.GetActive()
+	start := d.torBridgeCustomEntryBuf.GetStartIter()
+	end := d.torBridgeCustomEntryBuf.GetEndIter()
+
+	if !isInternal && d.torBridgeToggle.GetActive() {
+		d.torBridgeCustomEntryBuf.RemoveTag(d.entryInsensitive, start, end)
+	} else {
+		d.torBridgeCustomEntryBuf.ApplyTag(d.entryInsensitive, start, end)
+	}
 }
 
 func (ui *gtkUI) initConfigDialog(b *gtk3.Builder) error {
@@ -299,6 +310,7 @@ func (ui *gtkUI) initConfigDialog(b *gtk3.Builder) error {
 	} else {
 		d.torBridgeToggle.Connect("toggled", func() {
 			d.torBridgeConfigBox.SetSensitive(d.torBridgeToggle.GetActive())
+			d.updateBridgeEntrySensitive()
 		})
 	}
 	if d.torBridgeConfigBox, err = getBox(b, "torBridgeConfigBox"); err != nil {
@@ -334,6 +346,20 @@ func (ui *gtkUI) initConfigDialog(b *gtk3.Builder) error {
 	}
 	if d.torBridgeCustomEntry, err = getTextView(b, "torBridgeCustomEntry"); err != nil {
 		return err
+	}
+	if d.torBridgeCustomEntryBuf, err = d.torBridgeCustomEntry.GetBuffer(); err != nil {
+		return err
+	}
+	if d.entryInsensitive, err = gtk3.TextTagNew("insensitive"); err != nil {
+		return err
+	} else {
+		// XXX: Query this from the style somehow?
+		d.entryInsensitive.SetProperty("foreground", "#878787")
+		tt, err := d.torBridgeCustomEntryBuf.GetTagTable()
+		if err != nil {
+			return err
+		}
+		tt.Add(d.entryInsensitive)
 	}
 
 	// Sandbox config elements.
