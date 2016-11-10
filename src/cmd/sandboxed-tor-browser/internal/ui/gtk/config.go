@@ -69,8 +69,8 @@ type configDialog struct {
 	desktopDirChooser        *gtk3.FileChooserButton
 }
 
-func (d *configDialog) reset() {
-	// Propagate the state from the config to the UI.
+func (d *configDialog) loadFromConfig() {
+	// Populate the fields from the config.
 
 	d.torProxyToggle.SetActive(d.ui.Cfg.Tor.UseProxy)
 	d.proxyTypeFromCfg()
@@ -189,7 +189,6 @@ func (d *configDialog) onOk() error {
 }
 
 func (d *configDialog) run() bool {
-	d.reset()
 	defer func() {
 		d.dialog.Hide()
 		d.ui.forceRedraw()
@@ -365,6 +364,8 @@ func (ui *gtkUI) initConfigDialog(b *gtk3.Builder) error {
 	if d.desktopDirChooser, err = getFChooser(b, "desktopDirChooser"); err != nil {
 		return err
 	}
+
+	d.loadFromConfig()
 
 	ui.configDialog = d
 	return nil
