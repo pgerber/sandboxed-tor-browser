@@ -29,7 +29,7 @@ import (
 
 type installURLs struct {
 	DownloadsURLs map[string]string
-	UpdateURLBase string
+	UpdateURLs map[string]string
 }
 
 var urls *installURLs
@@ -113,7 +113,7 @@ func UpdateURL(cfg *config.Config) (string, error) {
 	default:
 		return "", fmt.Errorf("unsupported architecture for update: %v", cfg.Installed.Architecture)
 	}
-	return fmt.Sprintf("%s/%s/%s/%s/%s", urls.UpdateURLBase, cfg.Installed.Channel, arch, cfg.Installed.Version, cfg.Installed.Locale), nil
+	return fmt.Sprintf("%s/%s/%s/%s", urls.UpdateURLs[cfg.Installed.Channel], arch, cfg.Installed.Version, cfg.Installed.Locale), nil
 }
 
 // GetUpdateEntry parses the xml file and returns the UpdateEntry if any.
