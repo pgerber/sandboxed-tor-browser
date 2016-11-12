@@ -255,7 +255,7 @@ func run(cfg *config.Config, cmdPath string, cmdArgs []string, extraBwrapArgs []
 	// work, so stick synthetic ones inside the sandbox, with the user/group
 	// normalized to resemble that of the Tails amnesia user.
 	passwdBody := fmt.Sprintf("amnesia:x:%d:%d:Debian Live User,,,:/home/amnesia:/bin/bash\n", os.Getuid(), os.Getgid())
-	groupBody := fmt.Sprintf("amnesia:%d:1000\n", os.Getgid)
+	groupBody := fmt.Sprintf("amnesia:%d:1000\n", os.Getgid())
 	if err := newFdFile("/etc/passwd", []byte(passwdBody)); err != nil {
 		return nil, err
 	}
