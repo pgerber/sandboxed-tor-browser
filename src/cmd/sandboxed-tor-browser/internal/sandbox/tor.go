@@ -64,6 +64,10 @@ type socksProxy struct {
 	l net.Listener
 }
 
+func (p *socksProxy) close() {
+	p.l.Close()
+}
+
 func (p *socksProxy) newTag() error {
 	p.Lock()
 	defer p.Unlock()
@@ -368,6 +372,10 @@ type ctrlProxy struct {
 	l net.Listener
 }
 
+func (p *ctrlProxy) close() {
+	p.l.Close()
+}
+
 func (p *ctrlProxy) acceptLoop() {
 	defer p.l.Close()
 
@@ -394,7 +402,7 @@ func (p *ctrlProxy) handleConn(conn net.Conn) {
 	go c.handle()
 }
 
-func launchCtrlProxy(cfg *config.Config, socks *socksProxy, tor *tor.Tor) error {
+func launchCtrlProxy(cfg *config.Config, socks *socksProxy, tor *tor.Tor) (*ctrlProxy, error) {
 	p := new(ctrlProxy)
 	p.socks = socks
 	p.tor = tor
@@ -404,9 +412,9 @@ func launchCtrlProxy(cfg *config.Config, socks *socksProxy, tor *tor.Tor) error 
 	os.Remove(cPath)
 	p.l, err = net.Listen("unix", cPath)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	go p.acceptLoop()
 
-	return nil
+	return p, nil
 }

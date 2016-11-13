@@ -29,7 +29,7 @@ import (
 
 type installURLs struct {
 	DownloadsURLs map[string]string
-	UpdateURLs map[string]string
+	UpdateURLs    map[string]string
 }
 
 var urls *installURLs

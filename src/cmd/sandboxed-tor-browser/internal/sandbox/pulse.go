@@ -24,57 +24,72 @@ import (
 	"strings"
 
 	xdg "github.com/cep21/xdgbasedir"
-
-	"cmd/sandboxed-tor-browser/internal/ui/config"
 )
 
-const (
-	pulseServer = "PULSE_SERVER"
-	pulseCookie = "PULSE_COOKIE"
-)
-
-func prepareSandboxedPulseAudio(cfg *config.Config) (string, []byte, error) {
-	const unixPrefix = "unix:"
-
-	if !cfg.Sandbox.EnablePulseAudio {
-		return "", nil, fmt.Errorf("bug: PulseAudio prepared when not configured")
-	}
+func (h *hugbox) enablePulseAudio() error {
+	const (
+		pulseServer = "PULSE_SERVER"
+		pulseCookie = "PULSE_COOKIE"
+		unixPrefix  = "unix:"
+	)
 
 	// TODO: PulseAudio can optionally store information regarding the location
 	// of the socket and the cookie contents as X11 root window properties.
 
 	// The config may be in a pair of enviornment variables, so check those
 	// along with the modern default locations.
-	serverPath := os.Getenv(pulseServer)
-	if serverPath == "" {
-		serverPath = path.Join(runtimeDir(), "pulse/native")
-	} else if strings.HasPrefix(serverPath, unixPrefix) {
-		serverPath = strings.TrimPrefix(serverPath, unixPrefix)
+	sockPath := os.Getenv(pulseServer)
+	if sockPath == "" {
+		sockPath = path.Join(h.runtimeDir, "pulse", "native")
+	} else if strings.HasPrefix(sockPath, unixPrefix) {
+		sockPath = strings.TrimPrefix(sockPath, unixPrefix)
 	} else {
-		return "", nil, fmt.Errorf("non-local PulseAudio not supported")
+		return fmt.Errorf("sandbox: non-local PulseAudio not supported")
 	}
 
-	if fi, err := os.Stat(serverPath); err != nil {
+	if fi, err := os.Stat(sockPath); err != nil {
 		// No pulse Audio socket.
-		return "", nil, fmt.Errorf("no PulseAudio socket")
+		return fmt.Errorf("sandbox: no PulseAudio socket")
 	} else if fi.Mode()&os.ModeSocket == 0 {
 		// Not an AF_LOCAL socket.
-		return "", nil, fmt.Errorf("PulseAudio socket isn't an AF_LOCAL socket")
+		return fmt.Errorf("sandbox: PulseAudio socket isn't an AF_LOCAL socket")
 	}
 
+	// Read in the cookie, if any.
+	var err error
+	var cookie []byte
 	cookiePath := os.Getenv(pulseCookie)
 	if cookiePath == "" {
-		var err error
 		cookiePath, err = xdg.GetConfigFileLocation("pulse/cookie")
 		if err != nil {
 			// No cookie found, auth is probably disabled.
-			return serverPath, nil, nil
+			cookiePath = ""
 		}
 	}
-	cookie, err := ioutil.ReadFile(cookiePath)
-	if err != nil {
-		return "", nil, err
+	if cookiePath != "" {
+		cookie, err = ioutil.ReadFile(cookiePath)
+		if err != nil {
+			return err
+		}
 	}
 
-	return serverPath, cookie, nil
+	// Setup access to PulseAudio in the sandbox:
+	//  * The socket.
+	//  * The cookie, if any.
+	//  * A `client.conf` that disables shared memory.
+	sandboxPulseSock := path.Join(h.runtimeDir, "pulse", "native")
+	sandboxPulseConf := path.Join(h.runtimeDir, "pulse", "client.conf")
+
+	h.bind(sockPath, sandboxPulseSock, false)
+	h.setenv(pulseServer, "unix:"+sandboxPulseSock)
+	h.setenv("PULSE_CLIENTCONFIG", sandboxPulseConf)
+	h.file(sandboxPulseConf, []byte("enable-shm=no"))
+
+	if cookie != nil {
+		sandboxPulseCookie := path.Join(h.runtimeDir, "pulse", "cookie")
+		h.file(sandboxPulseCookie, cookie)
+		h.setenv(pulseCookie, sandboxPulseCookie)
+	}
+
+	return nil
 }

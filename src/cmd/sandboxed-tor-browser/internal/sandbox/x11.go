@@ -24,8 +24,6 @@ import (
 	"os/user"
 	"path"
 	"strings"
-
-	"cmd/sandboxed-tor-browser/internal/ui/config"
 )
 
 func x11CraftAuthority(realDisplay string) ([]byte, error) {
@@ -142,7 +140,7 @@ func x11CraftAuthority(realDisplay string) ([]byte, error) {
 		// display `:0`.
 		xauth := make([]byte, 2)
 		binary.BigEndian.PutUint16(xauth[0:], family)
-		xauth = append(xauth, encodeXString([]byte(sandboxedHostname))...)
+		xauth = append(xauth, encodeXString([]byte(sandboxHostname))...)
 		xauth = append(xauth, encodeXString([]byte("0"))...)
 		xauth = append(xauth, encodeXString(authMeth)...)
 		xauth = append(xauth, encodeXString(authData)...)
@@ -152,22 +150,21 @@ func x11CraftAuthority(realDisplay string) ([]byte, error) {
 	return nil, fmt.Errorf("failed to find an appropriate Xauthority entry")
 }
 
-func prepareSandboxedX11(cfg *config.Config) ([]string, []byte, error) {
+func (h *hugbox) enableX11(display string) error {
 	const x11SockDir = "/tmp/.X11-unix"
 
-	// Figure out the X11 display number and socket path.
-	display := ""
-	for _, d := range []string{cfg.Sandbox.Display, os.Getenv("DISPLAY")} {
+	// Apply override, and determine the display.
+	for _, d := range []string{display, os.Getenv("DISPLAY")} {
 		if d != "" {
 			display = d
 			break
 		}
 	}
 	if display == "" {
-		return nil, nil, fmt.Errorf("no DISPLAY env var set")
+		return fmt.Errorf("sandbox: no DISPLAY env var set")
 	}
 	if !strings.HasPrefix(display, ":") {
-		return nil, nil, fmt.Errorf("non-local X11 displays not supported")
+		return fmt.Errorf("sandbox: non-local X11 displays not supported")
 	}
 
 	// Certain multimonitor setups use the form ":0.0" or similar.
@@ -180,15 +177,17 @@ func prepareSandboxedX11(cfg *config.Config) ([]string, []byte, error) {
 	}
 	displayNum := string(d)
 	if len(displayNum) == 0 {
-		return nil, nil, fmt.Errorf("failed to determine X11 display")
+		return fmt.Errorf("sandbox: failed to determine X11 display")
 	}
 
-	xSockArgs := []string{
-		"--dir", x11SockDir,
-		"--bind", path.Join(x11SockDir, "X"+displayNum), path.Join(x11SockDir, "X0"),
+	// Add the X11 things to the sandbox.
+	h.setenv("DISPLAY", ":0")
+	h.dir(x11SockDir)
+	h.bind(path.Join(x11SockDir, "X"+displayNum), path.Join(x11SockDir, "X0"), false)
+	if xauth, err := x11CraftAuthority(displayNum); err == nil {
+		xauthPath := path.Join(h.homeDir, ".Xauthority")
+		h.setenv("XAUTHORITY", xauthPath)
+		h.file(xauthPath, xauth)
 	}
-
-	// Create a Xauthority file contents.
-	xauth, err := x11CraftAuthority(displayNum)
-	return xSockArgs, xauth, err
+	return nil
 }
