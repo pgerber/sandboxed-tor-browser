@@ -51,8 +51,10 @@ func RunTorBrowser(cfg *config.Config, tor *tor.Tor) (cmd *exec.Cmd, err error) 
 	if err != nil {
 		return nil, err
 	}
-	h.stdout = os.Stdout // XXX: This should be redirected.
-	h.stderr = os.Stderr
+
+	logger := newConsoleLogger("firefox")
+	h.stdout = logger
+	h.stderr = logger
 	h.seccompFn = installBasicBlacklist // XXX: Use something better.
 
 	// X11, Gtk+, and PulseAudio.
@@ -168,8 +170,9 @@ func RunUpdate(cfg *config.Config, mar []byte) (err error) {
 	if err != nil {
 		return err
 	}
-	h.stdout = os.Stdout // XXX: This should be redirected.
-	h.stderr = os.Stderr
+	logger := newConsoleLogger("update")
+	h.stdout = logger
+	h.stderr = logger
 	h.seccompFn = installBasicBlacklist // XXX: Use something better.
 
 	// https://wiki.mozilla.org/Software_Update:Manually_Installing_a_MAR_file
@@ -268,4 +271,23 @@ func stageUpdate(updateDir, installDir string, mar []byte) error {
 	}
 
 	return nil
+}
+
+type consoleLogger struct {
+	prefix string
+}
+
+func (l *consoleLogger) Write(p []byte) (n int, err error) {
+	for _, s := range bytes.Split(p, []byte{'\n'}) {
+		if len(s) != 0 { // Trim empty lines.
+			log.Printf("%s: %s", l.prefix, s)
+		}
+	}
+	return len(p), nil
+}
+
+func newConsoleLogger(prefix string) *consoleLogger {
+	l := new(consoleLogger)
+	l.prefix = prefix
+	return l
 }
