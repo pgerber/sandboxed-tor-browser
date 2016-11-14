@@ -31,17 +31,14 @@ import (
 	"cmd/sandboxed-tor-browser/internal/ui/config"
 )
 
-const (
-	controlSocket = "control"
-	socksSocket   = "socks"
-)
-
 // RunTorBrowser launches sandboxed Tor Browser.
 func RunTorBrowser(cfg *config.Config, tor *tor.Tor) (cmd *exec.Cmd, err error) {
 	const (
 		profileSubDir = "TorBrowser/Data/Browser/profile.default"
 		cachesSubDir  = "TorBrowser/Data/Browser/Caches"
 		stubPath      = "/tmp/tbb_stub.so"
+		controlSocket = "control"
+		socksSocket   = "socks"
 	)
 
 	defer func() {
@@ -142,27 +139,6 @@ func RunTorBrowser(cfg *config.Config, tor *tor.Tor) (cmd *exec.Cmd, err error) 
 	h.setenv("TOR_SKIP_LAUNCH", "1")
 	h.setenv("TOR_NO_DISPLAY_NETWORK_SETTINGS", "1")
 
-	// Launch the control/socks port surrogates.  They will be torn down if
-	// the launch fails in a manner that the UI can recover.
-	socks, err := launchSocksProxy(cfg, tor)
-	if err != nil {
-		return
-	}
-	defer func() {
-		if err != nil {
-			socks.close()
-		}
-	}()
-	ctrl, err := launchCtrlProxy(cfg, socks, tor)
-	if err != nil {
-		return
-	}
-	defer func() {
-		if err != nil {
-			ctrl.close()
-		}
-	}()
-
 	// Inject the AF_LOCAL compatibility hack stub into the filesystem, and
 	// supply the relevant args required for functionality.
 	ctrlPath := path.Join(h.runtimeDir, controlSocket)
@@ -170,8 +146,8 @@ func RunTorBrowser(cfg *config.Config, tor *tor.Tor) (cmd *exec.Cmd, err error) 
 	h.setenv("LD_PRELOAD", stubPath)
 	h.setenv("TOR_STUB_CONTROL_SOCKET", ctrlPath)
 	h.setenv("TOR_STUB_SOCKS_SOCKET", socksPath)
-	h.bind(path.Join(cfg.RuntimeDir, controlSocket), ctrlPath, false)
-	h.bind(path.Join(cfg.RuntimeDir, socksSocket), socksPath, false)
+	h.bind(tor.CtrlSurrogatePath(), ctrlPath, false)
+	h.bind(tor.SocksSurrogatePath(), socksPath, false)
 	h.assetFile(stubPath, "tbb_stub.so")
 
 	h.cmd = path.Join(browserHome, "firefox")

@@ -138,7 +138,7 @@ func (c *Common) launchTor(async *Async, onlySystem bool) (dialFunc, error) {
 
 	if c.Cfg.UseSystemTor {
 		// Get the Dial() routine used to reach the external network.
-		if c.tor, err = tor.NewSystemTor(c.Cfg.SystemTorControlNet, c.Cfg.SystemTorControlAddr); err != nil {
+		if c.tor, err = tor.NewSystemTor(c.Cfg); err != nil {
 			async.Err = err
 			return nil, err
 		}

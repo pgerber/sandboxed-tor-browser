@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-package sandbox
+package tor
 
 import (
 	"bufio"
@@ -33,7 +33,6 @@ import (
 	"sync"
 
 	"cmd/sandboxed-tor-browser/internal/socks5"
-	"cmd/sandboxed-tor-browser/internal/tor"
 	"cmd/sandboxed-tor-browser/internal/ui/config"
 )
 
@@ -58,6 +57,7 @@ const (
 
 type socksProxy struct {
 	sync.RWMutex
+	sPath       string
 	sNet, sAddr string
 	tag         string
 
@@ -168,7 +168,7 @@ func (p *socksProxy) copyLoop(upConn, downConn net.Conn) {
 	wg.Wait()
 }
 
-func launchSocksProxy(cfg *config.Config, tor *tor.Tor) (*socksProxy, error) {
+func launchSocksProxy(cfg *config.Config, tor *Tor) (*socksProxy, error) {
 	p := new(socksProxy)
 	if err := p.newTag(); err != nil {
 		return nil, err
@@ -180,9 +180,9 @@ func launchSocksProxy(cfg *config.Config, tor *tor.Tor) (*socksProxy, error) {
 		return nil, err
 	}
 
-	sPath := path.Join(cfg.RuntimeDir, socksSocket)
-	os.Remove(sPath)
-	p.l, err = net.Listen("unix", sPath)
+	p.sPath = path.Join(cfg.RuntimeDir, "socks")
+	os.Remove(p.sPath)
+	p.l, err = net.Listen("unix", p.sPath)
 	if err != nil {
 		return nil, err
 	}
@@ -194,7 +194,7 @@ func launchSocksProxy(cfg *config.Config, tor *tor.Tor) (*socksProxy, error) {
 
 type ctrlProxyConn struct {
 	socks         *socksProxy
-	tor           *tor.Tor
+	tor           *Tor
 	appConn       net.Conn
 	appConnReader *bufio.Reader
 	isPreAuth     bool
@@ -366,8 +366,9 @@ func (c *ctrlProxyConn) handle() {
 }
 
 type ctrlProxy struct {
+	cPath string
 	socks *socksProxy
-	tor   *tor.Tor
+	tor   *Tor
 
 	l net.Listener
 }
@@ -402,15 +403,15 @@ func (p *ctrlProxy) handleConn(conn net.Conn) {
 	go c.handle()
 }
 
-func launchCtrlProxy(cfg *config.Config, socks *socksProxy, tor *tor.Tor) (*ctrlProxy, error) {
+func launchCtrlProxy(cfg *config.Config, tor *Tor) (*ctrlProxy, error) {
 	p := new(ctrlProxy)
-	p.socks = socks
+	p.socks = tor.socksSurrogate
 	p.tor = tor
 
 	var err error
-	cPath := path.Join(cfg.RuntimeDir, controlSocket)
-	os.Remove(cPath)
-	p.l, err = net.Listen("unix", cPath)
+	p.cPath = path.Join(cfg.RuntimeDir, "control")
+	os.Remove(p.cPath)
+	p.l, err = net.Listen("unix", p.cPath)
 	if err != nil {
 		return nil, err
 	}

@@ -27,6 +27,8 @@ import (
 
 	"git.schwanenlied.me/yawning/bulb.git"
 	"golang.org/x/net/proxy"
+
+	"cmd/sandboxed-tor-browser/internal/ui/config"
 )
 
 // ErrTorNotRunning is the error returned when the tor is not running.
@@ -40,6 +42,9 @@ type Tor struct {
 
 	cmd  *exec.Cmd
 	ctrl *bulb.Conn
+
+	ctrlSurrogate  *ctrlProxy
+	socksSurrogate *socksProxy
 }
 
 // IsSystem returns if the tor instance is a OS service not being actively
@@ -103,12 +108,34 @@ func (t *Tor) Shutdown() {
 		t.cmd.Process.Signal(syscall.SIGTERM)
 		t.ctrl = nil
 	}
+
+	if t.ctrlSurrogate != nil {
+		t.ctrlSurrogate.close()
+		t.ctrlSurrogate = nil
+	}
+
+	if t.socksSurrogate != nil {
+		t.socksSurrogate = nil
+	}
+}
+
+// SocksSurrogatePath returns the socks port surrogate AF_UNIX path.
+func (t *Tor) SocksSurrogatePath() string {
+	return t.socksSurrogate.sPath
+}
+
+// CtrlSurrogatePath returns the control port surrogate AF_UNIX path.
+func (t *Tor) CtrlSurrogatePath() string {
+	return t.ctrlSurrogate.cPath
 }
 
 // NewSystemTor creates a Tor struct around a system tor instance.
-func NewSystemTor(net, addr string) (*Tor, error) {
+func NewSystemTor(cfg *config.Config) (*Tor, error) {
 	t := new(Tor)
 	t.isSystem = true
+
+	net := cfg.SystemTorControlNet
+	addr := cfg.SystemTorControlAddr
 
 	// Dial the control port.
 	var err error
@@ -118,6 +145,17 @@ func NewSystemTor(net, addr string) (*Tor, error) {
 
 	// Authenticate with the control port.
 	if err = t.ctrl.Authenticate(""); err != nil {
+		t.ctrl.Close()
+		return nil, err
+	}
+
+	if t.socksSurrogate, err = launchSocksProxy(cfg, t); err != nil {
+		t.ctrl.Close()
+		return nil, err
+	}
+
+	if t.ctrlSurrogate, err = launchCtrlProxy(cfg, t); err != nil {
+		t.socksSurrogate.close()
 		t.ctrl.Close()
 		return nil, err
 	}
