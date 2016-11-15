@@ -72,6 +72,11 @@ func (t *Tor) IsSystem() bool {
 // Dialer returns a proxy.Dialer configured to use the Socks port with the
 // generic `sandboxed-tor-browser:isolation:pid` isolation settings.
 func (t *Tor) Dialer() (proxy.Dialer, error) {
+	net, addr, err := t.SocksPort()
+	if err != nil {
+		return nil, err
+	}
+
 	t.Lock()
 	defer t.Unlock()
 
@@ -82,7 +87,8 @@ func (t *Tor) Dialer() (proxy.Dialer, error) {
 		User:     "sandboxed-tor-bowser",
 		Password: "isolation:" + strconv.Itoa(os.Getpid()),
 	}
-	return t.ctrl.Dialer(auth)
+
+	return proxy.SOCKS5(net, addr, auth, proxy.Direct)
 }
 
 // SocksPort returns the SocksPort associated with the tor instance.
@@ -399,10 +405,10 @@ func handleBootstrapEvent(async *Async, s string) bool {
 		}
 	}
 	if progress != "" && summary != "" {
+		async.UpdateProgress(fmt.Sprintf("Bootstrap: %s", summary))
 		if progress == "100" {
 			return true
 		}
-		async.UpdateProgress(fmt.Sprintf("Bootstrap: %s", summary))
 	}
 	return false
 }
