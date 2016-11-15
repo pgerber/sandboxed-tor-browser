@@ -18,6 +18,9 @@
 package tor
 
 import (
+	"bytes"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -32,6 +35,7 @@ import (
 	"unicode"
 
 	"git.schwanenlied.me/yawning/bulb.git"
+	"golang.org/x/crypto/openpgp/s2k"
 	"golang.org/x/net/proxy"
 
 	"cmd/sandboxed-tor-browser/internal/data"
@@ -259,7 +263,7 @@ func NewSandboxedTor(cfg *config.Config, async *Async, cmd *exec.Cmd) (t *Tor, e
 	}
 
 	// Authenticate with the control port.
-	if err = t.ctrl.Authenticate(""); err != nil {
+	if err = t.ctrl.Authenticate(cfg.Tor.CtrlPassword); err != nil {
 		return nil, err
 	}
 
@@ -347,6 +351,27 @@ func CfgToSandboxTorrc(cfg *config.Config) ([]byte, error) {
 	if cfg.Tor.UseBridges || cfg.Tor.UseProxy {
 		return nil, fmt.Errorf("tor: Bridges and Proxies not supported yet")
 	}
+
+	// Generate a random control port password.
+	var entropy [16]byte
+	if _, err := rand.Read(entropy[:]); err != nil {
+		return nil, fmt.Errorf("tor: Failed to generate a password: %v", err)
+	}
+	cfg.Tor.CtrlPassword = hex.EncodeToString(entropy[:])
+
+	// Convert it to the RFC2440 S2K variant that Tor understands and expects.
+	// (SHA1, with the first 2 bytes of the descriptor that specify
+	// iterated/salted, and the hash omitted).
+	b := &bytes.Buffer{}
+	key := make([]byte, 20)
+	if err := s2k.Serialize(b, key, rand.Reader, []byte(cfg.Tor.CtrlPassword), nil); err != nil {
+		return nil, fmt.Errorf("tor: Failed to hash password: %v", err)
+	}
+	b.Write(key)
+	hashedPasswd := "16:" + hex.EncodeToString(b.Bytes()[2:])
+
+	torrc = append(torrc, []byte("\nHashedControlPassword ")...)
+	torrc = append(torrc, []byte(hashedPasswd)...)
 
 	return torrc, nil
 }

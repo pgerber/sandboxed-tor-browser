@@ -56,6 +56,9 @@ var TorProxyTypes = []string{"SOCKS 4", "SOCKS 5", "HTTP(S)"}
 type Tor struct {
 	cfg *Config
 
+	// CtrlPassword is the unhashed onctol port password.
+	CtrlPassword string `json:"-"`
+
 	// UseProxy is if the Tor network should be reached via a local proxy.
 	UseProxy bool `json:"useProxy"`
 
