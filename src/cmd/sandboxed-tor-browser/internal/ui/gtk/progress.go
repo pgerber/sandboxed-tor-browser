@@ -130,6 +130,7 @@ func (ui *gtkUI) initProgressDialog(b *gtk3.Builder) error {
 	if d.progressText, err = getLabel(b, "progressText"); err != nil {
 		return err
 	}
+	d.progressText.SetLineWrap(true)
 	if d.progressCancel, err = getButton(b, "progressCancelButton"); err != nil {
 		return err
 	}
