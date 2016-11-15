@@ -374,7 +374,9 @@ func CfgToSandboxTorrc(cfg *config.Config, bridges map[string][]string) ([]byte,
 				}
 			*/
 		} else {
-			return nil, fmt.Errorf("tor: Custom Bridges are not supported yet")
+			// The caller is responsible for making sure that this is indeed
+			// bridge lines, and not random other bullshit.
+			bridgeArgs = append(bridgeArgs, cfg.Tor.CustomBridges)
 		}
 
 		// Join all the args and append to the torrc.
