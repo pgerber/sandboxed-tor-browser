@@ -156,7 +156,7 @@ func (c *Common) launchTor(async *Async, onlySystem bool) (dialFunc, error) {
 		}
 	} else if !onlySystem {
 		// Build the torrc.
-		torrc, err := tor.CfgToSandboxTorrc(c.Cfg)
+		torrc, err := tor.CfgToSandboxTorrc(c.Cfg, Bridges)
 		if err != nil {
 			async.Err = err
 			return nil, err

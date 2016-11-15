@@ -33,6 +33,10 @@ func (c *Common) DoLaunch(async *Async, checkUpdates bool) {
 	defer func() {
 		if async.Err != nil {
 			log.Printf("launch: Failing with error: %v", async.Err)
+			if c.tor != nil {
+				c.tor.Shutdown()
+				c.tor = nil
+			}
 		} else {
 			log.Printf("launch: Complete.")
 		}

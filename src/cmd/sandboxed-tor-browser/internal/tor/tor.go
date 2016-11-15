@@ -25,12 +25,14 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	mrand "math/rand"
 	"os"
 	"os/exec"
 	"path"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 	"unicode"
 
@@ -134,9 +136,7 @@ func (t *Tor) Shutdown() {
 	}
 
 	if t.cmd != nil {
-		// KILL instead of TERM since the control port technically should
-		// have ownership.
-		t.cmd.Process.Kill()
+		t.cmd.Process.Signal(syscall.SIGTERM)
 		t.ctrl = nil
 	}
 
@@ -146,6 +146,7 @@ func (t *Tor) Shutdown() {
 	}
 
 	if t.socksSurrogate != nil {
+		t.socksSurrogate.close()
 		t.socksSurrogate = nil
 	}
 }
@@ -219,16 +220,18 @@ func NewSystemTor(cfg *config.Config) (*Tor, error) {
 // NewSandboxedTor creates a Tor struct around a sandboxed tor instance,
 // and boostraps.
 func NewSandboxedTor(cfg *config.Config, async *Async, cmd *exec.Cmd) (t *Tor, err error) {
+	var torCleanup *Tor
 	defer func() { // Automagically handle async error propagation.
-		if async.Err != nil {
-			err = async.Err
-			if t != nil {
-				t.Shutdown()
+		if err != nil {
+			async.Err = err
+			if torCleanup != nil {
+				torCleanup.Shutdown()
 			}
-			t = nil
 		}
 	}()
+
 	t = new(Tor)
+	torCleanup = t
 	t.isSystem = false
 	t.cmd = cmd
 	t.socksNet = "unix"
@@ -347,15 +350,34 @@ func NewSandboxedTor(cfg *config.Config, async *Async, cmd *exec.Cmd) (t *Tor, e
 
 // CfgToSandboxTorrc converts the `ui/config/Config` to a sandboxed tor ready
 // torrc.
-func CfgToSandboxTorrc(cfg *config.Config) ([]byte, error) {
+func CfgToSandboxTorrc(cfg *config.Config, bridges map[string][]string) ([]byte, error) {
 	torrc, err := data.Asset("torrc")
 	if err != nil {
 		return nil, err
 	}
 
 	// Apply proxy/bridge config.
-	if cfg.Tor.UseBridges || cfg.Tor.UseProxy {
-		return nil, fmt.Errorf("tor: Bridges and Proxies not supported yet")
+	if cfg.Tor.UseBridges {
+		bridgeArgs := []string{
+			"UseBridges 1",
+		}
+		if !cfg.Tor.UseCustomBridges {
+			// XXX; The shuffle ordering should be persisted.
+			shuf := mrand.Perm(len(bridges[cfg.Tor.InternalBridgeType]))
+			for _, i := range shuf {
+				bridgeArgs = append(bridgeArgs, bridges[cfg.Tor.InternalBridgeType][i])
+			}
+		} else {
+			return nil, fmt.Errorf("tor: Custom Bridges are not supported yet")
+		}
+
+		// Join all the args and append to the torrc.
+		s := "\n" + strings.Join(bridgeArgs, "\n") + "\n"
+		torrc = append(torrc, []byte(s)...)
+	}
+
+	if cfg.Tor.UseProxy {
+		return nil, fmt.Errorf("tor: Proxies not supported yet")
 	}
 
 	// Generate a random control port password.
