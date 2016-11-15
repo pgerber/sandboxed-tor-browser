@@ -19,15 +19,23 @@ package tor
 
 import (
 	"errors"
+	"fmt"
+	"io/ioutil"
+	"log"
 	"os"
 	"os/exec"
+	"path"
 	"strconv"
+	"strings"
 	"sync"
-	"syscall"
+	"time"
+	"unicode"
 
 	"git.schwanenlied.me/yawning/bulb.git"
 	"golang.org/x/net/proxy"
 
+	"cmd/sandboxed-tor-browser/internal/data"
+	. "cmd/sandboxed-tor-browser/internal/ui/async"
 	"cmd/sandboxed-tor-browser/internal/ui/config"
 )
 
@@ -40,8 +48,12 @@ type Tor struct {
 
 	isSystem bool
 
-	cmd  *exec.Cmd
-	ctrl *bulb.Conn
+	cmd        *exec.Cmd
+	ctrl       *bulb.Conn
+	ctrlEvents chan *bulb.Response
+
+	socksNet  string
+	socksAddr string
 
 	ctrlSurrogate  *ctrlProxy
 	socksSurrogate *socksProxy
@@ -77,7 +89,10 @@ func (t *Tor) SocksPort() (net, addr string, err error) {
 	if t.ctrl == nil {
 		return "", "", ErrTorNotRunning
 	}
-	return t.ctrl.SocksPort()
+	if t.socksNet == "" && t.socksAddr == "" {
+		t.socksNet, t.socksAddr, err = t.ctrl.SocksPort()
+	}
+	return t.socksNet, t.socksAddr, err
 }
 
 // Newnym issues a `SIGNAL NWENYM`.
@@ -100,12 +115,18 @@ func (t *Tor) Shutdown() {
 	defer t.Unlock()
 
 	if t.ctrl != nil {
+		// Try extra hard to get tor to fuck off, if we spawned it.
+		if !t.isSystem {
+			t.ctrl.Request("SIGNAL HALT")
+		}
 		t.ctrl.Close()
 		t.ctrl = nil
 	}
 
 	if t.cmd != nil {
-		t.cmd.Process.Signal(syscall.SIGTERM)
+		// KILL instead of TERM since the control port technically should
+		// have ownership.
+		t.cmd.Process.Kill()
 		t.ctrl = nil
 	}
 
@@ -129,10 +150,34 @@ func (t *Tor) CtrlSurrogatePath() string {
 	return t.ctrlSurrogate.cPath
 }
 
+func (t *Tor) launchSurrogates(cfg *config.Config) error {
+	var err error
+	if t.socksSurrogate, err = launchSocksProxy(cfg, t); err != nil {
+		return err
+	}
+
+	if t.ctrlSurrogate, err = launchCtrlProxy(cfg, t); err != nil {
+		t.socksSurrogate.close()
+		return err
+	}
+	return nil
+}
+
+func (t *Tor) eventReader() {
+	for {
+		resp, err := t.ctrl.NextEvent()
+		if err != nil {
+			break
+		}
+		t.ctrlEvents <- resp
+	}
+}
+
 // NewSystemTor creates a Tor struct around a system tor instance.
 func NewSystemTor(cfg *config.Config) (*Tor, error) {
 	t := new(Tor)
 	t.isSystem = true
+	t.ctrlEvents = make(chan *bulb.Response, 16)
 
 	net := cfg.SystemTorControlNet
 	addr := cfg.SystemTorControlAddr
@@ -149,16 +194,212 @@ func NewSystemTor(cfg *config.Config) (*Tor, error) {
 		return nil, err
 	}
 
-	if t.socksSurrogate, err = launchSocksProxy(cfg, t); err != nil {
+	// Launch the surrogates.
+	if err = t.launchSurrogates(cfg); err != nil {
 		t.ctrl.Close()
 		return nil, err
 	}
 
-	if t.ctrlSurrogate, err = launchCtrlProxy(cfg, t); err != nil {
-		t.socksSurrogate.close()
-		t.ctrl.Close()
+	t.ctrl.StartAsyncReader()
+	go t.eventReader()
+
+	return t, nil
+}
+
+// NewSandboxedTor creates a Tor struct around a sandboxed tor instance,
+// and boostraps.
+func NewSandboxedTor(cfg *config.Config, async *Async, cmd *exec.Cmd) (t *Tor, err error) {
+	defer func() { // Automagically handle async error propagation.
+		if async.Err != nil {
+			err = async.Err
+			if t != nil {
+				t.Shutdown()
+			}
+			t = nil
+		}
+	}()
+	t = new(Tor)
+	t.isSystem = false
+	t.cmd = cmd
+	t.socksNet = "unix"
+	t.socksAddr = path.Join(cfg.TorDataDir, "socks")
+	t.ctrlEvents = make(chan *bulb.Response, 16)
+
+	hz := time.NewTicker(1 * time.Second)
+	defer hz.Stop()
+
+	// Wait for the control port to be ready.
+	var ctrlPortAddr []byte
+	for nTicks := 0; nTicks < 10; { // 10 sec timeout (control port).
+		if ctrlPortAddr, err = ioutil.ReadFile(path.Join(cfg.TorDataDir, "control_port")); err == nil {
+			break
+		}
+
+		if os.IsNotExist(err) {
+			select {
+			case <-hz.C:
+				nTicks++
+				continue
+			case <-async.Cancel:
+				return nil, ErrCanceled
+			}
+		}
+		return nil, err
+	}
+	if ctrlPortAddr == nil {
+		return nil, fmt.Errorf("tor: timeout waiting for the control port")
+	}
+
+	log.Printf("tor: control port is: %v", string(ctrlPortAddr))
+
+	// Dial the control port.
+	async.UpdateProgress("Connecting to the Tor Control Port.")
+	if t.ctrl, err = bulb.Dial("unix", path.Join(cfg.TorDataDir, "control")); err != nil {
+		return nil, err
+	}
+
+	// Authenticate with the control port.
+	if err = t.ctrl.Authenticate(""); err != nil {
+		return nil, err
+	}
+
+	// Take ownership of the tor process such that it will self terminate
+	// when the control port connection gets closed.  Past this point, tor
+	// shouldn't leave a turd process lying around, though I've seen it on
+	// occaision. :(
+	log.Printf("tor: Taking ownership of the tor process")
+	if _, err = t.ctrl.Request("TAKEOWNERSHIP"); err != nil {
+		return nil, err
+	}
+
+	// Start the event async reader.
+	t.ctrl.StartAsyncReader()
+	go t.eventReader()
+
+	// Register the `STATUS_CLIENT` event handler.
+	if _, err = t.ctrl.Request("SETEVENTS STATUS_CLIENT"); err != nil {
+		return nil, err
+	}
+
+	// Start the bootstrap.
+	async.UpdateProgress("Connecting to the Tor network.")
+	if _, err = t.ctrl.Request("RESETCONF DisableNetwork"); err != nil {
+		return nil, err
+	}
+
+	// Wait for bootstrap to finish.
+	bootstrapFinished := false
+	for nTicks := 0; nTicks < 120 && !bootstrapFinished; { // 120 sec timeout (bootstrap).
+		select {
+		case ev := <-t.ctrlEvents:
+			const evPrefix = "STATUS_CLIENT "
+			if !strings.HasPrefix(ev.Reply, evPrefix) {
+				continue
+			}
+			bootstrapFinished = handleBootstrapEvent(async, strings.TrimPrefix(ev.Reply, evPrefix))
+		case <-async.Cancel:
+			return nil, ErrCanceled
+		case <-hz.C:
+			const statusPrefix = "status/bootstrap-phase="
+			// Fallback in case something goes wrong, poll the bootstrap status
+			// every 10 sec.
+			nTicks++
+			if nTicks%10 != 0 {
+				continue
+			}
+
+			resp, err := t.ctrl.Request("GETINFO status/bootstrap-phase")
+			if err != nil {
+				return nil, err
+			}
+			bootstrapFinished = handleBootstrapEvent(async, strings.TrimPrefix(resp.Data[0], statusPrefix))
+		}
+	}
+	if !bootstrapFinished {
+		return nil, fmt.Errorf("tor: timeout connecting to the tor network")
+	}
+
+	// Squelch the events, and drain the event queue.
+	if _, err = t.ctrl.Request("SETEVENTS"); err != nil {
+		return nil, err
+	}
+	for len(t.ctrlEvents) > 0 {
+		<-t.ctrlEvents
+	}
+
+	// Launch the surrogates.
+	if err = t.launchSurrogates(cfg); err != nil {
 		return nil, err
 	}
 
 	return t, nil
+}
+
+// CfgToSandboxTorrc converts the `ui/config/Config` to a sandboxed tor ready
+// torrc.
+func CfgToSandboxTorrc(cfg *config.Config) ([]byte, error) {
+	torrc, err := data.Asset("torrc")
+	if err != nil {
+		return nil, err
+	}
+
+	// Apply proxy/bridge config.
+	if cfg.Tor.UseBridges || cfg.Tor.UseProxy {
+		return nil, fmt.Errorf("tor: Bridges and Proxies not supported yet")
+	}
+
+	return torrc, nil
+}
+
+func handleBootstrapEvent(async *Async, s string) bool {
+	const bootstrapPrefix = "NOTICE BOOTSTRAP "
+	if !strings.HasPrefix(s, bootstrapPrefix) {
+		return false
+	}
+
+	split := splitQuoted(strings.TrimPrefix(s, bootstrapPrefix))
+
+	var progress, summary string
+	for _, v := range split {
+		const (
+			progressPrefix = "PROGRESS="
+			summaryPrefix  = "SUMMARY="
+		)
+
+		if strings.HasPrefix(v, progressPrefix) {
+			progress = strings.TrimPrefix(v, progressPrefix)
+		} else if strings.HasPrefix(v, summaryPrefix) {
+			summary = strings.TrimPrefix(v, summaryPrefix)
+			summary = strings.Trim(summary, "\"")
+		}
+	}
+	if progress != "" && summary != "" {
+		if progress == "100" {
+			return true
+		}
+		async.UpdateProgress(fmt.Sprintf("Bootstrap: %s", summary))
+	}
+	return false
+}
+
+// Random quoted split function stolen and modified from the intertubes.
+// https://groups.google.com/forum/#!topic/golang-nuts/pNwqLyfl2co
+func splitQuoted(s string) []string {
+	lastQuote := rune(0)
+	f := func(c rune) bool {
+		switch {
+		case c == lastQuote:
+			lastQuote = rune(0)
+			return false
+		case lastQuote != rune(0):
+			return false
+		case c == '"':
+			lastQuote = c
+			return false
+		default:
+			return unicode.IsSpace(c)
+		}
+	}
+
+	return strings.FieldsFunc(s, f)
 }

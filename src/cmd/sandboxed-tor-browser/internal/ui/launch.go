@@ -22,6 +22,7 @@ import (
 	"runtime"
 
 	"cmd/sandboxed-tor-browser/internal/sandbox"
+	. "cmd/sandboxed-tor-browser/internal/ui/async"
 )
 
 // DoLaunch executes the launch step based on the configured parameters.

@@ -14,20 +14,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-package ui
+// Package async provides an async task struct to allow the UI to run background
+// tasks.
+package async
 
 import (
 	"bytes"
 	"errors"
 	"fmt"
-	"net/http"
 	"runtime"
 	"time"
 
 	"git.schwanenlied.me/yawning/grab.git"
-	"git.schwanenlied.me/yawning/hpkp.git"
-
-	"cmd/sandboxed-tor-browser/internal/installer"
 )
 
 // ErrCanceled is the error set when an async operation was canceled.
@@ -53,7 +51,9 @@ type Async struct {
 	UpdateProgress func(string)
 }
 
-func (async *Async) grab(client *grab.Client, url string, hzFn func(string)) []byte {
+// Grab asynchronously downloads the provided URL using the provided grab
+// client, periodically invoking the hzFn on forward progress.
+func (async *Async) Grab(client *grab.Client, url string, hzFn func(string)) []byte {
 	if req, err := grab.NewRequest(url); err != nil {
 		async.Err = err
 		return nil
@@ -103,26 +103,4 @@ func NewAsync() *Async {
 	async.Done = make(chan interface{})
 	async.ToUI = make(chan interface{})
 	return async
-}
-
-func newGrabClient(dialFn dialFunc, dialTLSFn dialFunc) *grab.Client {
-	// Create the async HTTP client.
-	client := grab.NewClient()
-	client.UserAgent = ""
-	client.HTTPClient.Transport = &http.Transport{
-		Proxy:   nil,
-		Dial:    dialFn,
-		DialTLS: dialTLSFn,
-	}
-	return client
-}
-
-func newHPKPGrabClient(dialFn dialFunc) *grab.Client {
-	dialConf := &hpkp.DialerConfig{
-		Storage:   installer.StaticHPKPPins,
-		PinOnly:   false,
-		TLSConfig: nil,
-		Dial:      dialFn,
-	}
-	return newGrabClient(dialFn, dialConf.NewDialer())
 }

@@ -17,9 +17,10 @@
 package gtk
 
 import (
-	sbui "cmd/sandboxed-tor-browser/internal/ui"
 	"github.com/gotk3/gotk3/glib"
 	gtk3 "github.com/gotk3/gotk3/gtk"
+
+	async "cmd/sandboxed-tor-browser/internal/ui/async"
 )
 
 type progressDialog struct {
@@ -40,7 +41,7 @@ func (d *progressDialog) setText(s string) {
 	d.progressText.SetText(s)
 }
 
-func (d *progressDialog) run(async *sbui.Async, runFn func()) {
+func (d *progressDialog) run(async *async.Async, runFn func()) {
 	const updateInterval = 100 // ms
 	cancel := false
 

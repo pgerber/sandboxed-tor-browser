@@ -24,13 +24,20 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"path"
 	"strings"
 
+	"git.schwanenlied.me/yawning/grab.git"
+	"git.schwanenlied.me/yawning/hpkp.git"
+
 	"cmd/sandboxed-tor-browser/internal/data"
+	"cmd/sandboxed-tor-browser/internal/installer"
+	"cmd/sandboxed-tor-browser/internal/sandbox"
 	"cmd/sandboxed-tor-browser/internal/tor"
+	. "cmd/sandboxed-tor-browser/internal/ui/async"
 	"cmd/sandboxed-tor-browser/internal/ui/config"
 )
 
@@ -129,20 +136,54 @@ type dialFunc func(string, string) (net.Conn, error)
 
 func (c *Common) launchTor(async *Async, onlySystem bool) (dialFunc, error) {
 	var err error
+	defer func() {
+		if async.Err != nil && c.tor != nil {
+			c.tor.Shutdown()
+			c.tor = nil
+		}
+	}()
 
 	if c.tor != nil {
-		log.Printf("launchTor: Shutting down old tor.")
+		log.Printf("launch: Shutting down old tor.")
 		c.tor.Shutdown()
 		c.tor = nil
 	}
 
 	if c.Cfg.UseSystemTor {
-		// Get the Dial() routine used to reach the external network.
 		if c.tor, err = tor.NewSystemTor(c.Cfg); err != nil {
 			async.Err = err
 			return nil, err
 		}
+	} else if !onlySystem {
+		// Build the torrc.
+		torrc, err := tor.CfgToSandboxTorrc(c.Cfg)
+		if err != nil {
+			async.Err = err
+			return nil, err
+		}
 
+		async.UpdateProgress("Launching Tor executable.")
+		cmd, err := sandbox.RunTor(c.Cfg, torrc)
+		if err != nil {
+			async.Err = err
+			return nil, err
+		}
+
+		async.UpdateProgress("Waiting on Tor bootstrap.")
+		if c.tor, err = tor.NewSandboxedTor(c.Cfg, async, cmd); err != nil {
+			async.Err = err
+			return nil, err
+		}
+	} else if !c.Cfg.NeedsInstall() {
+		// That's odd, we only asked for a system tor, but we should be capable
+		// of launching tor ourselves.  Don't use a direct connection.
+		err = fmt.Errorf("tor bootstrap would be skipped, when we could launch")
+		async.Err = err
+		return nil, err
+	}
+
+	// If we managed to launch tor...
+	if c.tor != nil {
 		// Query the socks port, setup the dialer.
 		if dialer, err := c.tor.Dialer(); err != nil {
 			async.Err = err
@@ -150,17 +191,6 @@ func (c *Common) launchTor(async *Async, onlySystem bool) (dialFunc, error) {
 		} else {
 			return dialer.Dial, nil
 		}
-	} else if !onlySystem {
-		// XXX: Launch bundled tor.
-		err = fmt.Errorf("launching tor is not supported yet")
-		async.Err = err
-		return nil, err
-	} else if !c.Cfg.NeedsInstall() {
-		// That's odd, we only asked for a system tor, but we should be capable
-		// of launching tor ourselves.  Don't use a direct connection.
-		err = fmt.Errorf("tor bootstrap would be skipped, when we could launch")
-		async.Err = err
-		return nil, err
 	}
 
 	// We must be installing, without a tor daemon already running.
@@ -235,6 +265,28 @@ func ValidateBridgeLines(ls string) (string, error) {
 	}
 
 	return strings.Join(ret, "\n"), nil
+}
+
+func newGrabClient(dialFn dialFunc, dialTLSFn dialFunc) *grab.Client {
+	// Create the async HTTP client.
+	client := grab.NewClient()
+	client.UserAgent = ""
+	client.HTTPClient.Transport = &http.Transport{
+		Proxy:   nil,
+		Dial:    dialFn,
+		DialTLS: dialTLSFn,
+	}
+	return client
+}
+
+func newHPKPGrabClient(dialFn dialFunc) *grab.Client {
+	dialConf := &hpkp.DialerConfig{
+		Storage:   installer.StaticHPKPPins,
+		PinOnly:   false,
+		TLSConfig: nil,
+		Dial:      dialFn,
+	}
+	return newGrabClient(dialFn, dialConf.NewDialer())
 }
 
 func init() {

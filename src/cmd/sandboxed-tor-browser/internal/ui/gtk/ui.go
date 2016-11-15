@@ -26,6 +26,7 @@ import (
 
 	"cmd/sandboxed-tor-browser/internal/data"
 	sbui "cmd/sandboxed-tor-browser/internal/ui"
+	"cmd/sandboxed-tor-browser/internal/ui/async"
 )
 
 type gtkUI struct {
@@ -53,7 +54,7 @@ func (ui *gtkUI) Run() error {
 				return nil
 			} else {
 				if err := ui.installDialog.onOk(); err != nil {
-					if err != sbui.ErrCanceled {
+					if err != async.ErrCanceled {
 						ui.bitch("Failed to install: %v", err)
 						return err
 					}
@@ -80,7 +81,7 @@ func (ui *gtkUI) Run() error {
 
 		// Launch
 		if err := ui.launch(); err != nil {
-			if err != sbui.ErrCanceled {
+			if err != async.ErrCanceled {
 				ui.bitch("Failed to launch Tor Browser: %v", err)
 			}
 			continue
@@ -158,7 +159,7 @@ func (ui *gtkUI) launch() error {
 	checkUpdate := ui.Cfg.NeedsUpdateCheck()
 	squelchUI := !checkUpdate && ui.Cfg.UseSystemTor
 
-	async := sbui.NewAsync()
+	async := async.NewAsync()
 	if squelchUI {
 		async.UpdateProgress = func(s string) {}
 		go ui.DoLaunch(async, checkUpdate)

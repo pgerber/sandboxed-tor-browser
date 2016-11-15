@@ -30,6 +30,7 @@ import (
 	"cmd/sandboxed-tor-browser/internal/data"
 	"cmd/sandboxed-tor-browser/internal/installer"
 	"cmd/sandboxed-tor-browser/internal/sandbox"
+	. "cmd/sandboxed-tor-browser/internal/ui/async"
 	"cmd/sandboxed-tor-browser/internal/ui/config"
 )
 
@@ -76,7 +77,7 @@ func (c *Common) DoInstall(async *Async) {
 	if url := installer.DownloadsURL(c.Cfg); url == "" {
 		async.Err = fmt.Errorf("unable to find downloads URL")
 		return
-	} else if b := async.grab(client, url, nil); async.Err != nil {
+	} else if b := async.Grab(client, url, nil); async.Err != nil {
 		return
 	} else if version, downloads, async.Err = installer.GetDownloadsEntry(c.Cfg, b); async.Err != nil {
 		return
@@ -90,7 +91,7 @@ func (c *Common) DoInstall(async *Async) {
 	async.UpdateProgress("Downloading Tor Browser.")
 
 	var bundleTarXz []byte
-	if bundleTarXz = async.grab(client, downloads.Binary, func(s string) { async.UpdateProgress(fmt.Sprintf("Downloading Tor Browser: %s", s)) }); async.Err != nil {
+	if bundleTarXz = async.Grab(client, downloads.Binary, func(s string) { async.UpdateProgress(fmt.Sprintf("Downloading Tor Browser: %s", s)) }); async.Err != nil {
 		return
 	}
 
@@ -99,7 +100,7 @@ func (c *Common) DoInstall(async *Async) {
 	async.UpdateProgress("Downloading Tor Browser PGP Signature.")
 
 	var bundleSig []byte
-	if bundleSig = async.grab(client, downloads.Sig, nil); async.Err != nil {
+	if bundleSig = async.Grab(client, downloads.Sig, nil); async.Err != nil {
 		return
 	}
 
@@ -181,7 +182,7 @@ func (c *Common) doUpdate(async *Async, dialFn dialFunc) {
 		return
 	} else {
 		log.Printf("launch: Update URL: %v", url)
-		if b := async.grab(client, url, nil); async.Err != nil {
+		if b := async.Grab(client, url, nil); async.Err != nil {
 			return
 		} else if update, async.Err = installer.GetUpdateEntry(b); async.Err != nil {
 			return
@@ -227,7 +228,7 @@ func (c *Common) doUpdate(async *Async, dialFn dialFunc) {
 	async.UpdateProgress("Downloading Tor Browser Update.")
 
 	var mar []byte
-	if mar = async.grab(client, patch.Url, func(s string) { async.UpdateProgress(fmt.Sprintf("Downloading Tor Browser Update: %s", s)) }); async.Err != nil {
+	if mar = async.Grab(client, patch.Url, func(s string) { async.UpdateProgress(fmt.Sprintf("Downloading Tor Browser Update: %s", s)) }); async.Err != nil {
 		return
 	}
 

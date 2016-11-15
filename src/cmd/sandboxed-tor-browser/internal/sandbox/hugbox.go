@@ -72,9 +72,11 @@ type hugbox struct {
 	chdir      string
 	mountProc  bool
 	unshare    unshareOpts
+	stdin      io.Reader
 	stdout     io.Writer
 	stderr     io.Writer
 	seccompFn  func(*os.File) error
+	pdeathSig  syscall.Signal
 
 	// Internal options, not to be modified except via helpers, unless you
 	// know what you are doing.
@@ -134,11 +136,11 @@ func (h *hugbox) run() (*exec.Cmd, error) {
 		Path:   h.bwrapPath,
 		Args:   []string{h.bwrapPath, "--args", "3", h.cmd},
 		Env:    []string{},
-		Stdin:  os.Stdin,
+		Stdin:  h.stdin,
 		Stdout: h.stdout,
 		Stderr: h.stderr,
 		SysProcAttr: &syscall.SysProcAttr{
-			Pdeathsig: syscall.SIGTERM,
+			Pdeathsig: h.pdeathSig,
 		},
 	}
 	cmd.Args = append(cmd.Args, h.cmdArgs...)
@@ -280,6 +282,7 @@ func newHugbox() (*hugbox, error) {
 		mountProc:  true,
 		runtimeDir: path.Join("/run", "user", fmt.Sprintf("%d", os.Getuid())),
 		homeDir:    "/home/amnesia",
+		pdeathSig:  syscall.SIGTERM,
 	}
 
 	// Look for the bwrap binary in sensible locations.

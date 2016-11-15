@@ -81,10 +81,10 @@ func RunTorBrowser(cfg *config.Config, tor *tor.Tor) (cmd *exec.Cmd, err error) 
 	realDownloadsDir := path.Join(realBrowserHome, "Downloads")
 
 	// Ensure that the `Downloads` and `Desktop` mount points exist.
-	if err = os.MkdirAll(realDesktopDir, os.ModeDir|0700); err != nil {
+	if err = os.MkdirAll(realDesktopDir, config.DirMode); err != nil {
 		return
 	}
-	if err = os.MkdirAll(realDownloadsDir, os.ModeDir|0700); err != nil {
+	if err = os.MkdirAll(realDownloadsDir, config.DirMode); err != nil {
 		return
 	}
 
@@ -102,7 +102,7 @@ func RunTorBrowser(cfg *config.Config, tor *tor.Tor) (cmd *exec.Cmd, err error) 
 	desktopDir := path.Join(browserHome, "Desktop")
 
 	// Filesystem stuff.
-	h.roBind(cfg.UserDataDir, "/home/amnesia/sandboxed-tor-browser", false)
+	h.roBind(cfg.BundleInstallDir, path.Join(h.homeDir, "sandboxed-tor-browser", "tor-browser"), false)
 	h.bind(realProfileDir, profileDir, false)
 	h.bind(realDesktopDir, desktopDir, false)
 	h.bind(realDownloadsDir, downloadsDir, false)
@@ -251,7 +251,7 @@ func stageUpdate(updateDir, installDir string, mar []byte) error {
 
 	// 1. Create a directory outside of the application's installation
 	//    directory to be updated.
-	if err := os.MkdirAll(updateDir, os.ModeDir|0700); err != nil {
+	if err := os.MkdirAll(updateDir, config.DirMode); err != nil {
 		return err
 	}
 
@@ -266,11 +266,55 @@ func stageUpdate(updateDir, installDir string, mar []byte) error {
 	// 3. Download the appropriate .mar file and put it into the outside
 	//    directory you created (see Where to get a mar file).
 	// 4. Rename the mar file you downloaded to update.mar.
-	if err := ioutil.WriteFile(path.Join(updateDir, "update.mar"), mar, 0600); err != nil {
+	if err := ioutil.WriteFile(path.Join(updateDir, "update.mar"), mar, config.FileMode); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+// RunTor launches sandboxeed Tor.
+func RunTor(cfg *config.Config, torrc []byte) (cmd *exec.Cmd, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%v", r)
+		}
+	}()
+
+	h, err := newHugbox()
+	if err != nil {
+		return nil, err
+	}
+
+	logger := newConsoleLogger("tor")
+	h.stdout = logger
+	h.stderr = logger
+	h.seccompFn = installBasicBlacklist
+	h.unshare.net = false // Use the loopback interface for the ports.
+
+	if err = os.MkdirAll(cfg.TorDataDir, config.DirMode); err != nil {
+		return
+	}
+
+	realTorHome := path.Join(cfg.BundleInstallDir, "Browser", "TorBrowser", "Tor")
+	realGeoIPDir := path.Join(cfg.BundleInstallDir, "Browser", "TorBrowser", "Data", "Tor")
+	torDir := path.Join(h.homeDir, "tor")
+	torBinDir := path.Join(torDir, "bin")
+	torrcPath := path.Join(torDir, "etc", "torrc")
+
+	h.dir(torDir)
+	h.roBind(realTorHome, torBinDir, false)
+	for _, v := range []string{"geoip", "geoip6"} {
+		h.roBind(path.Join(realGeoIPDir, v), path.Join(torDir, "etc", v), false)
+	}
+	h.bind(cfg.TorDataDir, path.Join(torDir, "data"), false)
+	h.file(torrcPath, torrc)
+	h.setenv("LD_LIBRARY_PATH", torBinDir)
+
+	h.cmd = path.Join(torBinDir, "tor")
+	h.cmdArgs = []string{"-f", torrcPath}
+
+	return h.run()
 }
 
 type consoleLogger struct {

@@ -20,6 +20,7 @@ import (
 	gtk3 "github.com/gotk3/gotk3/gtk"
 
 	sbui "cmd/sandboxed-tor-browser/internal/ui"
+	"cmd/sandboxed-tor-browser/internal/ui/async"
 )
 
 type installDialog struct {
@@ -59,7 +60,7 @@ func (d *installDialog) onOk() error {
 	d.ui.progressDialog.setText("Initializing installation process...")
 
 	// Display the progress dialog, and start the install task.
-	async := sbui.NewAsync()
+	async := async.NewAsync()
 	d.ui.progressDialog.run(async, func() { d.ui.DoInstall(async) })
 	return async.Err
 }

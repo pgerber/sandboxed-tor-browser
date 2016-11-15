@@ -46,6 +46,7 @@ const (
 
 	appDir           = "sandboxed-tor-browser"
 	bundleInstallDir = "tor-browser"
+	torDataDir       = "tor"
 )
 
 // TorProxyTypes are the proxy protocols supported by tor.
@@ -290,6 +291,9 @@ type Config struct {
 	// BundeInstallDir is `UserDataDir/bundleInstallDir`.
 	BundleInstallDir string `json:"-"`
 
+	// TorDataDir is `UserDataDir/torDataDir`.
+	TorDataDir string `json:"-"`
+
 	isDirty bool
 	path    string
 }
@@ -472,6 +476,7 @@ func New() (*Config, error) {
 	} else {
 		cfg.UserDataDir = path.Join(d, appDir)
 		cfg.BundleInstallDir = path.Join(cfg.UserDataDir, bundleInstallDir)
+		cfg.TorDataDir = path.Join(cfg.UserDataDir, torDataDir)
 	}
 	for _, d := range []string{cfg.RuntimeDir, cfg.UserDataDir} {
 		if err := os.MkdirAll(d, DirMode); err != nil {
