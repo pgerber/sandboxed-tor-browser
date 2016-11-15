@@ -25,7 +25,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	mrand "math/rand"
+	//	mrand "math/rand"
 	"os"
 	"os/exec"
 	"path"
@@ -362,11 +362,17 @@ func CfgToSandboxTorrc(cfg *config.Config, bridges map[string][]string) ([]byte,
 			"UseBridges 1",
 		}
 		if !cfg.Tor.UseCustomBridges {
-			// XXX; The shuffle ordering should be persisted.
-			shuf := mrand.Perm(len(bridges[cfg.Tor.InternalBridgeType]))
-			for _, i := range shuf {
-				bridgeArgs = append(bridgeArgs, bridges[cfg.Tor.InternalBridgeType][i])
+			// XXX: Actually shuffle this once there's a mechanism for
+			// persisting ordering. (#43)
+			for _, v := range bridges[cfg.Tor.InternalBridgeType] {
+				bridgeArgs = append(bridgeArgs, v)
 			}
+			/*
+				shuf := mrand.Perm(len(bridges[cfg.Tor.InternalBridgeType]))
+				for _, i := range shuf {
+					bridgeArgs = append(bridgeArgs, bridges[cfg.Tor.InternalBridgeType][i])
+				}
+			*/
 		} else {
 			return nil, fmt.Errorf("tor: Custom Bridges are not supported yet")
 		}
