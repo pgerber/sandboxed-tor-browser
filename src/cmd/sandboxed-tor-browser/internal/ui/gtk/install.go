@@ -75,14 +75,18 @@ func (d *installDialog) onChannelChanged() {
 		l = d.ui.Cfg.Locale
 	}
 	d.localeSelector.RemoveAll()
-	id := 0
-	for i, v := range sbui.BundleLocales[ch] {
+	canSetLocale := false
+	for _, v := range sbui.BundleLocales[ch] {
 		if v == l {
-			id = i
+			canSetLocale = true
 		}
-		d.localeSelector.AppendText(v)
+		d.localeSelector.Append(v, v)
 	}
-	d.localeSelector.SetActive(id)
+	if canSetLocale {
+		d.localeSelector.SetActiveID(l)
+	} else {
+		d.localeSelector.SetActive(0)
+	}
 }
 
 func (ui *gtkUI) initInstallDialog(b *gtk3.Builder) error {
@@ -113,14 +117,18 @@ func (ui *gtkUI) initInstallDialog(b *gtk3.Builder) error {
 	if d.channelSelector, err = getComboBoxText(b, "channelSelector"); err != nil {
 		return err
 	} else {
-		id := 0
-		for i, v := range sbui.BundleChannels[ui.Cfg.Architecture] {
+		id := ""
+		for _, v := range sbui.BundleChannels[ui.Cfg.Architecture] {
 			if v == ui.Cfg.Channel {
-				id = i
+				id = v
 			}
-			d.channelSelector.AppendText(v)
+			d.channelSelector.Append(v, v)
 		}
-		d.channelSelector.SetActive(id)
+		if id != "" {
+			d.channelSelector.SetActiveID(id)
+		} else {
+			d.channelSelector.SetActive(0)
+		}
 		d.channelSelector.Connect("changed", func() { d.onChannelChanged() })
 	}
 	if d.localeSelector, err = getComboBoxText(b, "localeSelector"); err != nil {

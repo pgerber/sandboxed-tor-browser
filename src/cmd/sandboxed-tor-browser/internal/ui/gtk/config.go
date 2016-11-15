@@ -54,8 +54,7 @@ type configDialog struct {
 	torBridgeCustomEntry    *gtk3.TextView
 	torBridgeCustomEntryBuf *gtk3.TextBuffer
 
-	entryInsensitive    *gtk3.TextTag
-	defaultTransportIdx int
+	entryInsensitive *gtk3.TextTag
 
 	torSystemIndicator *gtk3.Box
 
@@ -197,28 +196,21 @@ func (d *configDialog) run() bool {
 }
 
 func (d *configDialog) proxyTypeFromCfg() {
-	id := 0
-	for i, v := range config.TorProxyTypes {
-		if v == d.ui.Cfg.Tor.ProxyType {
-			id = i
-			break
-		}
+	t := d.ui.Cfg.Tor.ProxyType
+	if t == "" {
+		d.torProxyType.SetActive(0)
+	} else {
+		d.torProxyType.SetActiveID(t)
 	}
-	d.torProxyType.SetActive(id)
 	d.onProxyTypeChanged()
 }
 
 func (d *configDialog) internalBridgeTypeFromCfg() {
-	id := d.defaultTransportIdx
-	i := 0
-	for transport, _ := range sbui.Bridges {
-		if transport == d.ui.Cfg.Tor.InternalBridgeType {
-			id = i
-			break
-		}
-		i++
+	t := d.ui.Cfg.Tor.InternalBridgeType
+	if t == "" {
+		t = sbui.DefaultBridgeTransport
 	}
-	d.torBridgeInternalType.SetActive(id)
+	d.torBridgeInternalType.SetActiveID(t)
 }
 
 func (d *configDialog) onProxyTypeChanged() {
@@ -284,7 +276,7 @@ func (ui *gtkUI) initConfigDialog(b *gtk3.Builder) error {
 		return err
 	} else {
 		for _, v := range config.TorProxyTypes {
-			d.torProxyType.AppendText(v)
+			d.torProxyType.Append(v, v)
 		}
 		d.torProxyType.Connect("changed", func() { d.onProxyTypeChanged() })
 	}
@@ -327,13 +319,8 @@ func (ui *gtkUI) initConfigDialog(b *gtk3.Builder) error {
 	if d.torBridgeInternalType, err = getComboBoxText(b, "torBridgeInternalType"); err != nil {
 		return err
 	} else {
-		i := 0
 		for transport, _ := range sbui.Bridges {
-			if transport == sbui.DefaultBridgeTransport {
-				d.defaultTransportIdx = i
-			}
-			i++
-			d.torBridgeInternalType.AppendText(transport)
+			d.torBridgeInternalType.Append(transport, transport)
 		}
 	}
 	if d.torBridgeCustom, err = getRadioButton(b, "torBridgeCustom"); err != nil {
