@@ -24,6 +24,8 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"strconv"
+	"strings"
 	"time"
 
 	"git.schwanenlied.me/yawning/bulb.git/utils"
@@ -318,6 +320,42 @@ type Installed struct {
 	// LastUpdateCheck is the UNIX time when the last update check was
 	// sucessfully completed.
 	LastUpdateCheck int64 `json:"lastUpdateCheck,omitEmpty"`
+}
+
+// BundleVersionAtLeast returns true if the bundle version is greater than or
+// equal to the specified version.
+func (in *Installed) BundleVersionAtLeast(major, minor int) bool {
+	vStr := strings.TrimSuffix(in.Version, "-hardened")
+	if in.Version == "" {
+		return false
+	}
+	if in.Channel == "alpha" || in.Channel == "hardened" {
+		vStr = strings.Replace(vStr, "a", ".", 1)
+	}
+
+	// Split into major/minor/pl.
+	v := strings.Split(vStr, ".")
+	if len(v) < 2 { // Need at least a major/minor.
+		return false
+	}
+
+	iMaj, err := strconv.Atoi(v[0])
+	if err != nil {
+		return false
+	}
+	iMin, err := strconv.Atoi(v[1])
+	if err != nil {
+		return false
+	}
+
+	// Do the version comparison.
+	if iMaj > major {
+		return true
+	}
+	if iMaj == major && iMin >= minor {
+		return true
+	}
+	return false
 }
 
 // SetLocale sets the configured locale, and marks the config dirty.

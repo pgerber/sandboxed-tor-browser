@@ -318,3 +318,9 @@ func writeBuffer(w io.WriteCloser, contents []byte) error {
 	_, err := w.Write(contents)
 	return err
 }
+
+// IsGrsecKernel returns true if the system appears to be running a grsec
+// kernel.
+func IsGrsecKernel() bool {
+	return fileExists("/proc/sys/kernel/grsecurity") || fileExists("/dev/grsec")
+}

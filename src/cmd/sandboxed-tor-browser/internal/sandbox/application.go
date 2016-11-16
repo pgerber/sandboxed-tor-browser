@@ -26,6 +26,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"syscall"
 
 	"cmd/sandboxed-tor-browser/internal/tor"
 	"cmd/sandboxed-tor-browser/internal/ui/config"
@@ -153,10 +154,49 @@ func RunTorBrowser(cfg *config.Config, tor *tor.Tor) (cmd *exec.Cmd, err error) 
 	h.bind(tor.SocksSurrogatePath(), socksPath, false)
 	h.assetFile(stubPath, "tbb_stub.so")
 
+	// Tor Browser currently is incompatible with PaX MPROTECT, apply the
+	// override if needed.
+	realFirefoxPath := path.Join(realBrowserHome, "firefox")
+	if err = applyPaXAttributes(cfg, realFirefoxPath); err != nil {
+		return nil, err
+	}
+
 	h.cmd = path.Join(browserHome, "firefox")
 	h.cmdArgs = []string{"--class", "Tor Browser", "-profile", profileDir}
 
 	return h.run()
+}
+
+func applyPaXAttributes(cfg *config.Config, f string) error {
+	const paxAttr = "user.pax.flags"
+
+	sz, _ := syscall.Getxattr(f, paxAttr, nil)
+
+	// Strip off the attribute if this is a non-grsec kernel, or the bundle is
+	// sufficiently recent to the point where the required W^X fixes are present
+	// in the JIT.
+	if !IsGrsecKernel() || cfg.Installed.BundleVersionAtLeast(7, 0) {
+		if sz > 0 {
+			log.Printf("sandbox: Removing Tor Browser PaX attributes.")
+			syscall.Removexattr(f, paxAttr)
+		}
+		return nil
+	}
+
+	paxOverride := []byte{'m'}
+	if sz > 0 {
+		dest := make([]byte, sz)
+		if _, err := syscall.Getxattr(f, paxAttr, dest); err != nil {
+			return err
+		}
+		if bytes.Contains(dest, paxOverride) {
+			log.Printf("sandbox: Tor Browser PaX attributes already set.")
+			return nil
+		}
+	}
+
+	log.Printf("sandbox: Applying Tor Browser PaX attributes.")
+	return syscall.Setxattr(f, paxAttr, paxOverride, 0)
 }
 
 // RunUpdate launches sandboxed Tor Browser update.

@@ -314,6 +314,14 @@ func NewSandboxedTor(cfg *config.Config, async *Async, cmd *exec.Cmd) (t *Tor, e
 			return nil, ErrCanceled
 		case <-hz.C:
 			const statusPrefix = "status/bootstrap-phase="
+
+			// As a fallback, use kill(pid, 0) to detect if the process has
+			// puked.  waitpid(2) is probably better since it's a child, but
+			// this should be good enough, and is only to catch tor crashing.
+			if err := syscall.Kill(cmd.Process.Pid, 0); err == syscall.ESRCH {
+				return nil, fmt.Errorf("tor process appears to have crashed.")
+			}
+
 			// Fallback in case something goes wrong, poll the bootstrap status
 			// every 10 sec.
 			nTicks++
