@@ -360,6 +360,7 @@ func CfgToSandboxTorrc(cfg *config.Config, bridges map[string][]string) ([]byte,
 	if cfg.Tor.UseBridges {
 		bridgeArgs := []string{
 			"UseBridges 1",
+			"ClientTransportPlugin obfs2,obfs3,obfs4,scramblesuit exec /home/amnesia/tor/bin/PluggableTransports/obfs4proxy",
 		}
 		if !cfg.Tor.UseCustomBridges {
 			// XXX: Actually shuffle this once there's a mechanism for
@@ -382,6 +383,12 @@ func CfgToSandboxTorrc(cfg *config.Config, bridges map[string][]string) ([]byte,
 		// Join all the args and append to the torrc.
 		s := "\n" + strings.Join(bridgeArgs, "\n") + "\n"
 		torrc = append(torrc, []byte(s)...)
+	} else {
+		// Tor's built in seccomp whitelist based sandbox only works when
+		// there are no managed pluggable transports, so only enable it when
+		// bridges aren't in use.  The standard whitelist will have to
+		// suffice when people use bridges.
+		torrc = append(torrc, []byte("\nSandbox 1\n")...)
 	}
 
 	if cfg.Tor.UseProxy {

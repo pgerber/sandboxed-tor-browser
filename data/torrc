@@ -11,7 +11,6 @@ ControlPortWriteToFile /home/amnesia/tor/data/control_port
 DataDirectory /home/amnesia/tor/data
 GeoIPFile /home/amnesia/tor/etc/geoip
 GeoIPv6File /home/amnesia/tor/etc/geoip6
-ClientTransportPlugin obfs2,obfs3,obfs4,scramblesuit exec /home/amnesia/tor/bin/PluggableTransports/obfs4proxy
 
 HiddenServiceStatistics 0
 __OwningControllerProcess 1
