@@ -48,6 +48,7 @@ func installTBLOzWhitelist(fd *os.File) error {
 		"PR_GET_NAME":       syscall.PR_GET_NAME,
 		"PR_GET_TIMERSLACK": syscall.PR_GET_TIMERSLACK,
 		"PR_SET_SECCOMP":    syscall.PR_SET_SECCOMP,
+		"PR_SET_DUMPABLE":   syscall.PR_SET_DUMPABLE,
 		"AF_UNIX":           syscall.AF_UNIX,
 		"AF_INET":           syscall.AF_INET,
 		"AF_INET6":          syscall.AF_INET6,

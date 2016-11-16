@@ -43,7 +43,8 @@ getpgrp: 1
 getppid: 1
 getpid: 1
 fchown: 1
-prctl: arg0 == PR_SET_NAME || arg0 == PR_GET_NAME || arg0 == PR_GET_TIMERSLACK || arg0 == PR_SET_SECCOMP
+# XXX/yawning: tor exepects to be able to PR_SET_DUMPABLE.
+prctl: arg0 == PR_SET_NAME || arg0 == PR_GET_NAME || arg0 == PR_GET_TIMERSLACK || arg0 == PR_SET_SECCOMP || arg0 == PR_SET_DUMPABLE
 epoll_create1: 1
 readlinkat: 1
 getrandom: 1
@@ -145,3 +146,5 @@ capget: 1
 getdents64: 1
 inotify_rm_watch: 1
 socket: arg0 == AF_UNIX || arg0 == AF_INET || arg0 == AF_INET6 || arg0 == AF_NETLINK
+# XXX/yawning: tor uses flock.
+flock: 1

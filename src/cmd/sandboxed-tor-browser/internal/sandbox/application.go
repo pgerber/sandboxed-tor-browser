@@ -330,7 +330,7 @@ func RunTor(cfg *config.Config, torrc []byte) (cmd *exec.Cmd, err error) {
 	logger := newConsoleLogger("tor")
 	h.stdout = logger
 	h.stderr = logger
-	h.seccompFn = installBasicBlacklist // XXX: Use the oz one?
+	h.seccompFn = installTBLOzWhitelist
 	h.unshare.net = false               // Use the loopback interface for the ports.
 
 	if err = os.MkdirAll(cfg.TorDataDir, config.DirMode); err != nil {
