@@ -19,6 +19,7 @@ package sandbox
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"os"
 	"runtime"
 	"strconv"
@@ -83,7 +84,11 @@ func installTBLOzWhitelist(fd *os.File) error {
 			scallName := string(bytes.TrimSpace(sp[0]))
 			scall, err := seccomp.GetSyscallFromName(scallName)
 			if err != nil {
-				return fmt.Errorf("seccomp: unknown system call: %v", scallName)
+				// Continue instead of failing on ENOSYS.  It's a whitelist.
+				// the application will either do without the call, or fail
+				// horribly.
+				log.Printf("seccomp: unknown system call: %v", scallName)
+				continue
 			}
 			if !canUseConditionals {
 				if err = f.AddRule(scall, seccomp.ActAllow); err != nil {
