@@ -72,6 +72,7 @@ func RunTorBrowser(cfg *config.Config, tor *tor.Tor) (cmd *exec.Cmd, err error) 
 			log.Printf("sandbox: failed to proxy PulseAudio: %v", err)
 		}
 	}
+	h.roBind("/usr/share/libthai/thbrk.tri", "/usr/share/libthai/thbrk.tri", true) // Thai language support (Optional).
 
 	browserHome := path.Join(h.homeDir, "sandboxed-tor-browser", "tor-browser", "Browser")
 	realBrowserHome := path.Join(cfg.BundleInstallDir, "Browser")
