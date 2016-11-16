@@ -132,14 +132,14 @@ func (c *Common) DoInstall(async *Async) {
 		return
 	}
 
-	// Set the manifest portion of the config.
-	c.Cfg.SetInstalled(&config.Installed{
-		Version:         version,
-		Architecture:    c.Cfg.Architecture,
-		Channel:         c.Cfg.Channel,
-		Locale:          c.Cfg.Locale,
-		LastUpdateCheck: checkAt,
-	})
+	// Set the manifest.
+	c.Manif = config.NewManifest(c.Cfg, version)
+	if async.Err = c.Manif.Sync(); async.Err != nil {
+		return
+	}
+
+	// Set the appropriate bits in the config.
+	c.Cfg.SetLastUpdateCheck(checkAt)
 	c.Cfg.SetFirstLaunch(true)
 
 	// Sync the config, and return.
@@ -177,7 +177,7 @@ func (c *Common) doUpdate(async *Async, dialFn dialFunc) {
 
 	// Check the version, by downloading the XML file.
 	var update *installer.UpdateEntry
-	if url, err := installer.UpdateURL(c.Cfg); err != nil {
+	if url, err := installer.UpdateURL(c.Manif); err != nil {
 		async.Err = err
 		return
 	} else {
@@ -268,8 +268,11 @@ func (c *Common) doUpdate(async *Async, dialFn dialFunc) {
 		return
 	}
 
-	// Update the maniftest portion of the config.
-	c.Cfg.SetInstalledVersion(update.AppVersion)
+	// Update the maniftest and config.
+	c.Manif.SetVersion(update.AppVersion)
+	if async.Err = c.Manif.Sync(); async.Err != nil {
+		return
+	}
 	c.Cfg.SetLastUpdateCheck(checkAt)
 	if async.Err = c.Cfg.Sync(); async.Err != nil {
 		return

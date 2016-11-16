@@ -51,7 +51,7 @@ func (d *installDialog) onOk() error {
 	}
 
 	// No install to be done.
-	if !d.ui.Cfg.NeedsInstall() {
+	if !d.ui.NeedsInstall() {
 		return nil
 	}
 

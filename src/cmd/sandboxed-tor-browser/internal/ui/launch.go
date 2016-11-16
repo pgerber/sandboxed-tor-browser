@@ -47,12 +47,12 @@ func (c *Common) DoLaunch(async *Async, checkUpdates bool) {
 	log.Printf("launch: Starting.")
 
 	// Ensure that we actually can launch.
-	if c.Cfg.NeedsInstall() {
+	if c.NeedsInstall() {
 		async.Err = fmt.Errorf("launch failed, installation required")
 		return
 	}
 
-	if c.Cfg.Installed.Channel == "hardened" && sandbox.IsGrsecKernel() {
+	if c.Manif.Channel == "hardened" && sandbox.IsGrsecKernel() {
 		async.Err = fmt.Errorf("The 'hardened' release is incompatible with grsec.")
 		return
 	}
@@ -78,5 +78,5 @@ func (c *Common) DoLaunch(async *Async, checkUpdates bool) {
 	log.Printf("launch: Starting Tor Browser.")
 	async.UpdateProgress("Starting Tor Browser.")
 
-	c.Sandbox, async.Err = sandbox.RunTorBrowser(c.Cfg, c.tor)
+	c.Sandbox, async.Err = sandbox.RunTorBrowser(c.Cfg, c.Manif, c.tor)
 }

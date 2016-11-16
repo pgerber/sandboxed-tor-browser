@@ -47,7 +47,7 @@ func (ui *gtkUI) Run() error {
 		return err
 	}
 
-	if ui.Cfg.NeedsInstall() || ui.ForceInstall {
+	if ui.NeedsInstall() || ui.ForceInstall {
 		for {
 			if !ui.installDialog.run() {
 				ui.onDestroy()

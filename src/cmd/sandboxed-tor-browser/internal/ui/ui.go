@@ -68,6 +68,7 @@ type UI interface {
 // Common holds ui implementation agnostic state.
 type Common struct {
 	Cfg     *config.Config
+	Manif   *config.Manifest
 	Sandbox *exec.Cmd
 	tor     *tor.Tor
 
@@ -93,8 +94,16 @@ func (c *Common) Init() error {
 	if c.Cfg, err = config.New(); err != nil {
 		return err
 	}
+	if c.Manif, err = config.LoadManifest(c.Cfg); err != nil {
+		return err
+	}
 	c.Cfg.Sanitize()
 
+	if c.Manif != nil {
+		if err = c.Manif.Sync(); err != nil {
+			return err
+		}
+	}
 	return c.Cfg.Sync()
 }
 
@@ -130,6 +139,23 @@ func (c *Common) Term() {
 		c.lock.unlock()
 		c.lock = nil
 	}
+}
+
+// NeedsInstall returns true if the bundle needs to be (re)installed.
+func (c *Common) NeedsInstall() bool {
+	if c.Manif == nil {
+		return true
+	}
+	if c.Manif.Architecture != c.Cfg.Architecture {
+		return true
+	}
+	if c.Manif.Channel != c.Cfg.Channel {
+		return true
+	}
+	if c.Manif.Locale != c.Cfg.Locale {
+		return true
+	}
+	return false
 }
 
 type dialFunc func(string, string) (net.Conn, error)
@@ -174,7 +200,7 @@ func (c *Common) launchTor(async *Async, onlySystem bool) (dialFunc, error) {
 			async.Err = err
 			return nil, err
 		}
-	} else if !c.Cfg.NeedsInstall() {
+	} else if !c.NeedsInstall() {
 		// That's odd, we only asked for a system tor, but we should be capable
 		// of launching tor ourselves.  Don't use a direct connection.
 		err = fmt.Errorf("tor bootstrap would be skipped, when we could launch")

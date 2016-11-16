@@ -99,21 +99,17 @@ type Patch struct {
 }
 
 // UpdateURL returns the update check URL for the installed bundle.
-func UpdateURL(cfg *config.Config) (string, error) {
-	if cfg.NeedsInstall() {
-		return "", fmt.Errorf("no sensible update URL without installed bundle")
-	}
-
+func UpdateURL(manif *config.Manifest) (string, error) {
 	arch := ""
-	switch cfg.Installed.Architecture {
+	switch manif.Architecture {
 	case "linux64":
 		arch = "Linux_x86_64-gcc3"
 	case "linux32":
 		arch = "Linux_x86-gcc3"
 	default:
-		return "", fmt.Errorf("unsupported architecture for update: %v", cfg.Installed.Architecture)
+		return "", fmt.Errorf("unsupported architecture for update: %v", manif.Architecture)
 	}
-	return fmt.Sprintf("%s/%s/%s/%s", urls.UpdateURLs[cfg.Installed.Channel], arch, cfg.Installed.Version, cfg.Installed.Locale), nil
+	return fmt.Sprintf("%s/%s/%s/%s", urls.UpdateURLs[manif.Channel], arch, manif.Version, manif.Locale), nil
 }
 
 // GetUpdateEntry parses the xml file and returns the UpdateEntry if any.

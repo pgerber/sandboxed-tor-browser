@@ -24,8 +24,6 @@ import (
 	"os"
 	"path"
 	"runtime"
-	"strconv"
-	"strings"
 	"time"
 
 	"git.schwanenlied.me/yawning/bulb.git/utils"
@@ -39,7 +37,8 @@ const (
 	// FileMode is the permissions used when making files.
 	FileMode = 0600
 
-	configFile = "sandboxed-tor-browser.json"
+	configFile   = "sandboxed-tor-browser.json"
+	manifestFile = "manifest.json"
 
 	defaultChannel = "release"
 	defaultLocale  = "en-US"
@@ -266,8 +265,9 @@ type Config struct {
 	// Locale is the Tor Browser locale to install ("en-US", "ja").
 	Locale string `json:"locale,omitempty"`
 
-	// Installed is the installed Tor Browser information.
-	Installed *Installed `json:"installed,omitEmpty"`
+	// LastUpdateCheck is the UNIX time when the last update check was
+	// sucessfully completed.
+	LastUpdateCheck int64 `json:"lastUpdateCheck,omitEmpty"`
 
 	// Tor is the Tor network configuration.
 	Tor Tor `json:"tor,omitEmpty"`
@@ -299,63 +299,9 @@ type Config struct {
 	// TorDataDir is `UserDataDir/torDataDir`.
 	TorDataDir string `json:"-"`
 
-	isDirty bool
-	path    string
-}
-
-// Installed contains the installed Tor Browser information.
-type Installed struct {
-	// Version is the installed version.
-	Version string `json:"version,omitEmpty"`
-
-	// Architecture is the installed Tor Browser architecture.
-	Architecture string `json:"architecture,omitEmpty"`
-
-	// Channel is the installed Tor Browser channel.
-	Channel string `json:"channel,omitEmpty"`
-
-	// Locale is the installed Tor Browser locale.
-	Locale string `json:"locale,omitEmpty"`
-
-	// LastUpdateCheck is the UNIX time when the last update check was
-	// sucessfully completed.
-	LastUpdateCheck int64 `json:"lastUpdateCheck,omitEmpty"`
-}
-
-// BundleVersionAtLeast returns true if the bundle version is greater than or
-// equal to the specified version.
-func (in *Installed) BundleVersionAtLeast(major, minor int) bool {
-	vStr := strings.TrimSuffix(in.Version, "-hardened")
-	if in.Version == "" {
-		return false
-	}
-	if in.Channel == "alpha" || in.Channel == "hardened" {
-		vStr = strings.Replace(vStr, "a", ".", 1)
-	}
-
-	// Split into major/minor/pl.
-	v := strings.Split(vStr, ".")
-	if len(v) < 2 { // Need at least a major/minor.
-		return false
-	}
-
-	iMaj, err := strconv.Atoi(v[0])
-	if err != nil {
-		return false
-	}
-	iMin, err := strconv.Atoi(v[1])
-	if err != nil {
-		return false
-	}
-
-	// Do the version comparison.
-	if iMaj > major {
-		return true
-	}
-	if iMaj == major && iMin >= minor {
-		return true
-	}
-	return false
+	isDirty      bool
+	path         string
+	manifestPath string
 }
 
 // SetLocale sets the configured locale, and marks the config dirty.
@@ -374,35 +320,6 @@ func (cfg *Config) SetChannel(c string) {
 	}
 }
 
-// SetInstalled sets the installed Tor Browser, and marks the config dirty.
-func (cfg *Config) SetInstalled(i *Installed) {
-	cfg.isDirty = true
-	cfg.Installed = i
-}
-
-// SetInstalledVersion sets the installed version and marks the config dirty.
-func (cfg *Config) SetInstalledVersion(v string) {
-	cfg.isDirty = true
-	cfg.Installed.Version = v
-}
-
-// NeedsInstall returns true if the bundle needs to be (re)installed.
-func (cfg *Config) NeedsInstall() bool {
-	if cfg.Installed == nil {
-		return true
-	}
-	if cfg.Installed.Architecture != cfg.Architecture {
-		return true
-	}
-	if cfg.Installed.Channel != cfg.Channel {
-		return true
-	}
-	if cfg.Installed.Locale != cfg.Locale {
-		return true
-	}
-	return false
-}
-
 // SetFirstLaunch sets the first launch flag and marks the config dirty.
 func (cfg *Config) SetFirstLaunch(b bool) {
 	if cfg.FirstLaunch != b {
@@ -416,16 +333,16 @@ func (cfg *Config) SetFirstLaunch(b bool) {
 func (cfg *Config) NeedsUpdateCheck() bool {
 	const updateInterval = 60 * 60 * 12 // 12 hours.
 	now := time.Now().Unix()
-	return (now > cfg.Installed.LastUpdateCheck+updateInterval) || cfg.Installed.LastUpdateCheck > now
+	return (now > cfg.LastUpdateCheck+updateInterval) || cfg.LastUpdateCheck > now
 }
 
 // SetLastUpdateCheck sets the last update check time and marks the config
 // dirty.
 func (cfg *Config) SetLastUpdateCheck(t int64) {
-	if cfg.Installed.LastUpdateCheck != t {
+	if cfg.LastUpdateCheck != t {
+		cfg.LastUpdateCheck = t
 		cfg.isDirty = true
 	}
-	cfg.Installed.LastUpdateCheck = t
 }
 
 // Sanitize validates the config, and brings it inline with reality.
@@ -445,9 +362,6 @@ func (cfg *Config) Sanitize() {
 	}
 	if !dirExists(cfg.Sandbox.DesktopDir) {
 		cfg.Sandbox.SetDesktopDir("")
-	}
-	if !dirExists(cfg.BundleInstallDir) {
-		cfg.SetInstalled(nil)
 	}
 }
 
@@ -534,6 +448,7 @@ func New() (*Config, error) {
 			return nil, err
 		}
 		cfg.path = path.Join(d, configFile)
+		cfg.manifestPath = path.Join(d, manifestFile)
 	}
 
 	// Load the config file.

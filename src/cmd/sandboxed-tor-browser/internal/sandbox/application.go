@@ -33,7 +33,7 @@ import (
 )
 
 // RunTorBrowser launches sandboxed Tor Browser.
-func RunTorBrowser(cfg *config.Config, tor *tor.Tor) (cmd *exec.Cmd, err error) {
+func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (cmd *exec.Cmd, err error) {
 	const (
 		profileSubDir = "TorBrowser/Data/Browser/profile.default"
 		cachesSubDir  = "TorBrowser/Data/Browser/Caches"
@@ -157,7 +157,7 @@ func RunTorBrowser(cfg *config.Config, tor *tor.Tor) (cmd *exec.Cmd, err error) 
 	// Tor Browser currently is incompatible with PaX MPROTECT, apply the
 	// override if needed.
 	realFirefoxPath := path.Join(realBrowserHome, "firefox")
-	if err = applyPaXAttributes(cfg, realFirefoxPath); err != nil {
+	if err = applyPaXAttributes(manif, realFirefoxPath); err != nil {
 		return nil, err
 	}
 
@@ -167,7 +167,7 @@ func RunTorBrowser(cfg *config.Config, tor *tor.Tor) (cmd *exec.Cmd, err error) 
 	return h.run()
 }
 
-func applyPaXAttributes(cfg *config.Config, f string) error {
+func applyPaXAttributes(manif *config.Manifest, f string) error {
 	const paxAttr = "user.pax.flags"
 
 	sz, _ := syscall.Getxattr(f, paxAttr, nil)
@@ -175,7 +175,7 @@ func applyPaXAttributes(cfg *config.Config, f string) error {
 	// Strip off the attribute if this is a non-grsec kernel, or the bundle is
 	// sufficiently recent to the point where the required W^X fixes are present
 	// in the JIT.
-	if !IsGrsecKernel() || cfg.Installed.BundleVersionAtLeast(7, 0) {
+	if !IsGrsecKernel() || manif.BundleVersionAtLeast(7, 0) {
 		if sz > 0 {
 			log.Printf("sandbox: Removing Tor Browser PaX attributes.")
 			syscall.Removexattr(f, paxAttr)
@@ -331,7 +331,7 @@ func RunTor(cfg *config.Config, torrc []byte) (cmd *exec.Cmd, err error) {
 	h.stdout = logger
 	h.stderr = logger
 	h.seccompFn = installTBLOzWhitelist
-	h.unshare.net = false               // Use the loopback interface for the ports.
+	h.unshare.net = false // Use the loopback interface for the ports.
 
 	if err = os.MkdirAll(cfg.TorDataDir, config.DirMode); err != nil {
 		return
