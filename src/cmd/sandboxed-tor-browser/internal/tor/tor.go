@@ -380,7 +380,6 @@ func CfgToSandboxTorrc(cfg *config.Config, bridges map[string][]string) ([]byte,
 			bridgeArgs = append(bridgeArgs, cfg.Tor.CustomBridges)
 		}
 
-		// Join all the args and append to the torrc.
 		s := "\n" + strings.Join(bridgeArgs, "\n") + "\n"
 		torrc = append(torrc, []byte(s)...)
 	} else {
@@ -392,7 +391,31 @@ func CfgToSandboxTorrc(cfg *config.Config, bridges map[string][]string) ([]byte,
 	}
 
 	if cfg.Tor.UseProxy {
-		return nil, fmt.Errorf("tor: Proxies not supported yet")
+		proxyArgs := []string{}
+		proxyAddr := cfg.Tor.ProxyAddress + ":" + cfg.Tor.ProxyPort
+		proxyUser := cfg.Tor.ProxyUsername
+		proxyPasswd := cfg.Tor.ProxyPassword
+
+		switch cfg.Tor.ProxyType {
+		case "SOCKS 4":
+			proxyArgs = append(proxyArgs, "Socks4Proxy "+proxyAddr)
+		case "SOCKS 5":
+			proxyArgs = append(proxyArgs, "Socks5Proxy "+proxyAddr)
+			if proxyUser != "" && proxyPasswd != "" {
+				proxyArgs = append(proxyArgs, "Socks5ProxyUsername "+proxyUser)
+				proxyArgs = append(proxyArgs, "Socks5ProxyPassword "+proxyPasswd)
+			}
+		case "HTTP(S)":
+			proxyArgs = append(proxyArgs, "HTTPSProxy "+proxyAddr)
+			if proxyUser != "" && proxyPasswd != "" {
+				proxyArgs = append(proxyArgs, "HTTPSProxyAuthenticator "+proxyUser+":"+proxyPasswd)
+			}
+		default:
+			return nil, fmt.Errorf("tor: Unsupported proxy type: %v", cfg.Tor.ProxyType)
+		}
+
+		s := "\n" + strings.Join(proxyArgs, "\n") + "\n"
+		torrc = append(torrc, []byte(s)...)
 	}
 
 	// Generate a random control port password.

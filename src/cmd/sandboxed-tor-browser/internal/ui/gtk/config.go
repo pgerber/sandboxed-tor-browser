@@ -70,6 +70,8 @@ type configDialog struct {
 	desktopDirChooser        *gtk3.FileChooserButton
 }
 
+const proxySOCKS4 = "SOCKS 4"
+
 func (d *configDialog) loadFromConfig() {
 	// Populate the fields from the config.
 
@@ -146,6 +148,10 @@ func (d *configDialog) onOk() error {
 	} else {
 		d.ui.Cfg.Tor.SetProxyPort(s)
 	}
+	if d.ui.Cfg.Tor.ProxyType == proxySOCKS4 {
+		d.torProxyUsername.SetText("")
+		d.torProxyPassword.SetText("")
+	}
 	if s, err := d.torProxyUsername.GetText(); err != nil {
 		return err
 	} else {
@@ -158,6 +164,10 @@ func (d *configDialog) onOk() error {
 	}
 	if d.ui.Cfg.Tor.ProxyAddress == "" || d.ui.Cfg.Tor.ProxyPort == "" {
 		d.ui.Cfg.Tor.SetUseProxy(false)
+	}
+	if (d.ui.Cfg.Tor.ProxyUsername != "" && d.ui.Cfg.Tor.ProxyPassword == "") ||
+		(d.ui.Cfg.Tor.ProxyUsername == "" && d.ui.Cfg.Tor.ProxyPassword != "") {
+		return fmt.Errorf("Both a proxy username and password must be specified.")
 	}
 
 	d.ui.Cfg.Tor.SetUseBridges(d.torBridgeToggle.GetActive())
@@ -214,7 +224,7 @@ func (d *configDialog) internalBridgeTypeFromCfg() {
 }
 
 func (d *configDialog) onProxyTypeChanged() {
-	d.torProxyAuthBox.SetSensitive(d.torProxyType.GetActiveText() != "SOCKS 4")
+	d.torProxyAuthBox.SetSensitive(d.torProxyType.GetActiveText() != proxySOCKS4)
 }
 
 func (d *configDialog) onBridgeTypeChanged() {
