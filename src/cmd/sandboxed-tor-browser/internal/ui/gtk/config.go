@@ -29,7 +29,8 @@ import (
 )
 
 type configDialog struct {
-	ui *gtkUI
+	loaded bool
+	ui     *gtkUI
 
 	dialog *gtk3.Dialog
 
@@ -73,6 +74,9 @@ type configDialog struct {
 const proxySOCKS4 = "SOCKS 4"
 
 func (d *configDialog) loadFromConfig() {
+	if d.loaded {
+		return
+	}
 	// Populate the fields from the config.
 
 	d.torProxyToggle.SetActive(d.ui.Cfg.Tor.UseProxy)
@@ -123,6 +127,7 @@ func (d *configDialog) loadFromConfig() {
 	for _, w := range []*gtk3.Box{d.displayBox, d.downloadsDirBox, d.desktopDirBox} {
 		w.SetVisible(d.ui.AdvancedConfig || forceAdv)
 	}
+	d.loaded = true
 }
 
 func (d *configDialog) onOk() error {
@@ -197,6 +202,7 @@ func (d *configDialog) onOk() error {
 }
 
 func (d *configDialog) run() bool {
+	d.loadFromConfig()
 	defer func() {
 		d.dialog.Hide()
 		d.ui.forceRedraw()
@@ -387,8 +393,6 @@ func (ui *gtkUI) initConfigDialog(b *gtk3.Builder) error {
 	if d.desktopDirChooser, err = getFChooser(b, "desktopDirChooser"); err != nil {
 		return err
 	}
-
-	d.loadFromConfig()
 
 	ui.configDialog = d
 	return nil
