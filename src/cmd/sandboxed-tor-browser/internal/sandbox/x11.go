@@ -26,7 +26,7 @@ import (
 	"strings"
 )
 
-func x11CraftAuthority(realDisplay string) ([]byte, error) {
+func x11CraftAuthority(h *hugbox, realDisplay string) ([]byte, error) {
 	const familyAFLocal = 256
 
 	hostname, err := os.Hostname()
@@ -140,7 +140,11 @@ func x11CraftAuthority(realDisplay string) ([]byte, error) {
 		// display `:0`.
 		xauth := make([]byte, 2)
 		binary.BigEndian.PutUint16(xauth[0:], family)
-		xauth = append(xauth, encodeXString([]byte(sandboxHostname))...)
+		if h.hostname == "" {
+			xauth = append(xauth, encodeXString([]byte(hostname))...)
+		} else {
+			xauth = append(xauth, encodeXString([]byte(h.hostname))...)
+		}
 		xauth = append(xauth, encodeXString([]byte("0"))...)
 		xauth = append(xauth, encodeXString(authMeth)...)
 		xauth = append(xauth, encodeXString(authData)...)
@@ -184,7 +188,7 @@ func (h *hugbox) enableX11(display string) error {
 	h.setenv("DISPLAY", ":0")
 	h.dir(x11SockDir)
 	h.bind(path.Join(x11SockDir, "X"+displayNum), path.Join(x11SockDir, "X0"), false)
-	if xauth, err := x11CraftAuthority(displayNum); err == nil {
+	if xauth, err := x11CraftAuthority(h, displayNum); err == nil {
 		xauthPath := path.Join(h.homeDir, ".Xauthority")
 		h.setenv("XAUTHORITY", xauthPath)
 		h.file(xauthPath, xauth)

@@ -19,16 +19,17 @@ package sandbox
 import (
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/exec"
 	"path"
 	"runtime"
+	"strconv"
+	"strings"
 	"syscall"
 
 	"cmd/sandboxed-tor-browser/internal/data"
 )
-
-const sandboxHostname = "amnesia"
 
 type unshareOpts struct {
 	user   bool
@@ -278,7 +279,7 @@ func newHugbox() (*hugbox, error) {
 			uts:    true,
 			cgroup: true,
 		},
-		hostname:   sandboxHostname,
+		hostname:   "amnesia",
 		mountProc:  true,
 		runtimeDir: path.Join("/run", "user", fmt.Sprintf("%d", os.Getuid())),
 		homeDir:    "/home/amnesia",
@@ -300,7 +301,73 @@ func newHugbox() (*hugbox, error) {
 		return nil, fmt.Errorf("sandbox: unable to find bubblewrap binary")
 	}
 
+	// Fucking Ubuntu is slow about updating the bubblewrap package, and using
+	// `--unshare-uts` prior to 0.1.3 is a really bad idea because I'm a
+	// retard.
+	canSetHost, err := bubblewrapAtLeast(h.bwrapPath, 0, 1, 3)
+	if err != nil {
+		return nil, err
+	}
+	if !canSetHost {
+		log.Printf("sandbox: bubblewrap appears to be old, not normalizing hostname.")
+		h.unshare.uts = false
+		h.hostname = ""
+	}
+
 	return h, nil
+}
+
+func getBubblewrapVersion(f string) (int, int, int, error) {
+	cmd := &exec.Cmd{
+		Path: f,
+		Args: []string{f, "--version"},
+		Env:  []string{},
+		SysProcAttr: &syscall.SysProcAttr{
+			Pdeathsig: syscall.SIGKILL,
+		},
+	}
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Printf("out: %v", string(out))
+		return 0, 0, 0, err
+	}
+	vStr := strings.TrimPrefix(string(out), "bubblewrap ")
+	vStr = strings.TrimSpace(vStr)
+
+	// Split into major/minor/pl.
+	v := strings.Split(vStr, ".")
+	if len(v) < 3 {
+		return 0, 0, 0, fmt.Errorf("unable to determine bubblewrap version")
+	}
+
+	var iVers [3]int
+	for i := 0; i < 3; i++ {
+		iv, err := strconv.Atoi(v[i])
+		if err != nil {
+			return 0, 0, 0, fmt.Errorf("unable to determine bubblewrap version: %v", err)
+		}
+		iVers[i] = iv
+	}
+
+	return iVers[0], iVers[1], iVers[2], nil
+}
+
+func bubblewrapAtLeast(f string, maj, min, pl int) (bool, error) {
+	iMaj, iMin, iPl, err := getBubblewrapVersion(f)
+	if err != nil {
+		return false, err
+	}
+
+	if iMaj > maj {
+		return true, nil
+	}
+	if iMaj == maj && iMin > min {
+		return true, nil
+	}
+	if iMaj == maj && iMin == min && iPl >= pl {
+		return true, nil
+	}
+	return false, nil
 }
 
 func fileExists(f string) bool {
