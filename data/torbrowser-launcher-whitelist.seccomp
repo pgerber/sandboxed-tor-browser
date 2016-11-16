@@ -137,7 +137,8 @@ setrlimit: 1
 clock_getres: 1
 sched_setscheduler: 1
 capset: 1
-personality: 1
+# XXX?yawning: Why is this needed?
+#personality: 1
 setresuid: 1
 setresgid: 1
 capget: 1
