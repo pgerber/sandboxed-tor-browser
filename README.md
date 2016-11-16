@@ -5,9 +5,9 @@
 > believe me.  I will build a great, great sandbox on our application border.
 > And I will have Tor Browser pay for that sandbox.
 
-Tor Browser sandboxed somewhat correctly, requires bubblewrap and a system-wide
-Tor instance.  Obviously only works on Linux, and will NEVER support anything
-else since sandboxing is OS specific.
+Tor Browser sandboxed somewhat correctly using bubblewrap.  Obviously only
+works on Linux, and will NEVER support anything else since sandboxing is OS
+specific.
 
 There are several unresolved issues that affect security and fingerprinting.
 Do not assume that this is perfect, merely "an improvement over nothing".  If
@@ -17,8 +17,8 @@ Qubes or Tails.
 Runtime dependencies:
 
  * A modern Linux system on x86/x86_64 architecture (Tested on x86_64).
- * tor running as a daemon with the SOCKS and control ports accessible
- * bubblewrap >= 0.1.2 (https://github.com/projectatomic/bubblewrap)
+ * bubblewrap >= 0.1.2 (https://github.com/projectatomic/bubblewrap).  It is
+   *STRONGLY* recommended that 0.1.3 or later is used.
  * libseccomp2
  * Gtk+ 3.0
  * (Optional) PulseAudio
@@ -44,8 +44,6 @@ Upstream Bugs:
 
  * Tor Browser still shows update related UI elements.
    (https://bugs.torproject.org/20083)
- * The alpha/hardened bundles can't be installed.
-   (https://bugs.torproject.org/20219)
  * HTTPS-Everywhere doesn't use Isolation properly at all, or honor SSL
    Observatory being disabled.
    (https://bugs.torproject.org/20195)
