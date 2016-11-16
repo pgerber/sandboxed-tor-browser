@@ -56,7 +56,7 @@ func RunTorBrowser(cfg *config.Config, tor *tor.Tor) (cmd *exec.Cmd, err error) 
 	logger := newConsoleLogger("firefox")
 	h.stdout = logger
 	h.stderr = logger
-	h.seccompFn = installBasicBlacklist // XXX: Use something better.
+	h.seccompFn = installTBLOzWhitelist
 
 	// X11, Gtk+, and PulseAudio.
 	if err = h.enableX11(cfg.Sandbox.Display); err != nil {
@@ -214,7 +214,7 @@ func RunUpdate(cfg *config.Config, mar []byte) (err error) {
 	logger := newConsoleLogger("update")
 	h.stdout = logger
 	h.stderr = logger
-	h.seccompFn = installBasicBlacklist // XXX: Use something better.
+	h.seccompFn = installTBLOzWhitelist
 
 	// https://wiki.mozilla.org/Software_Update:Manually_Installing_a_MAR_file
 	const (
@@ -330,8 +330,8 @@ func RunTor(cfg *config.Config, torrc []byte) (cmd *exec.Cmd, err error) {
 	logger := newConsoleLogger("tor")
 	h.stdout = logger
 	h.stderr = logger
-	h.seccompFn = installBasicBlacklist
-	h.unshare.net = false // Use the loopback interface for the ports.
+	h.seccompFn = installBasicBlacklist // XXX: Use the oz one?
+	h.unshare.net = false               // Use the loopback interface for the ports.
 
 	if err = os.MkdirAll(cfg.TorDataDir, config.DirMode); err != nil {
 		return

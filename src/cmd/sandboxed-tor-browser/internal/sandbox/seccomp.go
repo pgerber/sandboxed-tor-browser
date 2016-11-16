@@ -17,11 +17,166 @@
 package sandbox
 
 import (
+	"bytes"
+	"fmt"
 	"os"
 	"runtime"
+	"strconv"
+	"syscall"
 
 	seccomp "github.com/seccomp/libseccomp-golang"
+
+	"cmd/sandboxed-tor-browser/internal/data"
 )
+
+func installTBLOzWhitelist(fd *os.File) error {
+	defer fd.Close()
+
+	actEPerm := seccomp.ActErrno.SetReturnCode(1)
+	f, err := seccomp.NewFilter(actEPerm)
+	if err != nil {
+		return err
+	}
+	defer f.Release()
+	if err := f.AddArch(seccomp.ArchNative); err != nil {
+		return err
+	}
+
+	constantTable := map[string]uint64{
+		"PR_SET_NAME":       syscall.PR_SET_NAME,
+		"PR_GET_NAME":       syscall.PR_GET_NAME,
+		"PR_GET_TIMERSLACK": syscall.PR_GET_TIMERSLACK,
+		"PR_SET_SECCOMP":    syscall.PR_SET_SECCOMP,
+		"AF_UNIX":           syscall.AF_UNIX,
+		"AF_INET":           syscall.AF_INET,
+		"AF_INET6":          syscall.AF_INET6,
+		"AF_NETLINK":        syscall.AF_NETLINK,
+	}
+
+	// Load the rule set.
+	b, err := data.Asset("torbrowser-launcher-whitelist.seccomp")
+	if err != nil {
+		return err
+	}
+
+	// AFIAK, only certain architectures can use seccomp conditionals that
+	// filter based on args.  Fuck x86 anyway.
+	canUseConditionals := runtime.GOARCH == "amd64"
+
+	// Parse the rule set and build seccomp rules.
+	for ln, l := range bytes.Split(b, []byte{'\n'}) {
+		l = bytes.TrimSpace(l)
+		if len(l) == 0 { // Empty line.
+			continue
+		}
+		if bytes.HasPrefix(l, []byte{'#'}) { // Comment.
+			continue
+		}
+
+		if bytes.IndexByte(l, ':') != -1 {
+			// Rule
+			sp := bytes.SplitN(l, []byte{':'}, 2)
+			if len(sp) != 2 {
+				return fmt.Errorf("seccomp: invalid rule: %d:%v", ln, string(l))
+			}
+
+			scallName := string(bytes.TrimSpace(sp[0]))
+			scall, err := seccomp.GetSyscallFromName(scallName)
+			if err != nil {
+				return fmt.Errorf("seccomp: unknown system call: %v", scallName)
+			}
+			if !canUseConditionals {
+				if err = f.AddRule(scall, seccomp.ActAllow); err != nil {
+					return err
+				}
+			} else {
+				rawCond := bytes.TrimSpace(sp[1])
+				if bytes.Equal(rawCond, []byte{'1'}) {
+					if err = f.AddRule(scall, seccomp.ActAllow); err != nil {
+						return err
+					}
+				} else {
+					argConds := make([][]uint64, 5)
+					conds := bytes.Split(rawCond, []byte{'|', '|'})
+					if len(conds) < 1 {
+						return fmt.Errorf("seccomp: invalid rule: %d:%v", ln, string(l))
+					}
+					for _, v := range conds {
+						v = bytes.TrimSpace(v)
+						spCond := bytes.Split(v, []byte{'=', '='})
+						if len(spCond) != 2 {
+							return fmt.Errorf("seccomp: invalid condition: %d:%v", ln, string(l))
+						}
+
+						arg := string(bytes.TrimSpace(spCond[0]))
+						var argN uint
+						switch arg {
+						case "arg0":
+							argN = 0
+						case "arg1":
+							argN = 1
+						case "arg2":
+							argN = 2
+						case "arg3":
+							argN = 3
+						case "arg4":
+							argN = 4
+						case "arg5":
+							argN = 5
+						default:
+							return fmt.Errorf("seccomp: invalid argument: %d:%v", ln, string(l))
+						}
+
+						rawVal := string(bytes.TrimSpace(spCond[1]))
+						val, ok := constantTable[rawVal]
+						if !ok {
+							val, err = strconv.ParseUint(rawVal, 0, 64)
+							if err != nil {
+								return fmt.Errorf("seccomp: invalid value: %d:%v: %v", ln, string(l), err)
+							}
+						}
+
+						argConds[argN] = append(argConds[argN], val)
+					}
+
+					var scConds []seccomp.ScmpCondition
+					for arg, vals := range argConds {
+						if len(vals) == 0 {
+							continue
+						}
+						for _, val := range vals {
+							cond, err := seccomp.MakeCondition(uint(arg), seccomp.CompareEqual, val)
+							if err != nil {
+								return err
+							}
+							scConds = append(scConds, cond)
+						}
+					}
+
+					if err = f.AddRuleConditionalExact(scall, seccomp.ActAllow, scConds); err != nil {
+						return err
+					}
+				}
+			}
+		} else if bytes.IndexByte(l, '=') != -1 {
+			// Declaration.
+			sp := bytes.Split(l, []byte{'='})
+			if len(sp) != 2 {
+				return fmt.Errorf("seccomp: invalid constant: %d:%v", ln, string(l))
+			}
+			k := string(bytes.TrimSpace(sp[0]))
+			v, err := strconv.ParseUint(string(bytes.TrimSpace(sp[1])), 0, 64)
+			if err != nil {
+				return fmt.Errorf("seccomp: invalid conditional: %d:%v: %v", ln, string(l), err)
+			}
+			constantTable[k] = v
+		} else {
+			return fmt.Errorf("seccomp: syntax error in profile: %d:%v", ln, string(l))
+		}
+	}
+
+	return f.ExportBPF(fd)
+}
 
 func installBasicBlacklist(fd *os.File) error {
 	defer fd.Close()
