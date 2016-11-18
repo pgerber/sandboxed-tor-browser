@@ -31,6 +31,11 @@ import (
 )
 
 func installTBLOzWhitelist(fd *os.File) error {
+	if !libseccompAtLeast(2, 2, 1) {
+		log.Printf("seccomp: library is older than 2.2.1), using default blacklist")
+		return installBasicBlacklist(fd)
+	}
+
 	defer fd.Close()
 
 	actEPerm := seccomp.ActErrno.SetReturnCode(1)
@@ -299,4 +304,18 @@ func installBasicBlacklist(fd *os.File) error {
 
 	// Compile the filter rules, and write it out to the bwrap child process.
 	return f.ExportBPF(fd)
+}
+
+func libseccompAtLeast(maj, min, micro int) bool {
+	iMaj, iMin, iMicro := seccomp.GetLibraryVersion()
+	if iMaj > maj {
+		return true
+	}
+	if iMaj == maj && iMin > min {
+		return true
+	}
+	if iMaj == maj && iMin == min && iMicro >= micro {
+		return true
+	}
+	return false
 }

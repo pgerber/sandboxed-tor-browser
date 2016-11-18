@@ -19,7 +19,7 @@ Runtime dependencies:
  * A modern Linux system on x86/x86_64 architecture (Tested on x86_64).
  * bubblewrap >= 0.1.2 (https://github.com/projectatomic/bubblewrap).  It is
    *STRONGLY* recommended that 0.1.3 or later is used.
- * libseccomp2
+ * libseccomp2 >= 2.2.1
  * Gtk+ 3.0
  * (Optional) PulseAudio
 
