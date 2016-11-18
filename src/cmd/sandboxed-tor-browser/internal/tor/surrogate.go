@@ -41,8 +41,10 @@ const (
 	cmdAuthenticate  = "AUTHENTICATE"
 	cmdAuthChallenge = "AUTHCHALLENGE"
 	cmdQuit          = "QUIT"
-	cmdGetInfo       = "GETINFO"
+	cmdGetinfo       = "GETINFO"
+	cmdGetconf       = "GETCONF"
 	cmdSignal        = "SIGNAL"
+	cmdSetEvents     = "SETEVENTS"
 
 	responseOk = "250 OK\r\n"
 
@@ -51,8 +53,7 @@ const (
 	errUnspecifiedTor         = "550 Unspecified Tor error\r\n"
 
 	// These responses are entirely synthetic so they don't matter.
-	torVersion = "0.2.8.7"
-	socksAddr  = "127.0.0.1:9150"
+	socksAddr = "127.0.0.1:9150"
 )
 
 type socksProxy struct {
@@ -193,14 +194,18 @@ func launchSocksProxy(cfg *config.Config, tor *Tor) (*socksProxy, error) {
 }
 
 type ctrlProxyConn struct {
-	socks         *socksProxy
-	tor           *Tor
+	sync.Mutex
+
+	p             *ctrlProxy
 	appConn       net.Conn
 	appConnReader *bufio.Reader
 	isPreAuth     bool
 }
 
 func (c *ctrlProxyConn) appConnWrite(b []byte) (int, error) {
+	c.Lock()
+	defer c.Unlock()
+
 	return c.appConn.Write(b)
 }
 
@@ -223,7 +228,7 @@ func (c *ctrlProxyConn) processPreAuth() error {
 			return err
 		}
 
-		switch cmd {
+		switch strings.ToUpper(cmd) {
 		case cmdProtocolInfo:
 			if sentProtocolInfo {
 				c.sendErrAuthenticationRequired()
@@ -261,13 +266,17 @@ func (c *ctrlProxyConn) proxyAndFilerApp() {
 			break
 		}
 
-		switch cmd {
+		switch strings.ToUpper(cmd) {
 		case cmdProtocolInfo:
 			err = c.onCmdProtocolInfo(splitCmd)
-		case cmdGetInfo:
-			err = c.onCmdGetInfo(splitCmd, raw)
+		case cmdGetinfo:
+			err = c.onCmdGetinfo(splitCmd, raw)
 		case cmdSignal:
 			err = c.onCmdSignal(splitCmd, raw)
+		case cmdSetEvents:
+			err = c.onCmdSetEvents(splitCmd, raw)
+		case cmdGetconf:
+			err = c.onCmdGetconf(splitCmd, raw)
 		default:
 			err = c.sendErrUnrecognizedCommand()
 		}
@@ -313,44 +322,102 @@ func (c *ctrlProxyConn) onCmdProtocolInfo(splitCmd []string) error {
 			return err
 		}
 	}
-	respStr := "250-PROTOCOLINFO 1\r\n250-AUTH METHODS=NULL,HASHEDPASSWORD\r\n250-VERSION Tor=\"" + torVersion + "\"\r\n" + responseOk
+	respStr := "250-PROTOCOLINFO 1\r\n250-AUTH METHODS=NULL,HASHEDPASSWORD\r\n250-VERSION Tor=\"" + c.p.torVersion + "\"\r\n" + responseOk
 	_, err := c.appConnWrite([]byte(respStr))
 	return err
 }
 
-func (c *ctrlProxyConn) onCmdGetInfo(splitCmd []string, raw []byte) error {
-	const argGetInfoSocks = "net/listeners/socks"
+func (c *ctrlProxyConn) onCmdGetinfo(splitCmd []string, raw []byte) error {
+	const (
+		argGetinfoSocks          = "net/listeners/socks"
+		prefixGetinfoNsId        = "ns/id/"
+		prefixGetinfoIpToCountry = "ip-to-country/"
+	)
 	if len(splitCmd) != 2 {
-		return c.sendErrUnexpectedArgCount(cmdGetInfo, 2, len(splitCmd))
-	} else if splitCmd[1] != argGetInfoSocks {
-		respStr := "552 Unrecognized key \"" + splitCmd[1] + "\"\r\n"
-		_, err := c.appConnWrite([]byte(respStr))
-		return err
-	} else {
-		respStr := "250-" + argGetInfoSocks + "=\"" + socksAddr + "\"\r\n" + responseOk
-		_, err := c.appConnWrite([]byte(respStr))
-		return err
+		return c.sendErrUnexpectedArgCount(cmdGetinfo, 2, len(splitCmd))
 	}
+
+	if strings.HasPrefix(splitCmd[1], prefixGetinfoNsId) || strings.HasPrefix(splitCmd[1], prefixGetinfoIpToCountry) {
+		// This *could* filter the relevant results to those that are actually
+		// part of circuits that the user has, but that seems overly paranoid,
+		// and ironically leaks more information.
+		if resp, _ := c.p.tor.getinfo(splitCmd[1]); resp != nil {
+			respStr := strings.Join(resp.RawLines, "\r\n") + "\r\n"
+			_, err := c.appConnWrite([]byte(respStr))
+			return err
+		}
+		return c.sendErrUnspecifiedTor()
+	}
+
+	// Handle the synthetic responses.
+	respStr := "552 Unrecognized key \"" + splitCmd[1] + "\"\r\n"
+	if splitCmd[1] == argGetinfoSocks {
+		respStr = "250-" + argGetinfoSocks + "=\"" + socksAddr + "\"\r\n" + responseOk
+	}
+	_, err := c.appConnWrite([]byte(respStr))
+	return err
+}
+
+func (c *ctrlProxyConn) onCmdGetconf(splitCmd []string, raw []byte) error {
+	const argBridge = "BRIDGE"
+	if len(splitCmd) != 2 {
+		return c.sendErrUnexpectedArgCount(cmdGetconf, 2, len(splitCmd))
+	}
+
+	if strings.ToUpper(splitCmd[1]) == argBridge {
+		if resp, _ := c.p.tor.getconf(splitCmd[1]); resp != nil {
+			respStr := strings.Join(resp.RawLines, "\r\n") + "\r\n"
+			_, err := c.appConnWrite([]byte(respStr))
+			return err
+		}
+		return c.sendErrUnspecifiedTor()
+	}
+
+	respStr := "552 Unrecognized configuration key \"" + splitCmd[1] + "\"\r\n"
+	_, err := c.appConnWrite([]byte(respStr))
+	return err
 }
 
 func (c *ctrlProxyConn) onCmdSignal(splitCmd []string, raw []byte) error {
 	const argSignalNewnym = "NEWNYM"
 	if len(splitCmd) != 2 {
 		return c.sendErrUnexpectedArgCount(cmdSignal, 2, len(splitCmd))
-	} else if splitCmd[1] != argSignalNewnym {
+	} else if strings.ToUpper(splitCmd[1]) != argSignalNewnym {
 		respStr := "552 Unrecognized signal code \"" + splitCmd[1] + "\"\r\n"
 		_, err := c.appConnWrite([]byte(respStr))
 		return err
 	} else {
-		if err := c.socks.newTag(); err != nil {
+		if err := c.p.socks.newTag(); err != nil {
 			return c.sendErrUnspecifiedTor()
 		}
-		if err := c.tor.Newnym(); err != nil {
+		if err := c.p.tor.newnym(); err != nil {
 			return c.sendErrUnspecifiedTor()
 		}
 		_, err := c.appConnWrite([]byte(responseOk))
 		return err
 	}
+}
+
+func (c *ctrlProxyConn) onCmdSetEvents(splitCmd []string, raw []byte) error {
+	const argEventStream = "STREAM"
+	if len(splitCmd) == 1 {
+		// XXX: Deregister for stream events.
+		_, err := c.appConnWrite([]byte(responseOk))
+		return err
+	} else if len(splitCmd) != 2 {
+		// Tor Browser only uses "SETEVENTS STREAM" AFAIK.
+		return c.sendErrUnexpectedArgCount(cmdSignal, 2, len(splitCmd))
+	} else if strings.ToUpper(splitCmd[1]) != argEventStream {
+		respStr := "552 Unrecognized event \"" + splitCmd[1] + "\"\r\n"
+		_, err := c.appConnWrite([]byte(respStr))
+		return err
+	} else if !c.p.circuitMonitorEnabled {
+		return c.sendErrUnrecognizedCommand()
+	}
+	// XXX: Register for stream events.
+
+	_, err := c.appConnWrite([]byte(responseOk))
+	return err
 }
 
 func (c *ctrlProxyConn) handle() {
@@ -366,9 +433,12 @@ func (c *ctrlProxyConn) handle() {
 }
 
 type ctrlProxy struct {
-	cPath string
-	socks *socksProxy
-	tor   *Tor
+	cPath      string
+	socks      *socksProxy
+	tor        *Tor
+	torVersion string
+
+	circuitMonitorEnabled bool
 
 	l net.Listener
 }
@@ -395,8 +465,7 @@ func (p *ctrlProxy) acceptLoop() {
 
 func (p *ctrlProxy) handleConn(conn net.Conn) {
 	c := &ctrlProxyConn{
-		socks:         p.socks,
-		tor:           p.tor,
+		p:             p,
 		appConn:       conn,
 		appConnReader: bufio.NewReader(conn),
 	}
@@ -407,6 +476,15 @@ func launchCtrlProxy(cfg *config.Config, tor *Tor) (*ctrlProxy, error) {
 	p := new(ctrlProxy)
 	p.socks = tor.socksSurrogate
 	p.tor = tor
+
+	// Save the real tor version.  Tor Browser doesn't use PROTOCOLINFO,
+	// but we should do the right thing when it does, and this query is
+	// serviced entirely from bulb's internal cache.
+	if pi, err := p.tor.ctrl.ProtocolInfo(); err != nil {
+		return nil, err
+	} else {
+		p.torVersion = pi.TorVersion
+	}
 
 	var err error
 	p.cPath = path.Join(cfg.RuntimeDir, "control")

@@ -107,8 +107,7 @@ func (t *Tor) SocksPort() (net, addr string, err error) {
 	return t.socksNet, t.socksAddr, err
 }
 
-// Newnym issues a `SIGNAL NWENYM`.
-func (t *Tor) Newnym() error {
+func (t *Tor) newnym() error {
 	t.Lock()
 	defer t.Unlock()
 
@@ -117,6 +116,26 @@ func (t *Tor) Newnym() error {
 	}
 	_, err := t.ctrl.Request("SIGNAL NEWNYM")
 	return err
+}
+
+func (t *Tor) getinfo(arg string) (*bulb.Response, error) {
+	t.Lock()
+	defer t.Unlock()
+
+	if t.ctrl == nil {
+		return nil, ErrTorNotRunning
+	}
+	return t.ctrl.Request("GETINFO %s", arg)
+}
+
+func (t *Tor) getconf(arg string) (*bulb.Response, error) {
+	t.Lock()
+	defer t.Unlock()
+
+	if t.ctrl == nil {
+		return nil, ErrTorNotRunning
+	}
+	return t.ctrl.Request("GETCONF %s", arg)
 }
 
 // Shutdown attempts to gracefully clean up the Tor instance.  If it is a
@@ -182,6 +201,7 @@ func (t *Tor) eventReader() {
 		}
 		t.ctrlEvents <- resp
 	}
+	close(t.ctrlEvents)
 }
 
 // NewSystemTor creates a Tor struct around a system tor instance.
@@ -205,14 +225,14 @@ func NewSystemTor(cfg *config.Config) (*Tor, error) {
 		return nil, err
 	}
 
+	t.ctrl.StartAsyncReader()
+	go t.eventReader()
+
 	// Launch the surrogates.
 	if err = t.launchSurrogates(cfg); err != nil {
 		t.ctrl.Close()
 		return nil, err
 	}
-
-	t.ctrl.StartAsyncReader()
-	go t.eventReader()
 
 	return t, nil
 }
@@ -329,7 +349,7 @@ func NewSandboxedTor(cfg *config.Config, async *Async, cmd *exec.Cmd) (t *Tor, e
 				continue
 			}
 
-			resp, err := t.ctrl.Request("GETINFO status/bootstrap-phase")
+			resp, err := t.getinfo("status/bootstrap-phase")
 			if err != nil {
 				return nil, err
 			}
