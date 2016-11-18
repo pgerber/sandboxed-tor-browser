@@ -1,5 +1,5 @@
 CC	:= gcc
-CFLAGS := -Os -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2 -fstack-protector-all -Wstack-protector --param ssp-buffer-size=1 -fPIC -Wall -Werror -Wextra
+CFLAGS := -Os -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2 -fstack-protector-all -Wstack-protector --param ssp-buffer-size=1 -fPIC -Wall -Werror -Wextra -Wl,-z,relro,-z,now
 
 all: sandboxed-tor-browser
 
