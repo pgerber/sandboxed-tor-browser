@@ -1,4 +1,4 @@
-// sandbox.go - Tor related sandbox routines.
+// surrogate.go - Tor control/socks port surrogates.
 // Copyright (C) 2016  Yawning Angel.
 //
 // This program is free software: you can redistribute it and/or modify
@@ -19,6 +19,7 @@ package tor
 import (
 	"bufio"
 	"bytes"
+	"container/list"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
@@ -37,6 +38,8 @@ import (
 )
 
 const (
+	crLf = "\r\n"
+
 	cmdProtocolInfo  = "PROTOCOLINFO"
 	cmdAuthenticate  = "AUTHENTICATE"
 	cmdAuthChallenge = "AUTHCHALLENGE"
@@ -46,11 +49,14 @@ const (
 	cmdSignal        = "SIGNAL"
 	cmdSetEvents     = "SETEVENTS"
 
-	responseOk = "250 OK\r\n"
+	eventStream = "STREAM"
 
-	errAuthenticationRequired = "514 Authentication required\r\n"
-	errUnrecognizedCommand    = "510 Unrecognized command\r\n"
-	errUnspecifiedTor         = "550 Unspecified Tor error\r\n"
+	responseOk            = "250 OK" + crLf
+	responseCircuitStatus = "250+circuit-status="
+
+	errAuthenticationRequired = "514 Authentication required" + crLf
+	errUnrecognizedCommand    = "510 Unrecognized command" + crLf
+	errUnspecifiedTor         = "550 Unspecified Tor error" + crLf
 
 	// These responses are entirely synthetic so they don't matter.
 	socksAddr = "127.0.0.1:9150"
@@ -80,6 +86,12 @@ func (p *socksProxy) newTag() error {
 	p.tag = "sandboxed-tor-browser:" + hex.EncodeToString(b[:])
 
 	return nil
+}
+
+func (p *socksProxy) getTag() string {
+	p.RLock()
+	defer p.RUnlock()
+	return ":" + p.tag
 }
 
 func (p *socksProxy) acceptLoop() {
@@ -130,8 +142,6 @@ func (p *socksProxy) handleConn(conn net.Conn) {
 }
 
 func (p *socksProxy) rewriteTag(conn net.Conn, req *socks5.Request) error {
-	p.RLock()
-	defer p.RUnlock()
 	if req.Auth.Uname == nil {
 		// If the socks request ever isn't using username/password isolation,
 		// fail the request, since it's an upstream bug, instead of trying to
@@ -140,7 +150,7 @@ func (p *socksProxy) rewriteTag(conn net.Conn, req *socks5.Request) error {
 		// See https://bugs.torproject.org/20195
 		return fmt.Errorf("invalid isolation requested by Tor Browser")
 	}
-	req.Auth.Passwd = append(req.Auth.Passwd, []byte(":"+p.tag)...)
+	req.Auth.Passwd = append(req.Auth.Passwd, []byte(p.getTag())...)
 	// With the current format this should never happen, ever.
 	if len(req.Auth.Passwd) > 255 {
 		return fmt.Errorf("failed to redispatch, socks5 password too long")
@@ -200,6 +210,8 @@ type ctrlProxyConn struct {
 	appConn       net.Conn
 	appConnReader *bufio.Reader
 	isPreAuth     bool
+
+	monitorEle *list.Element
 }
 
 func (c *ctrlProxyConn) appConnWrite(b []byte) (int, error) {
@@ -305,9 +317,9 @@ func (c *ctrlProxyConn) sendErrUnexpectedArgCount(cmd string, expected, actual i
 	var err error
 	var respStr string
 	if expected > actual {
-		respStr = "512 Too many arguments to " + cmd + "\r\n"
+		respStr = "512 Too many arguments to " + cmd + crLf
 	} else {
-		respStr = "512 Missing argument to " + cmd + "\r\n"
+		respStr = "512 Missing argument to " + cmd + crLf
 	}
 	_, err = c.appConnWrite([]byte(respStr))
 	return err
@@ -317,7 +329,7 @@ func (c *ctrlProxyConn) onCmdProtocolInfo(splitCmd []string) error {
 	for i := 1; i < len(splitCmd); i++ {
 		v := splitCmd[i]
 		if _, err := strconv.ParseInt(v, 10, 32); err != nil {
-			respStr := "513 No such version \"" + v + "\"\r\n"
+			respStr := "513 No such version \"" + v + crLf
 			_, err := c.appConnWrite([]byte(respStr))
 			return err
 		}
@@ -330,6 +342,7 @@ func (c *ctrlProxyConn) onCmdProtocolInfo(splitCmd []string) error {
 func (c *ctrlProxyConn) onCmdGetinfo(splitCmd []string, raw []byte) error {
 	const (
 		argGetinfoSocks          = "net/listeners/socks"
+		argGetinfoCircuitStatus  = "circuit-status"
 		prefixGetinfoNsId        = "ns/id/"
 		prefixGetinfoIpToCountry = "ip-to-country/"
 	)
@@ -342,7 +355,7 @@ func (c *ctrlProxyConn) onCmdGetinfo(splitCmd []string, raw []byte) error {
 		// part of circuits that the user has, but that seems overly paranoid,
 		// and ironically leaks more information.
 		if resp, _ := c.p.tor.getinfo(splitCmd[1]); resp != nil {
-			respStr := strings.Join(resp.RawLines, "\r\n") + "\r\n"
+			respStr := strings.Join(resp.RawLines, crLf) + crLf
 			_, err := c.appConnWrite([]byte(respStr))
 			return err
 		}
@@ -350,9 +363,18 @@ func (c *ctrlProxyConn) onCmdGetinfo(splitCmd []string, raw []byte) error {
 	}
 
 	// Handle the synthetic responses.
-	respStr := "552 Unrecognized key \"" + splitCmd[1] + "\"\r\n"
-	if splitCmd[1] == argGetinfoSocks {
-		respStr = "250-" + argGetinfoSocks + "=\"" + socksAddr + "\"\r\n" + responseOk
+	respStr := "552 Unrecognized key \"" + splitCmd[1] + "\"" + crLf
+	switch splitCmd[1] {
+	case argGetinfoSocks:
+		respStr = "250-" + argGetinfoSocks + "=\"" + socksAddr + "\"" + crLf + responseOk
+	case argGetinfoCircuitStatus:
+		if !c.p.circuitMonitorEnabled {
+			break
+		}
+		respVec := []string{responseCircuitStatus}
+		respVec = append(respVec, c.p.circuitMonitor.getCircuitStatus()...)
+		respVec = append(respVec, ".", responseOk)
+		respStr = strings.Join(respVec, crLf)
 	}
 	_, err := c.appConnWrite([]byte(respStr))
 	return err
@@ -366,14 +388,14 @@ func (c *ctrlProxyConn) onCmdGetconf(splitCmd []string, raw []byte) error {
 
 	if strings.ToUpper(splitCmd[1]) == argBridge {
 		if resp, _ := c.p.tor.getconf(splitCmd[1]); resp != nil {
-			respStr := strings.Join(resp.RawLines, "\r\n") + "\r\n"
+			respStr := strings.Join(resp.RawLines, crLf) + crLf
 			_, err := c.appConnWrite([]byte(respStr))
 			return err
 		}
 		return c.sendErrUnspecifiedTor()
 	}
 
-	respStr := "552 Unrecognized configuration key \"" + splitCmd[1] + "\"\r\n"
+	respStr := "552 Unrecognized configuration key \"" + splitCmd[1] + "\"" + crLf
 	_, err := c.appConnWrite([]byte(respStr))
 	return err
 }
@@ -383,7 +405,7 @@ func (c *ctrlProxyConn) onCmdSignal(splitCmd []string, raw []byte) error {
 	if len(splitCmd) != 2 {
 		return c.sendErrUnexpectedArgCount(cmdSignal, 2, len(splitCmd))
 	} else if strings.ToUpper(splitCmd[1]) != argSignalNewnym {
-		respStr := "552 Unrecognized signal code \"" + splitCmd[1] + "\"\r\n"
+		respStr := "552 Unrecognized signal code \"" + splitCmd[1] + "\"" + crLf
 		_, err := c.appConnWrite([]byte(respStr))
 		return err
 	} else {
@@ -399,23 +421,23 @@ func (c *ctrlProxyConn) onCmdSignal(splitCmd []string, raw []byte) error {
 }
 
 func (c *ctrlProxyConn) onCmdSetEvents(splitCmd []string, raw []byte) error {
-	const argEventStream = "STREAM"
 	if len(splitCmd) == 1 {
-		// XXX: Deregister for stream events.
+		if c.p.circuitMonitorEnabled {
+			c.p.circuitMonitor.register(c)
+		}
 		_, err := c.appConnWrite([]byte(responseOk))
 		return err
 	} else if len(splitCmd) != 2 {
 		// Tor Browser only uses "SETEVENTS STREAM" AFAIK.
 		return c.sendErrUnexpectedArgCount(cmdSignal, 2, len(splitCmd))
-	} else if strings.ToUpper(splitCmd[1]) != argEventStream {
-		respStr := "552 Unrecognized event \"" + splitCmd[1] + "\"\r\n"
+	} else if strings.ToUpper(splitCmd[1]) != eventStream {
+		respStr := "552 Unrecognized event \"" + splitCmd[1] + "\"" + crLf
 		_, err := c.appConnWrite([]byte(respStr))
 		return err
 	} else if !c.p.circuitMonitorEnabled {
 		return c.sendErrUnrecognizedCommand()
 	}
-	// XXX: Register for stream events.
-
+	c.p.circuitMonitor.register(c)
 	_, err := c.appConnWrite([]byte(responseOk))
 	return err
 }
@@ -439,6 +461,7 @@ type ctrlProxy struct {
 	torVersion string
 
 	circuitMonitorEnabled bool
+	circuitMonitor        *circuitMonitor
 
 	l net.Listener
 }
@@ -493,6 +516,13 @@ func launchCtrlProxy(cfg *config.Config, tor *Tor) (*ctrlProxy, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	p.circuitMonitor, err = initCircuitMonitor(p)
+	p.circuitMonitorEnabled = err == nil
+	if err != nil {
+		log.Printf("tor: failed to launch circuit display helper: %v", err)
+	}
+
 	go p.acceptLoop()
 
 	return p, nil

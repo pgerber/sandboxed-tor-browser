@@ -38,7 +38,6 @@ Things that the sandbox breaks:
  * X11 input methods (IBus requires access to the host D-Bus)
  * Installing addons via the browser UI (Unless allowed via the config)
  * Tor Browser's updater (launcher handles keeping the bundle up to date)
- * Tor Browser's circuit display (Will be fixed)
 
 Upstream Bugs:
 
