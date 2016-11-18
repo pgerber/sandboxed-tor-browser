@@ -389,7 +389,7 @@ func (c *ctrlProxyConn) onCmdGetconf(splitCmd []string, raw []byte) error {
 		return c.sendErrUnexpectedArgCount(cmdGetconf, 2, len(splitCmd))
 	}
 
-	if strings.ToUpper(splitCmd[1]) == argBridge {
+	if strings.ToUpper(splitCmd[1]) == argBridge && c.p.circuitMonitorEnabled {
 		if resp, _ := c.p.tor.getconf(splitCmd[1]); resp != nil {
 			respStr := strings.Join(resp.RawLines, crLf) + crLf
 			_, err := c.appConnWrite([]byte(respStr))
