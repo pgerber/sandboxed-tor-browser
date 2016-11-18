@@ -322,14 +322,16 @@ func NewSandboxedTor(cfg *config.Config, async *Async, cmd *exec.Cmd) (t *Tor, e
 
 	// Wait for bootstrap to finish.
 	bootstrapFinished := false
+	pct := 0
 	for nTicks := 0; nTicks < 120 && !bootstrapFinished; { // 120 sec timeout (bootstrap).
+		newPct := 0
 		select {
 		case ev := <-t.ctrlEvents:
 			const evPrefix = "STATUS_CLIENT "
 			if !strings.HasPrefix(ev.Reply, evPrefix) {
 				continue
 			}
-			bootstrapFinished = handleBootstrapEvent(async, strings.TrimPrefix(ev.Reply, evPrefix))
+			bootstrapFinished, newPct  = handleBootstrapEvent(async, strings.TrimPrefix(ev.Reply, evPrefix))
 		case <-async.Cancel:
 			return nil, ErrCanceled
 		case <-hz.C:
@@ -353,7 +355,12 @@ func NewSandboxedTor(cfg *config.Config, async *Async, cmd *exec.Cmd) (t *Tor, e
 			if err != nil {
 				return nil, err
 			}
-			bootstrapFinished = handleBootstrapEvent(async, strings.TrimPrefix(resp.Data[0], statusPrefix))
+			bootstrapFinished, newPct = handleBootstrapEvent(async, strings.TrimPrefix(resp.Data[0], statusPrefix))
+		}
+		// As long as forward progress is being made, reset the timer.
+		if newPct > pct {
+			pct = newPct
+			nTicks = 0
 		}
 	}
 	if !bootstrapFinished {
@@ -470,10 +477,10 @@ func CfgToSandboxTorrc(cfg *config.Config, bridges map[string][]string) ([]byte,
 	return torrc, nil
 }
 
-func handleBootstrapEvent(async *Async, s string) bool {
+func handleBootstrapEvent(async *Async, s string) (bool, int) {
 	const bootstrapPrefix = "NOTICE BOOTSTRAP "
 	if !strings.HasPrefix(s, bootstrapPrefix) {
-		return false
+		return false, 0
 	}
 
 	split := splitQuoted(strings.TrimPrefix(s, bootstrapPrefix))
@@ -492,13 +499,18 @@ func handleBootstrapEvent(async *Async, s string) bool {
 			summary = strings.Trim(summary, "\"")
 		}
 	}
+	progressPct, err := strconv.Atoi(progress)
+	if err != nil {
+		progressPct = 0
+	}
+
 	if progress != "" && summary != "" {
 		async.UpdateProgress(fmt.Sprintf("Bootstrap: %s", summary))
 		if progress == "100" {
-			return true
+			return true, progressPct
 		}
 	}
-	return false
+	return false, progressPct
 }
 
 // Random quoted split function stolen and modified from the intertubes.
