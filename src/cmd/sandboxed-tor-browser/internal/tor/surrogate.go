@@ -296,6 +296,9 @@ func (c *ctrlProxyConn) proxyAndFilerApp() {
 			break
 		}
 	}
+	if c.p.circuitMonitorEnabled {
+		c.p.circuitMonitor.deregister(c)
+	}
 }
 
 func (c *ctrlProxyConn) sendErrAuthenticationRequired() error {
@@ -423,7 +426,7 @@ func (c *ctrlProxyConn) onCmdSignal(splitCmd []string, raw []byte) error {
 func (c *ctrlProxyConn) onCmdSetEvents(splitCmd []string, raw []byte) error {
 	if len(splitCmd) == 1 {
 		if c.p.circuitMonitorEnabled {
-			c.p.circuitMonitor.register(c)
+			c.p.circuitMonitor.deregister(c)
 		}
 		_, err := c.appConnWrite([]byte(responseOk))
 		return err
