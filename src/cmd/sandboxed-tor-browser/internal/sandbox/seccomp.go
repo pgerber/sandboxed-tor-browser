@@ -58,11 +58,6 @@ func installTorSeccompProfile(fd *os.File) error {
 }
 
 func installOzSeccompProfile(fd *os.File, b []byte) error {
-	if !libseccompAtLeast(2, 2, 1) {
-		log.Printf("seccomp: library is older than 2.2.1, using default blacklist.")
-		return installBasicSeccompBlacklist(fd)
-	}
-
 	defer fd.Close()
 
 	actEPerm := seccomp.ActErrno.SetReturnCode(1)
@@ -107,9 +102,9 @@ func installOzSeccompProfile(fd *os.File, b []byte) error {
 		"LOCK_UN":    syscall.LOCK_UN,
 	}
 
-	// AFIAK, only certain architectures can use seccomp conditionals that
-	// filter based on args.  Fuck x86 anyway.
-	canUseConditionals := runtime.GOARCH == "amd64"
+	// Only certain architectures, and sufficiently new libseccomp
+	// supports conditionals.
+	canUseConditionals := runtime.GOARCH == "amd64" && libseccompAtLeast(2, 2, 1)
 
 	// Parse the rule set and build seccomp rules.
 	for ln, l := range bytes.Split(b, []byte{'\n'}) {
