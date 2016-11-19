@@ -246,7 +246,7 @@ func (c *Common) launchTor(async *Async, onlySystem bool) (dialFunc, error) {
 			async.Err = err
 			return nil, err
 		}
-	} else if !c.NeedsInstall() {
+	} else if !(c.NeedsInstall() || c.ForceInstall) {
 		// That's odd, we only asked for a system tor, but we should be capable
 		// of launching tor ourselves.  Don't use a direct connection.
 		err = fmt.Errorf("tor bootstrap would be skipped, when we could launch")
