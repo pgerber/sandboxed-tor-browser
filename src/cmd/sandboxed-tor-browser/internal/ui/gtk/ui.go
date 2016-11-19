@@ -46,6 +46,9 @@ func (ui *gtkUI) Run() error {
 		ui.bitch("Failed to run common UI: %v", err)
 		return err
 	}
+	if ui.PrintVersion {
+		return nil
+	}
 
 	if ui.NeedsInstall() || ui.ForceInstall {
 		for {

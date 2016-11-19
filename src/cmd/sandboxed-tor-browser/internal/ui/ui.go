@@ -50,6 +50,9 @@ var (
 
 	// Bridges is the map of transports to Bridge lines.
 	Bridges map[string][]string
+
+	// Version is the version of `sandboxed-tor-browser`.
+	Version string
 )
 
 const (
@@ -59,6 +62,19 @@ const (
 
 	chanHardened = "hardened"
 )
+
+func usage() {
+	_, file := path.Split(os.Args[0])
+	fmt.Fprintf(os.Stderr, "Usage: %s [OPTION]... [COMMAND]\n", file)
+	fmt.Fprintf(os.Stderr, "\n Options:\n\n")
+	flag.PrintDefaults()
+	fmt.Fprintf(os.Stderr, "\n")
+	fmt.Fprintf(os.Stderr, "\n Commands:\n\n")
+	fmt.Fprintf(os.Stderr, "   install\tForce (re)installation.\n")
+	fmt.Fprintf(os.Stderr, "   config\tForce (re)configuration.\n")
+	fmt.Fprintf(os.Stderr, "\n")
+	os.Exit(-1)
+}
 
 // UI is a user interface implementation.
 type UI interface {
@@ -75,13 +91,12 @@ type Common struct {
 	Manif   *config.Manifest
 	Sandbox *exec.Cmd
 	tor     *tor.Tor
-
-	lock   *lockFile
-	noLock bool
+	lock    *lockFile
 
 	ForceInstall   bool
 	ForceConfig    bool
 	AdvancedConfig bool
+	PrintVersion   bool
 }
 
 // Init initializes the common interface state.
@@ -89,10 +104,9 @@ func (c *Common) Init() error {
 	var err error
 
 	// Register the common command line flags.
-	flag.BoolVar(&c.noLock, "nolock", false, "Ignore checking the lock file.")
-	flag.BoolVar(&c.ForceInstall, "install", false, "Force (re)installation.")
-	flag.BoolVar(&c.ForceConfig, "config", false, "Force (re)configuration.")
-	flag.BoolVar(&c.AdvancedConfig, "advanced", false, "Show advanced config options")
+	flag.Usage = usage
+	flag.BoolVar(&c.AdvancedConfig, "advanced", false, "Show advanced config options.")
+	flag.BoolVar(&c.PrintVersion, "version", false, "Print the version and exit.")
 
 	// Initialize/load the config file.
 	if c.Cfg, err = config.New(); err != nil {
@@ -123,15 +137,33 @@ func (c *Common) Init() error {
 
 // Run handles initiailzing the at-runtime state.
 func (c *Common) Run() error {
+	const (
+		cmdInstall = "install"
+		cmdConfig  = "config"
+	)
+
 	// Parse the command line flags.
 	flag.Parse()
+	for _, v := range flag.Args() {
+		switch strings.ToLower(v) {
+		case cmdInstall:
+			c.ForceInstall = true
+		case cmdConfig:
+			c.ForceConfig = true
+		default:
+			flag.Usage()
+		}
+	}
+
+	if c.PrintVersion {
+		fmt.Printf("sandboxed-tor-browser %s\n", Version)
+		return nil // Skip the lock, because we will exit.
+	}
 
 	// Acquire the lock file.
-	if !c.noLock {
-		var err error
-		if c.lock, err = newLockFile(c); err != nil {
-			return err
-		}
+	var err error
+	if c.lock, err = newLockFile(c); err != nil {
+		return err
 	}
 
 	return nil
@@ -355,6 +387,12 @@ func init() {
 		panic(err)
 	} else if err = json.Unmarshal(d, &Bridges); err != nil {
 		panic(err)
+	}
+
+	if d, err := data.Asset("version"); err != nil {
+		panic(err)
+	} else {
+		Version = strings.TrimSpace(string(d))
 	}
 
 	// Fixup all the bridge lines to be well formed.
