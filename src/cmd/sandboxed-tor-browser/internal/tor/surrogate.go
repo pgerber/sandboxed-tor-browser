@@ -62,6 +62,75 @@ const (
 	socksAddr = "127.0.0.1:9150"
 )
 
+func copyLoop(upConn, downConn net.Conn) {
+	errChan := make(chan error, 2)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	cpFn := func(a, b net.Conn) {
+		defer wg.Done()
+		defer a.Close()
+		defer b.Close()
+
+		_, err := io.Copy(a, b)
+		errChan <- err
+	}
+
+	go cpFn(upConn, downConn)
+	go cpFn(downConn, upConn)
+
+	wg.Wait()
+}
+
+type passthroughProxy struct {
+	sNet, sAddr string
+	l           net.Listener
+}
+
+func (p *passthroughProxy) close() {
+	p.l.Close()
+}
+
+func (p *passthroughProxy) acceptLoop() {
+	defer p.l.Close()
+	for {
+		conn, err := p.l.Accept()
+		if err != nil {
+			if e, ok := err.(net.Error); ok && e.Temporary() {
+				continue
+			}
+			return
+		}
+
+		go func() {
+			defer conn.Close()
+
+			downConn, err := net.Dial(p.sNet, p.sAddr)
+			if err != nil {
+				return
+			}
+			defer downConn.Close()
+
+			copyLoop(conn, downConn)
+		}()
+	}
+}
+
+func launchPassthroughProxy(hostNet, hostAddr, destNet, destAddr string) (*passthroughProxy, error) {
+	p := new(passthroughProxy)
+	p.sNet, p.sAddr = destNet, destAddr
+
+	var err error
+	p.l, err = net.Listen(hostNet, hostAddr)
+	if err != nil {
+		return nil, err
+	}
+	go p.acceptLoop()
+
+	return p, nil
+}
+
 type socksProxy struct {
 	sync.RWMutex
 	sPath       string
@@ -138,7 +207,7 @@ func (p *socksProxy) handleConn(conn net.Conn) {
 		return
 	}
 
-	p.copyLoop(upConn, conn)
+	copyLoop(upConn, conn)
 }
 
 func (p *socksProxy) rewriteTag(conn net.Conn, req *socks5.Request) error {
@@ -156,27 +225,6 @@ func (p *socksProxy) rewriteTag(conn net.Conn, req *socks5.Request) error {
 		return fmt.Errorf("failed to redispatch, socks5 password too long")
 	}
 	return nil
-}
-
-func (p *socksProxy) copyLoop(upConn, downConn net.Conn) {
-	errChan := make(chan error, 2)
-
-	var wg sync.WaitGroup
-	wg.Add(2)
-
-	cpFn := func(a, b net.Conn) {
-		defer wg.Done()
-		defer a.Close()
-		defer b.Close()
-
-		_, err := io.Copy(a, b)
-		errChan <- err
-	}
-
-	go cpFn(upConn, downConn)
-	go cpFn(downConn, upConn)
-
-	wg.Wait()
 }
 
 func launchSocksProxy(cfg *config.Config, tor *Tor) (*socksProxy, error) {

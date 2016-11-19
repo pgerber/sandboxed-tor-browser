@@ -61,8 +61,9 @@ type Tor struct {
 	socksNet  string
 	socksAddr string
 
-	ctrlSurrogate  *ctrlProxy
-	socksSurrogate *socksProxy
+	ctrlSurrogate    *ctrlProxy
+	socksSurrogate   *socksProxy
+	socksPassthrough *passthroughProxy
 }
 
 // IsSystem returns if the tor instance is a OS service not being actively
@@ -168,6 +169,11 @@ func (t *Tor) Shutdown() {
 		t.socksSurrogate.close()
 		t.socksSurrogate = nil
 	}
+
+	if t.socksPassthrough != nil {
+		t.socksPassthrough.close()
+		t.socksPassthrough = nil
+	}
 }
 
 // SocksSurrogatePath returns the socks port surrogate AF_UNIX path.
@@ -190,6 +196,19 @@ func (t *Tor) launchSurrogates(cfg *config.Config) error {
 		t.socksSurrogate.close()
 		return err
 	}
+
+	if !t.IsSystem() {
+		const passthroughAddr = "127.0.0.1:9150"
+
+		tNet, tAddr, _ := t.SocksPort()
+		t.socksPassthrough, err = launchPassthroughProxy("tcp", passthroughAddr, tNet, tAddr)
+		if err != nil {
+			log.Printf("tor: Failed to open SOCKS passthrough listener: %v", err)
+		} else {
+			log.Printf("tor: Opened SOCKS passthrough listener: %v", passthroughAddr)
+		}
+	}
+
 	return nil
 }
 
