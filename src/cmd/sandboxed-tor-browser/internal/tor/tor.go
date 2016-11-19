@@ -323,7 +323,7 @@ func NewSandboxedTor(cfg *config.Config, async *Async, cmd *exec.Cmd) (t *Tor, e
 	// Wait for bootstrap to finish.
 	bootstrapFinished := false
 	pct := 0
-	for nTicks := 0; nTicks < 120 && !bootstrapFinished; { // 120 sec timeout (bootstrap).
+	for nTicks := 0; nTicks < 300 && !bootstrapFinished; { // 300 sec timeout (bootstrap).
 		newPct := 0
 		select {
 		case ev := <-t.ctrlEvents:
