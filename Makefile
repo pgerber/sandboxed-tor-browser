@@ -1,10 +1,13 @@
 CC	:= gcc
 CFLAGS := -Os -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2 -fstack-protector-all -Wstack-protector --param ssp-buffer-size=1 -fPIC -Wall -Werror -Wextra -Wl,-z,relro,-z,now
 
+GTK3TAG := gtk_3_14
+
 all: sandboxed-tor-browser
 
 sandboxed-tor-browser: static-assets
-	gb build
+	gb build -tags $(GTK3TAG)
+	mv ./bin/sandboxed-tor-browser-$(GTK3TAG) ./bin/sandboxed-tor-browser
 
 static-assets: go-bindata tbb_stub
 	./bin/go-bindata -nometadata -pkg data -prefix data -o ./src/cmd/sandboxed-tor-browser/internal/data/bindata.go data/...

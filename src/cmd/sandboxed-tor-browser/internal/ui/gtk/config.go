@@ -350,6 +350,9 @@ func (ui *gtkUI) initConfigDialog(b *gtk3.Builder) error {
 	if d.torBridgeCustomEntry, err = getTextView(b, "torBridgeCustomEntry"); err != nil {
 		return err
 	}
+	if _, err = d.torBridgeCustomEntry.GetProperty("monospace"); err == nil { // Gtk+ >= 3.16
+		d.torBridgeCustomEntry.SetProperty("monospace", true)
+	}
 	if d.torBridgeCustomEntryBuf, err = d.torBridgeCustomEntry.GetBuffer(); err != nil {
 		return err
 	}

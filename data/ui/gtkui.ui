@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Generated with glade 3.20.0 -->
 <interface>
-  <requires lib="gtk+" version="3.20"/>
+  <requires lib="gtk+" version="3.14"/>
   <object class="GtkDialog" id="configDialog">
     <property name="can_focus">False</property>
     <property name="default_width">480</property>
@@ -411,7 +411,6 @@
                                                   <object class="GtkTextView" id="torBridgeCustomEntry">
                                                     <property name="visible">True</property>
                                                     <property name="can_focus">True</property>
-                                                    <property name="monospace">True</property>
                                                   </object>
                                                 </child>
                                               </object>
