@@ -56,7 +56,7 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (cm
 	logger := newConsoleLogger("firefox")
 	h.stdout = logger
 	h.stderr = logger
-	h.seccompFn = installTBLOzWhitelist
+	h.seccompFn = installTorBrowserSeccompProfile
 
 	// X11, Gtk+, and PulseAudio.
 	if err = h.enableX11(cfg.Sandbox.Display); err != nil {
@@ -214,7 +214,7 @@ func RunUpdate(cfg *config.Config, mar []byte) (err error) {
 	logger := newConsoleLogger("update")
 	h.stdout = logger
 	h.stderr = logger
-	h.seccompFn = installTBLOzWhitelist
+	h.seccompFn = installTorBrowserSeccompProfile
 
 	// https://wiki.mozilla.org/Software_Update:Manually_Installing_a_MAR_file
 	const (
@@ -331,9 +331,9 @@ func RunTor(cfg *config.Config, torrc []byte) (cmd *exec.Cmd, err error) {
 	h.stdout = logger
 	h.stderr = logger
 	if !cfg.Tor.UseBridges {
-		h.seccompFn = installTBLOzWhitelist
+		h.seccompFn = installTorSeccompProfile
 	} else {
-		h.seccompFn = installBasicBlacklist
+		h.seccompFn = installBasicSeccompBlacklist
 	}
 	h.unshare.net = false // Tor needs host network access.
 

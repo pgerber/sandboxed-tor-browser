@@ -30,10 +30,37 @@ import (
 	"cmd/sandboxed-tor-browser/internal/data"
 )
 
-func installTBLOzWhitelist(fd *os.File) error {
+func installTorBrowserSeccompProfile(fd *os.File) error {
+	b, err := data.Asset("torbrowser-launcher-whitelist.seccomp")
+	if err != nil {
+		return err
+	}
+
+	log.Printf("seccomp: Using Tor Browser profile.")
+
+	return installOzSeccompProfile(fd, b)
+}
+
+func installTorSeccompProfile(fd *os.File) error {
+	b, err := data.Asset("tor-whitelist.seccomp")
+	if err != nil {
+		return err
+	}
+	if runtime.GOARCH == "386" {
+		// Tor's code claims that these calls are required on x86.
+		// There's no point in filtering socketcall's args, since this
+		// is x86.
+		b = append(b, []byte("\nrecv: 1\nsend: 1\nsocketcall: 1\n")...)
+	}
+
+	log.Printf("seccomp: Using Tor profile.")
+	return installOzSeccompProfile(fd, b)
+}
+
+func installOzSeccompProfile(fd *os.File, b []byte) error {
 	if !libseccompAtLeast(2, 2, 1) {
-		log.Printf("seccomp: library is older than 2.2.1), using default blacklist")
-		return installBasicBlacklist(fd)
+		log.Printf("seccomp: library is older than 2.2.1, using default blacklist.")
+		return installBasicSeccompBlacklist(fd)
 	}
 
 	defer fd.Close()
@@ -54,16 +81,30 @@ func installTBLOzWhitelist(fd *os.File) error {
 		"PR_GET_TIMERSLACK": syscall.PR_GET_TIMERSLACK,
 		"PR_SET_SECCOMP":    syscall.PR_SET_SECCOMP,
 		"PR_SET_DUMPABLE":   syscall.PR_SET_DUMPABLE,
+		"PR_SET_PDEATHSIG":  syscall.PR_SET_PDEATHSIG,
 		"AF_UNIX":           syscall.AF_UNIX,
 		"AF_INET":           syscall.AF_INET,
 		"AF_INET6":          syscall.AF_INET6,
 		"AF_NETLINK":        syscall.AF_NETLINK,
-	}
 
-	// Load the rule set.
-	b, err := data.Asset("torbrowser-launcher-whitelist.seccomp")
-	if err != nil {
-		return err
+		"SIGINT":  uint64(syscall.SIGINT),
+		"SIGTERM": uint64(syscall.SIGTERM),
+		"SIGPIPE": uint64(syscall.SIGPIPE),
+		"SIGUSR1": uint64(syscall.SIGUSR1),
+		"SIGUSR2": uint64(syscall.SIGUSR2),
+		"SIGHUP":  uint64(syscall.SIGHUP),
+		"SIGCHLD": uint64(syscall.SIGCHLD),
+		"SIGXFSZ": uint64(syscall.SIGXFSZ),
+
+		"EPOLL_CTL_ADD": syscall.EPOLL_CTL_ADD,
+		"EPOLL_CTL_MOD": syscall.EPOLL_CTL_MOD,
+		"EPOLL_CTL_DEL": syscall.EPOLL_CTL_DEL,
+
+		"PROT_READ": syscall.PROT_READ,
+		"PROT_NONE": syscall.PROT_NONE,
+
+		"LOCK_EX_NB": syscall.LOCK_EX | syscall.LOCK_NB,
+		"LOCK_UN":    syscall.LOCK_UN,
 	}
 
 	// AFIAK, only certain architectures can use seccomp conditionals that
@@ -189,7 +230,7 @@ func installTBLOzWhitelist(fd *os.File) error {
 	return f.ExportBPF(fd)
 }
 
-func installBasicBlacklist(fd *os.File) error {
+func installBasicSeccompBlacklist(fd *os.File) error {
 	defer fd.Close()
 
 	f, err := seccomp.NewFilter(seccomp.ActAllow)
