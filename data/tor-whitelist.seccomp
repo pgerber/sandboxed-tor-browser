@@ -1,15 +1,10 @@
 # tor binary seccomp rules based off the tor sandbox and the subgraph
 # tor-browser-launcher rules.
-#
-# Note: tor can and does filter certain calls by argument that this
-# ruleset can not, so it is advantageous to enable tor's sandboxing when
-# possible.
 
 # Constants used for argument comparisons.
 SIG_BLOCK=1
 SIG_SETMASK=2
 MREMAP_MAYMOVE=1
-TIOCGPGRP=21519
 
 # The tor stage 1 set.
 access: 1

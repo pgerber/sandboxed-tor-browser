@@ -436,12 +436,6 @@ func CfgToSandboxTorrc(cfg *config.Config, bridges map[string][]string) ([]byte,
 
 		s := "\n" + strings.Join(bridgeArgs, "\n") + "\n"
 		torrc = append(torrc, []byte(s)...)
-	} else {
-		// Tor's built in seccomp whitelist based sandbox only works when
-		// there are no managed pluggable transports, so only enable it when
-		// bridges aren't in use.  The standard whitelist will have to
-		// suffice when people use bridges.
-		torrc = append(torrc, []byte("\nSandbox 1\n")...)
 	}
 
 	if cfg.Tor.UseProxy {
