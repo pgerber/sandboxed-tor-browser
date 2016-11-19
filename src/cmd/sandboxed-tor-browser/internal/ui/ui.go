@@ -52,9 +52,13 @@ var (
 	Bridges map[string][]string
 )
 
-// DefaultBridgeTransport is the decault bridge transport when using internal
-// bridges.
-const DefaultBridgeTransport = "obfs4"
+const (
+	// DefaultBridgeTransport is the decault bridge transport when using internal
+	// bridges.
+	DefaultBridgeTransport = "obfs4"
+
+	chanHardened = "hardened"
+)
 
 // UI is a user interface implementation.
 type UI interface {
@@ -98,6 +102,16 @@ func (c *Common) Init() error {
 		return err
 	}
 	c.Cfg.Sanitize()
+
+	if sandbox.IsGrsecKernel() {
+		channels := []string{}
+		for _, v := range BundleChannels[c.Cfg.Architecture] {
+			if v != "hardened" {
+				channels = append(channels, v)
+			}
+		}
+		BundleChannels[c.Cfg.Architecture] = channels
+	}
 
 	if c.Manif != nil {
 		if err = c.Manif.Sync(); err != nil {
@@ -328,6 +342,12 @@ func init() {
 		panic(err)
 	} else if err = json.Unmarshal(d, &BundleLocales); err != nil {
 		panic(err)
+	}
+
+	// Cowardly refuse to allow the user to install the hardeened bundle on
+	// grsec kernels.
+	if sandbox.IsGrsecKernel() {
+		delete(BundleLocales, chanHardened)
 	}
 
 	Bridges = make(map[string][]string)

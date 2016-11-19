@@ -52,7 +52,7 @@ func (c *Common) DoLaunch(async *Async, checkUpdates bool) {
 		return
 	}
 
-	if c.Manif.Channel == "hardened" && sandbox.IsGrsecKernel() {
+	if c.Manif.Channel == chanHardened && sandbox.IsGrsecKernel() {
 		async.Err = fmt.Errorf("The 'hardened' release is incompatible with grsec.")
 		return
 	}

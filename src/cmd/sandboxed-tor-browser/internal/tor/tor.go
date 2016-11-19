@@ -331,7 +331,7 @@ func NewSandboxedTor(cfg *config.Config, async *Async, cmd *exec.Cmd) (t *Tor, e
 			if !strings.HasPrefix(ev.Reply, evPrefix) {
 				continue
 			}
-			bootstrapFinished, newPct  = handleBootstrapEvent(async, strings.TrimPrefix(ev.Reply, evPrefix))
+			bootstrapFinished, newPct = handleBootstrapEvent(async, strings.TrimPrefix(ev.Reply, evPrefix))
 		case <-async.Cancel:
 			return nil, ErrCanceled
 		case <-hz.C:
