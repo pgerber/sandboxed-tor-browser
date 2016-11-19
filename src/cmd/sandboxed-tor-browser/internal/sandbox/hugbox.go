@@ -310,7 +310,6 @@ func newHugbox() (*hugbox, error) {
 	}
 	if !canSetHost {
 		log.Printf("sandbox: bubblewrap appears to be old, not normalizing hostname.")
-		h.unshare.uts = false
 		h.hostname = ""
 	}
 
