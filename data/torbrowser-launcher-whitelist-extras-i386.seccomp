@@ -1,10 +1,14 @@
 # Tor Browser  i386 specific seccomp rules that will be installed in addition to
 # torbrowser-launcher-whitelist-seccomp.
 
+fcntl64:1
 fstat64: 1
 lstat64: 1
 statfs64: 1
 stat64: 1
+pread64: 1
+pwrite64: 1
+prlimit64: 1
 
 mmap2: 1
 set_thread_area: 1
