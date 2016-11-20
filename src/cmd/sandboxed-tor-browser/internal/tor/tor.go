@@ -412,10 +412,11 @@ func CfgToSandboxTorrc(cfg *config.Config, bridges map[string][]string) ([]byte,
 
 	// Apply proxy/bridge config.
 	if cfg.Tor.UseBridges {
-		bridgeArgs := []string{
-			"UseBridges 1",
-			"ClientTransportPlugin obfs2,obfs3,obfs4,scramblesuit exec /home/amnesia/tor/bin/PluggableTransports/obfs4proxy",
+		torrcBridges, err := data.Asset("torrc-bridges")
+		if err != nil {
+			return nil, err
 		}
+		bridgeArgs := []string{string(torrcBridges)}
 		if !cfg.Tor.UseCustomBridges {
 			// XXX: Actually shuffle this once there's a mechanism for
 			// persisting ordering. (#43)
