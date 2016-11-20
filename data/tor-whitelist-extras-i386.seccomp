@@ -8,3 +8,6 @@
 recv: 1
 send: 1
 socketcall: 1
+
+# This appears to be required on x86 to initialize TLS.
+set_thread_area: 1
