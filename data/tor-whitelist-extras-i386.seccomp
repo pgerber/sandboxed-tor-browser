@@ -1,0 +1,10 @@
+# tor binary i386 specific seccomp rules that will be installed in addition to
+# tor-whitelist-seccomp.
+
+# tor's sandbox code claims that these calls are required on x86 but not on
+# x86_64.  tor's sandbox attempts to filter socketcall's arguments as well
+# when it adds a rule, but seccomp on x86 does not support argument filtering,
+# and I suspect that the arg filter is incorrect.
+recv: 1
+send: 1
+socketcall: 1

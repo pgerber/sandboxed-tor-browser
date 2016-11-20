@@ -47,13 +47,17 @@ func installTorSeccompProfile(fd *os.File) error {
 		return err
 	}
 	if runtime.GOARCH == "386" {
-		// Tor's code claims that these calls are required on x86.
-		// There's no point in filtering socketcall's args, since this
-		// is x86.
-		b = append(b, []byte("\nrecv: 1\nsend: 1\nsocketcall: 1\n")...)
+		bb, err := data.Asset("tor-whitelist-extras-i386.seccomp")
+		if err != nil {
+			return err
+		}
+		b = append(b, '\n')
+		b = append(b, bb...)
+		b = append(b, '\n')
 	}
 
 	log.Printf("seccomp: Using Tor profile.")
+
 	return installOzSeccompProfile(fd, b)
 }
 
@@ -105,6 +109,9 @@ func installOzSeccompProfile(fd *os.File, b []byte) error {
 	// Only certain architectures, and sufficiently new libseccomp
 	// supports conditionals.
 	canUseConditionals := runtime.GOARCH == "amd64" && libseccompAtLeast(2, 2, 1)
+	if !canUseConditionals {
+		log.Printf("seccomp: Either libseccomp or the current arch does not support conditionals.")
+	}
 
 	// Parse the rule set and build seccomp rules.
 	for ln, l := range bytes.Split(b, []byte{'\n'}) {
