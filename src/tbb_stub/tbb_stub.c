@@ -48,6 +48,11 @@
 #include <stdlib.h>
 #include <X11/Xlib.h>
 
+#ifdef __i386__
+#include <sys/time.h>
+#include <sys/resource.h>
+#endif
+
 static pthread_once_t stub_init_once = PTHREAD_ONCE_INIT;
 static int (*real_connect)(int, const struct sockaddr *, socklen_t) = NULL;
 static int (*real_socket)(int, int, int) = NULL;
@@ -61,6 +66,7 @@ static struct sockaddr_un control_addr;
 #define SYSTEM_CONTROL_PORT 9051
 #define TBB_SOCKS_PORT 9150
 #define TBB_CONTROL_PORT 9151
+
 
 static void stub_init(void);
 
@@ -162,6 +168,27 @@ XQueryExtension(Display *display, _Xconst char *name, int *major, int *event, in
 
   return real_XQueryExtension(display, name, major, event, error);
 }
+
+#ifdef __i386__
+static int (*real_getrlimit)(__rlimit_resource_t, struct rlimit *);
+
+int
+getrlimit(__rlimit_resource_t resource, struct rlimit *rlim)
+{
+  /* I have no fucking idea why, on i386 systems rlimit starts failing
+   * randomly deep inside firefox, even with the appropriate system calls
+   * whitelisted.  Hooking it, makes the problem go away for extra fun.
+   */
+  if (real_getrlimit == NULL) {
+    if ((real_getrlimit = dlsym(RTLD_NEXT, "getrlimit")) == NULL) {
+      fprintf(stderr, "ERROR: Failed to find `getrlimit() symbol: %s\n", dlerror());
+      abort();
+    }
+  }
+
+  return real_getrlimit(resource, rlim);
+}
+#endif
 
 /*  Initialize the stub. */
 static void
