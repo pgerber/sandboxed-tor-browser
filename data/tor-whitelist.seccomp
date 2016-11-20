@@ -36,7 +36,6 @@ lseek: 1
 _llseek: 1
 mkdir: 1
 munmap: 1
-prlimit: 1
 prlimit64: 1
 read: 1
 rt_sigreturn: 1
