@@ -36,6 +36,12 @@ func installTorBrowserSeccompProfile(fd *os.File) error {
 		return err
 	}
 	if runtime.GOARCH == "386" {
+		// One day, I will figure out all the stupid fucking system calls
+		// required to get firefox to not crash with "too much recursion".
+		//
+		// Maybe this will magically happen when the proc stuff is fixed.
+		return installBasicSeccompBlacklist(fd)
+/*
 		bb, err := data.Asset("torbrowser-launcher-whitelist-extras-i386.seccomp")
 		if err != nil {
 			return err
@@ -43,6 +49,7 @@ func installTorBrowserSeccompProfile(fd *os.File) error {
 		b = append(b, '\n')
 		b = append(b, bb...)
 		b = append(b, '\n')
+*/
 	}
 
 	log.Printf("seccomp: Using Tor Browser profile.")
@@ -243,6 +250,8 @@ func installOzSeccompProfile(fd *os.File, b []byte) error {
 
 func installBasicSeccompBlacklist(fd *os.File) error {
 	defer fd.Close()
+
+	log.Printf("seccomp: Using basic blacklist")
 
 	f, err := seccomp.NewFilter(seccomp.ActAllow)
 	if err != nil {
