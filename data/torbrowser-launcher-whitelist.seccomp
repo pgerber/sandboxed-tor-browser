@@ -137,11 +137,12 @@ setrlimit: 1
 clock_getres: 1
 sched_setscheduler: 1
 capset: 1
-# XXX?yawning: Why is this needed?
+# XXX/yawning: Why is this needed?
 #personality: 1
 setresuid: 1
 setresgid: 1
 capget: 1
 getdents64: 1
 inotify_rm_watch: 1
-socket: arg0 == AF_UNIX || arg0 == AF_INET || arg0 == AF_INET6 || arg0 == AF_NETLINK
+# XXX/yawning: Only allow AF_UNIX.
+socket: arg0 == AF_UNIX # || arg0 == AF_INET || arg0 == AF_INET6 || arg0 == AF_NETLINK
