@@ -197,7 +197,7 @@ func (h *hugbox) run() (*exec.Cmd, error) {
 		fdArgs = append(fdArgs, "--chdir", h.chdir)
 	}
 	passwdBody := fmt.Sprintf("amnesia:x:%d:%d:Debian Live User,,,:/home/amnesia:/bin/bash\n", os.Getuid(), os.Getgid())
-	groupBody := fmt.Sprintf("amnesia:%d:1000\n", os.Getgid())
+	groupBody := fmt.Sprintf("amnesia:x:%d:\n", os.Getgid())
 	h.file("/etc/passwd", []byte(passwdBody))
 	h.file("/etc/group", []byte(groupBody))
 
