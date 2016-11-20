@@ -35,6 +35,15 @@ func installTorBrowserSeccompProfile(fd *os.File) error {
 	if err != nil {
 		return err
 	}
+	if runtime.GOARCH == "386" {
+		bb, err := data.Asset("torbrowser-launcher-whitelist-extras-i386.seccomp")
+		if err != nil {
+			return err
+		}
+		b = append(b, '\n')
+		b = append(b, bb...)
+		b = append(b, '\n')
+	}
 
 	log.Printf("seccomp: Using Tor Browser profile.")
 
