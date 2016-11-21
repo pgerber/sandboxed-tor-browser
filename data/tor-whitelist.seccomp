@@ -5,6 +5,7 @@
 SIG_BLOCK=1
 SIG_SETMASK=2
 MREMAP_MAYMOVE=1
+PF_LOCAL=AF_LOCAL
 
 # The tor stage 1 set.
 access: 1
@@ -75,23 +76,26 @@ flock: arg1 == (LOCK_EX | LOCK_NB) || arg1 == LOCK_UN
 # FUTEX_WAIT_BITSET_PRIVATE|FUTEX_CLOCK_REALTIME || FUTEX_WAKE_PRIVATE || FUTEX_WAIT_PRIVATE
 futex: arg1 == 393 || arg1 == 128 || arg1 == 129
 mremap: arg3 == MREMAP_MAYMOVE
+poll: arg1 == 2 && arg2 == 10
 socket: arg0 == AF_UNIX || arg0 == AF_INET || arg0 == AF_INET6 || arg0 == AF_NETLINK
+setsockopt: arg1 == SOL_SOCKET && (arg2 == SO_REUSEADDR || arg2 == SO_SNDBUF || arg2 == SO_RCVBUF)
+getsockopt: arg1 == SOL_SOCKET && arg2 == SO_ERROR
+# XXX: src/common/compat.c:tor_socketpair looks like it uses SOCK_CLOEXEC,
+# but according to strace, fcntl is used to actually set the flag (6.0.6).
+socketpair: arg0 == PF_LOCAL && (arg1 == SOCK_STREAM || arg1 == SOCK_STREAM | SOCK_CLOEXEC)
 
-# System calls that tor has filters for, that we do not due to the limitations
-# of Yawnings' profile parser, or because Yawning is too dumb to figure out how
-# to modify the rules.
+# System calls that tor has filters for, that we do not due to:
+#  * Yawning being too dumb/lazy to convert the rules (accept4, mmap2,
+#    rt_sigaction).
+#  * Tor has a comment to filter, but doesn't yet (mmap).
 rt_sigaction: 1
 accept4: 1
 mmap: 1
 # mmap2: 1
 # fcntl64: 1
-poll: 1
-setsockopt: 1
-getsockopt: 1
-socketpair: 1
 
 # System calls that tor restricts by argument, but that need to be done by the
-# tor binary.
+# tor binary, because the restriction is by pointer.
 chown: 1
 chmod: 1
 open: 1
