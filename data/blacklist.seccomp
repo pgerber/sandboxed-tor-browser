@@ -4,12 +4,18 @@
 # linux-user-chroot (v0 profile)
 #
 
-syslog: 1        # Block dmesg
-uselib: 1        # Useless old syscall
-personality: 1   # Don't allow you to switch to bsd emulation or whatnot
-acct: 1          # Don't allow disabling accounting
-modify_ldt: 1    # 16-bit code is unnecessary in the sandbox, and modify_ldt is a historic source of interesting information leaks.
-quotactl: 1      # Don't allow reading current quota use
+# Block dmesg
+syslog: 1
+# Useless old syscall
+uselib: 1
+# Don't allow you to switch to bsd emulation or whatnot
+personality: 1
+# Don't allow disabling accounting
+acct: 1
+# 16-bit code is unnecessary in the sandbox, and modify_ldt is a historic source of interesting information leaks.
+modify_ldt: 1
+# Don't allow reading current quota use
+quotactl: 1
 
 # Scary VM/NUMA ops:
 move_pages: 1
@@ -87,6 +93,3 @@ tuxcall: 1
 reboot: 1
 nfsservctl: 1
 get_kernel_syms: 1
-
-vm86: 1
-vm86old: 1

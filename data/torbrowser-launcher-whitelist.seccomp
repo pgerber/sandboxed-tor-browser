@@ -145,4 +145,4 @@ capget: 1
 getdents64: 1
 inotify_rm_watch: 1
 # XXX/yawning: Only allow AF_UNIX.
-socket: arg0 == AF_UNIX # || arg0 == AF_INET || arg0 == AF_INET6 || arg0 == AF_NETLINK
+socket: arg0 == AF_UNIX
