@@ -44,6 +44,12 @@
 			"branch": "master"
 		},
 		{
+			"importpath": "github.com/twtiger/gosecco",
+			"repository": "https://github.com/twtiger/gosecco",
+			"revision": "81110d334ed7a530d99ad620375855246f21d524",
+			"branch": "master"
+		},
+		{
 			"importpath": "github.com/ulikunitz/xz",
 			"repository": "https://github.com/ulikunitz/xz",
 			"revision": "3e84f9193f6ec5cd5998463d64c88f798356b0c9",
@@ -68,6 +74,13 @@
 			"revision": "7394c112eae4dba7e96bfcfe738e6373d61772b4",
 			"branch": "master",
 			"path": "/proxy"
+		},
+		{
+			"importpath": "golang.org/x/sys/unix",
+			"repository": "https://go.googlesource.com/sys",
+			"revision": "b699b7032584f0953262cb2788a0ca19bb494703",
+			"branch": "master",
+			"path": "/unix"
 		}
 	]
 }
