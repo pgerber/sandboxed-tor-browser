@@ -22,6 +22,8 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -93,6 +95,10 @@ type Common struct {
 	tor     *tor.Tor
 	lock    *lockFile
 
+	logQuiet bool
+	logPath  string
+	logFile  *os.File
+
 	ForceInstall   bool
 	ForceConfig    bool
 	AdvancedConfig bool
@@ -107,6 +113,8 @@ func (c *Common) Init() error {
 	flag.Usage = usage
 	flag.BoolVar(&c.AdvancedConfig, "advanced", false, "Show advanced config options.")
 	flag.BoolVar(&c.PrintVersion, "version", false, "Print the version and exit.")
+	flag.BoolVar(&c.logQuiet, "q", false, "Suppress logging to console.")
+	flag.StringVar(&c.logPath, "l", "", "Specify a log file.")
 
 	// Initialize/load the config file.
 	if c.Cfg, err = config.New(); err != nil {
@@ -154,14 +162,33 @@ func (c *Common) Run() error {
 			flag.Usage()
 		}
 	}
-
 	if c.PrintVersion {
 		fmt.Printf("sandboxed-tor-browser %s\n", Version)
 		return nil // Skip the lock, because we will exit.
 	}
 
-	// Acquire the lock file.
+	// Setup logging.
 	var err error
+	logWriters := []io.Writer{}
+	if c.logPath != "" {
+		flags := os.O_CREATE | os.O_APPEND | os.O_WRONLY
+		c.logFile, err = os.OpenFile(c.logPath, flags, config.FileMode)
+		if err != nil {
+			fmt.Printf("Failed to open log file '%v': %v", c.logPath, err)
+		}
+		logWriters = append(logWriters, c.logFile)
+	}
+	if !c.logQuiet {
+		logWriters = append(logWriters, os.Stdout)
+	}
+	if len(logWriters) == 0 {
+		log.SetOutput(ioutil.Discard)
+	} else {
+		w := io.MultiWriter(logWriters...)
+		log.SetOutput(w)
+	}
+
+	// Acquire the lock file.
 	if c.lock, err = newLockFile(c); err != nil {
 		return err
 	}
