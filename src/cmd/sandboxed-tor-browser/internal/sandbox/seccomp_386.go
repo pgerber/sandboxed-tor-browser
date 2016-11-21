@@ -1,4 +1,4 @@
-// secomp_i386.go - Sandbox seccomp rules (i386).
+// secomp_386.go - Sandbox seccomp rules (i386).
 // Copyright (C) 2016  Yawning Angel.
 //
 // This program is free software: you can redistribute it and/or modify
@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// +build i386
+// +build 386
 
 package sandbox
 
@@ -55,11 +55,11 @@ func installSeccomp(fd *os.File, assets []string, isBlacklist bool) error {
 		if err != nil {
 			return err
 		}
-		rules = append(rules, b)
+		rules = append(rules, b...)
 		rules = append(rules, '\n')
 	}
 
-	defaultAct, ruleAct := seccomp.ActAllow, seccomp.ActTrace
+	defaultAct, ruleAct := seccomp.ActTrace, seccomp.ActAllow
 	if isBlacklist {
 		defaultAct, ruleAct = ruleAct, defaultAct
 	}
