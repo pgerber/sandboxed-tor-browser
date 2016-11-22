@@ -17,6 +17,8 @@
 package sandbox
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"log"
@@ -79,6 +81,8 @@ type hugbox struct {
 	seccompFn  func(*os.File) error
 	pdeathSig  syscall.Signal
 
+	fakeDbus   bool
+
 	// Internal options, not to be modified except via helpers, unless you
 	// know what you are doing.
 	bwrapPath string
@@ -121,6 +125,16 @@ func (h *hugbox) roBind(src, dest string, optional bool) {
 func (h *hugbox) file(dest string, data []byte) {
 	h.args = append(h.args, "--file", fmt.Sprintf("%d", 4+len(h.fileData)), dest)
 	h.fileData = append(h.fileData, data)
+}
+
+func (h *hugbox) setupDbus() {
+	var fakeUUID [16]byte
+
+	if _, err := rand.Read(fakeUUID[:]); err != nil {
+		panic(err)
+	}
+	hexUUID := hex.EncodeToString(fakeUUID[:])
+	h.file("/var/lib/dbus/machine-id", []byte(hexUUID))
 }
 
 func (h *hugbox) assetFile(dest, asset string) {
@@ -182,6 +196,10 @@ func (h *hugbox) run() (*exec.Cmd, error) {
 	}
 	if runtime.GOARCH == "amd64" { // 64 bit Linux-ism.
 		fdArgs = append(fdArgs, "--ro-bind", "/lib64", "/lib64")
+		if fileExists("/usr/lib64") {
+			// openSUSE keeps 64 bit libraries here.
+			fdArgs = append(fdArgs, "--ro-bind", "/usr/lib64", "/usr/lib64")
+		}
 	}
 	fdArgs = append(fdArgs, h.unshare.toArgs()...) // unshare(2) options.
 	if h.hostname != "" {
@@ -200,6 +218,10 @@ func (h *hugbox) run() (*exec.Cmd, error) {
 	groupBody := fmt.Sprintf("amnesia:x:%d:\n", os.Getgid())
 	h.file("/etc/passwd", []byte(passwdBody))
 	h.file("/etc/group", []byte(groupBody))
+
+	if h.fakeDbus {
+		h.setupDbus()
+	}
 
 	// Handle the files to be injected via pipes.
 	pendingWriteFds := []*os.File{argsWrFd}
