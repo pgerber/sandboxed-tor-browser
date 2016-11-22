@@ -30,6 +30,7 @@ import (
 
 	"cmd/sandboxed-tor-browser/internal/tor"
 	"cmd/sandboxed-tor-browser/internal/ui/config"
+	"cmd/sandboxed-tor-browser/internal/utils"
 )
 
 // RunTorBrowser launches sandboxed Tor Browser.
@@ -84,10 +85,10 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (cm
 	realDownloadsDir := path.Join(realBrowserHome, "Downloads")
 
 	// Ensure that the `Downloads` and `Desktop` mount points exist.
-	if err = os.MkdirAll(realDesktopDir, config.DirMode); err != nil {
+	if err = os.MkdirAll(realDesktopDir, utils.DirMode); err != nil {
 		return
 	}
-	if err = os.MkdirAll(realDownloadsDir, config.DirMode); err != nil {
+	if err = os.MkdirAll(realDownloadsDir, utils.DirMode); err != nil {
 		return
 	}
 
@@ -293,7 +294,7 @@ func stageUpdate(updateDir, installDir string, mar []byte) error {
 
 	// 1. Create a directory outside of the application's installation
 	//    directory to be updated.
-	if err := os.MkdirAll(updateDir, config.DirMode); err != nil {
+	if err := os.MkdirAll(updateDir, utils.DirMode); err != nil {
 		return err
 	}
 
@@ -308,7 +309,7 @@ func stageUpdate(updateDir, installDir string, mar []byte) error {
 	// 3. Download the appropriate .mar file and put it into the outside
 	//    directory you created (see Where to get a mar file).
 	// 4. Rename the mar file you downloaded to update.mar.
-	if err := ioutil.WriteFile(path.Join(updateDir, "update.mar"), mar, config.FileMode); err != nil {
+	if err := ioutil.WriteFile(path.Join(updateDir, "update.mar"), mar, utils.FileMode); err != nil {
 		return err
 	}
 
@@ -338,7 +339,7 @@ func RunTor(cfg *config.Config, torrc []byte) (cmd *exec.Cmd, err error) {
 	}
 	h.unshare.net = false // Tor needs host network access.
 
-	if err = os.MkdirAll(cfg.TorDataDir, config.DirMode); err != nil {
+	if err = os.MkdirAll(cfg.TorDataDir, utils.DirMode); err != nil {
 		return
 	}
 

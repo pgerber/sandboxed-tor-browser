@@ -22,6 +22,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"cmd/sandboxed-tor-browser/internal/utils"
 )
 
 // Manifest contains the installed Tor Browser information.
@@ -56,7 +58,7 @@ func (m *Manifest) Sync() error {
 		// Encode to JSON and write to disk.
 		if b, err := json.Marshal(&m); err != nil {
 			return err
-		} else if err = ioutil.WriteFile(m.path, b, FileMode); err != nil {
+		} else if err = ioutil.WriteFile(m.path, b, utils.FileMode); err != nil {
 			return err
 		}
 
@@ -99,6 +101,11 @@ func (m *Manifest) BundleVersionAtLeast(major, minor int) bool {
 		return true
 	}
 	return false
+}
+
+// Purge deletes the manifest.
+func (m *Manifest) Purge() {
+	os.Remove(m.path)
 }
 
 // LoadManifest loads a manifest if present.  Note that a missing manifest is

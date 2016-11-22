@@ -32,6 +32,7 @@ import (
 	"cmd/sandboxed-tor-browser/internal/sandbox"
 	. "cmd/sandboxed-tor-browser/internal/ui/async"
 	"cmd/sandboxed-tor-browser/internal/ui/config"
+	"cmd/sandboxed-tor-browser/internal/utils"
 )
 
 // DoInstall executes the install step based on the configured parameters.
@@ -150,14 +151,14 @@ func writeAutoconfig(cfg *config.Config) error {
 	autoconfigFile := path.Join(cfg.BundleInstallDir, "Browser", "defaults", "pref", "autoconfig.js")
 	if b, err := data.Asset("installer/autoconfig.js"); err != nil {
 		return err
-	} else if err = ioutil.WriteFile(autoconfigFile, b, config.FileMode); err != nil {
+	} else if err = ioutil.WriteFile(autoconfigFile, b, utils.FileMode); err != nil {
 		return err
 	}
 
 	mozillacfgFile := path.Join(cfg.BundleInstallDir, "Browser", "mozilla.cfg")
 	if b, err := data.Asset("installer/mozilla.cfg"); err != nil {
 		return err
-	} else if err = ioutil.WriteFile(mozillacfgFile, b, config.FileMode); err != nil {
+	} else if err = ioutil.WriteFile(mozillacfgFile, b, utils.FileMode); err != nil {
 		return err
 	}
 

@@ -26,17 +26,13 @@ import (
 	"runtime"
 	"time"
 
-	"git.schwanenlied.me/yawning/bulb.git/utils"
+	butils "git.schwanenlied.me/yawning/bulb.git/utils"
 	xdg "github.com/cep21/xdgbasedir"
+
+	"cmd/sandboxed-tor-browser/internal/utils"
 )
 
 const (
-	// DirMode is the permissions used when making directories.
-	DirMode = os.ModeDir | 0700
-
-	// FileMode is the permissions used when making files.
-	FileMode = 0600
-
 	configFile   = "sandboxed-tor-browser.json"
 	manifestFile = "manifest.json"
 
@@ -347,20 +343,10 @@ func (cfg *Config) SetLastUpdateCheck(t int64) {
 
 // Sanitize validates the config, and brings it inline with reality.
 func (cfg *Config) Sanitize() {
-	dirExists := func(d string) bool {
-		if d == "" {
-			return false
-		}
-		fi, err := os.Lstat(d)
-		if err != nil {
-			return false
-		}
-		return fi.IsDir()
-	}
-	if !dirExists(cfg.Sandbox.DownloadsDir) {
+	if !utils.DirExists(cfg.Sandbox.DownloadsDir) {
 		cfg.Sandbox.SetDownloadsDir("")
 	}
-	if !dirExists(cfg.Sandbox.DesktopDir) {
+	if !utils.DirExists(cfg.Sandbox.DesktopDir) {
 		cfg.Sandbox.SetDesktopDir("")
 	}
 }
@@ -371,7 +357,7 @@ func (cfg *Config) Sync() error {
 		// Encode to JSON and write to disk.
 		if b, err := json.Marshal(&cfg); err != nil {
 			return err
-		} else if err = ioutil.WriteFile(cfg.path, b, FileMode); err != nil {
+		} else if err = ioutil.WriteFile(cfg.path, b, utils.FileMode); err != nil {
 			return err
 		}
 
@@ -410,7 +396,7 @@ func New() (*Config, error) {
 		return nil, fmt.Errorf("unsupported Arch: %v", runtime.GOARCH)
 	}
 	if env := os.Getenv(envControlPort); env != "" {
-		if net, addr, err := utils.ParseControlPortString(env); err != nil {
+		if net, addr, err := butils.ParseControlPortString(env); err != nil {
 			return nil, fmt.Errorf("invalid control port: %v", err)
 		} else {
 			cfg.UseSystemTor = true
@@ -433,18 +419,13 @@ func New() (*Config, error) {
 		cfg.BundleInstallDir = path.Join(cfg.UserDataDir, bundleInstallDir)
 		cfg.TorDataDir = path.Join(cfg.UserDataDir, torDataDir)
 	}
-	for _, d := range []string{cfg.RuntimeDir, cfg.UserDataDir} {
-		if err := os.MkdirAll(d, DirMode); err != nil {
-			return nil, err
-		}
-	}
 
 	// Ensure the path used to store the config file exits.
 	if d, err := xdg.ConfigHomeDirectory(); err != nil {
 		return nil, err
 	} else {
 		d = path.Join(d, appDir)
-		if err := os.MkdirAll(d, DirMode); err != nil {
+		if err := os.MkdirAll(d, utils.DirMode); err != nil {
 			return nil, err
 		}
 		cfg.path = path.Join(d, configFile)

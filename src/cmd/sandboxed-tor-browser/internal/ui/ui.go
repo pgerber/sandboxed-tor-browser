@@ -41,6 +41,7 @@ import (
 	"cmd/sandboxed-tor-browser/internal/tor"
 	. "cmd/sandboxed-tor-browser/internal/ui/async"
 	"cmd/sandboxed-tor-browser/internal/ui/config"
+	"cmd/sandboxed-tor-browser/internal/utils"
 )
 
 var (
@@ -167,12 +168,29 @@ func (c *Common) Run() error {
 		return nil // Skip the lock, because we will exit.
 	}
 
+	// Create the directories required.
+	if !utils.DirExists(c.Cfg.UserDataDir) {
+		// That's odd, there's a manifest even though there's no user data.
+		if c.Manif != nil {
+			c.Manif.Purge()
+			c.Manif = nil
+		}
+		if err := os.MkdirAll(c.Cfg.UserDataDir, utils.DirMode); err != nil {
+			return err
+		}
+	}
+	if !utils.DirExists(c.Cfg.RuntimeDir) {
+		if err := os.MkdirAll(c.Cfg.RuntimeDir, utils.DirMode); err != nil {
+			return err
+		}
+	}
+
 	// Setup logging.
 	var err error
 	logWriters := []io.Writer{}
 	if c.logPath != "" {
 		flags := os.O_CREATE | os.O_APPEND | os.O_WRONLY
-		c.logFile, err = os.OpenFile(c.logPath, flags, config.FileMode)
+		c.logFile, err = os.OpenFile(c.logPath, flags, utils.FileMode)
 		if err != nil {
 			fmt.Printf("Failed to open log file '%v': %v", c.logPath, err)
 		}
@@ -312,7 +330,7 @@ func newLockFile(c *Common) (*lockFile, error) {
 	p := path.Join(c.Cfg.RuntimeDir, lockFileName)
 
 	var err error
-	if l.f, err = os.OpenFile(p, os.O_CREATE|os.O_EXCL, config.FileMode); err != nil {
+	if l.f, err = os.OpenFile(p, os.O_CREATE|os.O_EXCL, utils.FileMode); err != nil {
 		return nil, err
 	}
 	return l, nil

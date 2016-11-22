@@ -81,7 +81,7 @@ type hugbox struct {
 	seccompFn  func(*os.File) error
 	pdeathSig  syscall.Signal
 
-	fakeDbus   bool
+	fakeDbus bool
 
 	// Internal options, not to be modified except via helpers, unless you
 	// know what you are doing.
