@@ -12,7 +12,7 @@ specific.
 There are several unresolved issues that affect security and fingerprinting.
 Do not assume that this is perfect, merely "an improvement over nothing".  If
 you require strong security, consider combining the sandbox with something like
-Qubes or Tails.
+Qubes, Subgraph or Tails.
 
 Runtime dependencies:
 
@@ -57,7 +57,7 @@ Notes:
  * Unless you're capable of debugging it, don't use it, and don't contact me
    about it.
  * By default the sandbox `~/Desktop` and `~/Downloads` directories are mapped
-   to the host `~/.local/share/sandboxed-tor-browser/tor-browser/Browser/[Deskto,Downloads]`
+   to the host `~/.local/share/sandboxed-tor-browser/tor-browser/Browser/[Desktop,Downloads]`
    directories.
  * https://git.schwanenlied.me/yawning/sandboxed-tor-browser/wiki has something
    resembling build instructions, that may or may not be up to date.
