@@ -301,16 +301,17 @@ func newHugbox() (*hugbox, error) {
 		return nil, fmt.Errorf("sandbox: unable to find bubblewrap binary")
 	}
 
-	// Fucking Ubuntu is slow about updating the bubblewrap package, and using
-	// `--unshare-uts` prior to 0.1.3 is a really bad idea because I'm a
-	// retard.
-	canSetHost, err := bubblewrapAtLeast(h.bwrapPath, 0, 1, 3)
-	if err != nil {
+	// Bubblewrap <= 0.1.2-2 (in Debian terms, 0.1.3 for the rest of us), is
+	// a really bad idea because I'm a retard, and didn't expect bubblewrap
+	// to be ptrace-able when I contributed support for the hostname.
+	//
+	// There is a CVE for it.  Sensible people have made 0.1.3 available,
+	// including jessie-backports.  Ubuntu is still shipping an old version.
+	// Sucks to be them.
+	if ok, err := bubblewrapAtLeast(h.bwrapPath, 0, 1, 3); err != nil {
 		return nil, err
-	}
-	if !canSetHost {
-		log.Printf("sandbox: bubblewrap appears to be old, not normalizing hostname.")
-		h.hostname = ""
+	} else if !ok {
+		return nil, fmt.Errorf("sandbox: bubblewrap appears to be older than 0.1.3, you MUST upgrade.")
 	}
 
 	return h, nil
