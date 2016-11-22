@@ -32,21 +32,21 @@ import (
 )
 
 const (
-	actAllow = "allow"
-	actTrace = "trace"
-	actKill  = "kill"
+	actAllow  = "allow"
+	actKill   = "kill"
+	actENOSYS = "ENOSYS"
 )
 
 var whitelistSettings = &gosecco.SeccompSettings{
 	DefaultPositiveAction: actAllow,
-	DefaultNegativeAction: actTrace,
-	DefaultPolicyAction:   actTrace,
+	DefaultNegativeAction: actENOSYS,
+	DefaultPolicyAction:   actENOSYS,
 	ActionOnX32:           actKill,
 	ActionOnAuditFailure:  actKill,
 }
 
 var blacklistSettings = &gosecco.SeccompSettings{
-	DefaultPositiveAction: actTrace,
+	DefaultPositiveAction: actENOSYS,
 	DefaultNegativeAction: actAllow,
 	DefaultPolicyAction:   actAllow,
 	ActionOnX32:           actKill,
