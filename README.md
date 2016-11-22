@@ -37,10 +37,18 @@ Things that the sandbox breaks:
  * Installing addons via the browser UI (Unless allowed via the config)
  * Tor Browser's updater (launcher handles keeping the bundle up to date)
 
+Places where the sandbox could be better:
+
+ * More about the host system is exposed than neccecary, both due to taking a
+   shotgun approach for dynamic libraries, and because firefox crashes without
+   `/proc`.
+
 Upstream Bugs:
 
  * Tor Browser still shows update related UI elements.
    (https://bugs.torproject.org/20083)
+ * Tor Browser should run without a `/proc` filesystem.
+   (https://bugs.torproject.org/20283)
 
 Notes:
 
@@ -48,3 +56,8 @@ Notes:
  * Questions that could be answered by reading the code will be ignored.
  * Unless you're capable of debugging it, don't use it, and don't contact me
    about it.
+ * By default the sandbox `~/Desktop` and `~/Downloads` directories are mapped
+   to the host `~/.local/share/sandboxed-tor-browser/tor-browser/Browser/[Deskto,Downloads]`
+   directories.
+ * https://git.schwanenlied.me/yawning/sandboxed-tor-browser/wiki has something
+   resembling build instructions, that may or may not be up to date.
