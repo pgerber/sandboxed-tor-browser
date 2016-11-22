@@ -57,6 +57,7 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (cm
 	h.stdout = logger
 	h.stderr = logger
 	h.seccompFn = installTorBrowserSeccompProfile
+	h.fakeDbus = true
 
 	// X11, Gtk+, and PulseAudio.
 	if err = h.enableX11(cfg.Sandbox.Display); err != nil {

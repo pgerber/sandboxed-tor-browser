@@ -128,13 +128,15 @@ func (h *hugbox) file(dest string, data []byte) {
 }
 
 func (h *hugbox) setupDbus() {
+	const idPath = "/var/lib/dbus/machine-id"
 	var fakeUUID [16]byte
 
 	if _, err := rand.Read(fakeUUID[:]); err != nil {
 		panic(err)
 	}
 	hexUUID := hex.EncodeToString(fakeUUID[:])
-	h.file("/var/lib/dbus/machine-id", []byte(hexUUID))
+	h.file(idPath, []byte(hexUUID))
+	h.symlink(idPath, "/etc/machine-id") // openSUSE again.
 }
 
 func (h *hugbox) assetFile(dest, asset string) {
