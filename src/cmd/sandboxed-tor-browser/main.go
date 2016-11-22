@@ -21,7 +21,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"cmd/sandboxed-tor-browser/internal/ui/gtk"
 )
@@ -31,15 +30,6 @@ func main() {
 	if ret, _, err := syscall.Syscall6(syscall.SYS_PRCTL, syscall.PR_SET_DUMPABLE, 0, 0, 0, 0, 0); ret != 0 {
 		log.Fatalf("failed to disable core dumps: %v", err)
 		return
-	}
-
-	// jwz does this for xscreensaver and it's a good idea for this,
-	// especially since it's nothing resembling stable, and shouldn't be
-	// packaged in any distribution.
-	//
-	// If you're a random distribution that decided to package this, fuck off.
-	if time.Now().After(time.Date(2017, time.March, 01, 00, 00, 00, 00, time.UTC)) {
-		log.Fatalf("This version is very old!  Please upgrade.")
 	}
 
 	// Install the signal handlers before initializing the UI.
