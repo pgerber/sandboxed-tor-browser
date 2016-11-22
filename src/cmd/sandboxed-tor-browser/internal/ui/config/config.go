@@ -295,6 +295,9 @@ type Config struct {
 	// TorDataDir is `UserDataDir/torDataDir`.
 	TorDataDir string `json:"-"`
 
+	// ConfigDir is `XDG_CONFIG_HOME/appDir`.
+	ConfigDir string `json:"-"`
+
 	isDirty      bool
 	path         string
 	manifestPath string
@@ -418,6 +421,7 @@ func New() (*Config, error) {
 		cfg.UserDataDir = path.Join(d, appDir)
 		cfg.BundleInstallDir = path.Join(cfg.UserDataDir, bundleInstallDir)
 		cfg.TorDataDir = path.Join(cfg.UserDataDir, torDataDir)
+		cfg.manifestPath = path.Join(cfg.UserDataDir, manifestFile)
 	}
 
 	// Ensure the path used to store the config file exits.
@@ -428,8 +432,8 @@ func New() (*Config, error) {
 		if err := os.MkdirAll(d, utils.DirMode); err != nil {
 			return nil, err
 		}
-		cfg.path = path.Join(d, configFile)
-		cfg.manifestPath = path.Join(d, manifestFile)
+		cfg.ConfigDir = d
+		cfg.path = path.Join(cfg.ConfigDir, configFile)
 	}
 
 	// Load the config file.

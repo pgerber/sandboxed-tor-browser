@@ -18,8 +18,10 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 
@@ -112,6 +114,15 @@ func (m *Manifest) Purge() {
 // not treated as an error.
 func LoadManifest(cfg *Config) (*Manifest, error) {
 	m := new(Manifest)
+
+	// Somewhere in the 0.0.1-dev era, the location for the manifiest file
+	// changed.  Transition gracefully by moving the file to the new location.
+	oldManifestPath := path.Join(cfg.ConfigDir, manifestFile)
+	if _, err := os.Lstat(oldManifestPath); err == nil {
+		if err = os.Rename(oldManifestPath, cfg.manifestPath); err != nil {
+			return nil, fmt.Errorf("failed to move manifest to new location: %v", err)
+		}
+	}
 
 	// Load the manifest file.
 	if b, err := ioutil.ReadFile(cfg.manifestPath); err != nil {
