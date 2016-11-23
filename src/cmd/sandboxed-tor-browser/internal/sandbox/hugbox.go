@@ -24,7 +24,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"path"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -305,7 +305,7 @@ func newHugbox() (*hugbox, error) {
 		},
 		hostname:   "amnesia",
 		mountProc:  true,
-		runtimeDir: path.Join("/run", "user", fmt.Sprintf("%d", os.Getuid())),
+		runtimeDir: filepath.Join("/run", "user", fmt.Sprintf("%d", os.Getuid())),
 		homeDir:    "/home/amnesia",
 		pdeathSig:  syscall.SIGTERM,
 	}

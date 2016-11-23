@@ -28,7 +28,7 @@ import (
 	//	mrand "math/rand"
 	"os"
 	"os/exec"
-	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -274,7 +274,7 @@ func NewSandboxedTor(cfg *config.Config, async *Async, cmd *exec.Cmd) (t *Tor, e
 	t.isSystem = false
 	t.cmd = cmd
 	t.socksNet = "unix"
-	t.socksAddr = path.Join(cfg.TorDataDir, "socks")
+	t.socksAddr = filepath.Join(cfg.TorDataDir, "socks")
 	t.ctrlEvents = make(chan *bulb.Response, 16)
 
 	hz := time.NewTicker(1 * time.Second)
@@ -283,7 +283,7 @@ func NewSandboxedTor(cfg *config.Config, async *Async, cmd *exec.Cmd) (t *Tor, e
 	// Wait for the control port to be ready.
 	var ctrlPortAddr []byte
 	for nTicks := 0; nTicks < 10; { // 10 sec timeout (control port).
-		if ctrlPortAddr, err = ioutil.ReadFile(path.Join(cfg.TorDataDir, "control_port")); err == nil {
+		if ctrlPortAddr, err = ioutil.ReadFile(filepath.Join(cfg.TorDataDir, "control_port")); err == nil {
 			break
 		}
 
@@ -306,7 +306,7 @@ func NewSandboxedTor(cfg *config.Config, async *Async, cmd *exec.Cmd) (t *Tor, e
 
 	// Dial the control port.
 	async.UpdateProgress("Connecting to the Tor Control Port.")
-	if t.ctrl, err = bulb.Dial("unix", path.Join(cfg.TorDataDir, "control")); err != nil {
+	if t.ctrl, err = bulb.Dial("unix", filepath.Join(cfg.TorDataDir, "control")); err != nil {
 		return nil, err
 	}
 

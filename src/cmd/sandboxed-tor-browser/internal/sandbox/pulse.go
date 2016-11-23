@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 
 	xdg "github.com/cep21/xdgbasedir"
@@ -40,7 +40,7 @@ func (h *hugbox) enablePulseAudio() error {
 	// along with the modern default locations.
 	sockPath := os.Getenv(pulseServer)
 	if sockPath == "" {
-		sockPath = path.Join(h.runtimeDir, "pulse", "native")
+		sockPath = filepath.Join(h.runtimeDir, "pulse", "native")
 	} else if strings.HasPrefix(sockPath, unixPrefix) {
 		sockPath = strings.TrimPrefix(sockPath, unixPrefix)
 	} else {
@@ -77,8 +77,8 @@ func (h *hugbox) enablePulseAudio() error {
 	//  * The socket.
 	//  * The cookie, if any.
 	//  * A `client.conf` that disables shared memory.
-	sandboxPulseSock := path.Join(h.runtimeDir, "pulse", "native")
-	sandboxPulseConf := path.Join(h.runtimeDir, "pulse", "client.conf")
+	sandboxPulseSock := filepath.Join(h.runtimeDir, "pulse", "native")
+	sandboxPulseConf := filepath.Join(h.runtimeDir, "pulse", "client.conf")
 
 	h.bind(sockPath, sandboxPulseSock, false)
 	h.setenv(pulseServer, "unix:"+sandboxPulseSock)
@@ -86,7 +86,7 @@ func (h *hugbox) enablePulseAudio() error {
 	h.file(sandboxPulseConf, []byte("enable-shm=no"))
 
 	if cookie != nil {
-		sandboxPulseCookie := path.Join(h.runtimeDir, "pulse", "cookie")
+		sandboxPulseCookie := filepath.Join(h.runtimeDir, "pulse", "cookie")
 		h.file(sandboxPulseCookie, cookie)
 		h.setenv(pulseCookie, sandboxPulseCookie)
 	}

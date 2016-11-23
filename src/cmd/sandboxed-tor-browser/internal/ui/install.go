@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"path"
+	"path/filepath"
 	"runtime"
 	"time"
 
@@ -148,14 +148,14 @@ func (c *Common) DoInstall(async *Async) {
 }
 
 func writeAutoconfig(cfg *config.Config) error {
-	autoconfigFile := path.Join(cfg.BundleInstallDir, "Browser", "defaults", "pref", "autoconfig.js")
+	autoconfigFile := filepath.Join(cfg.BundleInstallDir, "Browser", "defaults", "pref", "autoconfig.js")
 	if b, err := data.Asset("installer/autoconfig.js"); err != nil {
 		return err
 	} else if err = ioutil.WriteFile(autoconfigFile, b, utils.FileMode); err != nil {
 		return err
 	}
 
-	mozillacfgFile := path.Join(cfg.BundleInstallDir, "Browser", "mozilla.cfg")
+	mozillacfgFile := filepath.Join(cfg.BundleInstallDir, "Browser", "mozilla.cfg")
 	if b, err := data.Asset("installer/mozilla.cfg"); err != nil {
 		return err
 	} else if err = ioutil.WriteFile(mozillacfgFile, b, utils.FileMode); err != nil {

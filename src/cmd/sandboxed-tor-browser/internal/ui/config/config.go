@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
+	"path/filepath"
 	"runtime"
 	"time"
 
@@ -413,27 +413,27 @@ func New() (*Config, error) {
 	if d := os.Getenv(envRuntimeDir); d == "" {
 		return nil, fmt.Errorf("no `%s` set in the enviornment", envRuntimeDir)
 	} else {
-		cfg.RuntimeDir = path.Join(d, appDir)
+		cfg.RuntimeDir = filepath.Join(d, appDir)
 	}
 	if d, err := xdg.DataHomeDirectory(); err != nil {
 		return nil, err
 	} else {
-		cfg.UserDataDir = path.Join(d, appDir)
-		cfg.BundleInstallDir = path.Join(cfg.UserDataDir, bundleInstallDir)
-		cfg.TorDataDir = path.Join(cfg.UserDataDir, torDataDir)
-		cfg.manifestPath = path.Join(cfg.UserDataDir, manifestFile)
+		cfg.UserDataDir = filepath.Join(d, appDir)
+		cfg.BundleInstallDir = filepath.Join(cfg.UserDataDir, bundleInstallDir)
+		cfg.TorDataDir = filepath.Join(cfg.UserDataDir, torDataDir)
+		cfg.manifestPath = filepath.Join(cfg.UserDataDir, manifestFile)
 	}
 
 	// Ensure the path used to store the config file exits.
 	if d, err := xdg.ConfigHomeDirectory(); err != nil {
 		return nil, err
 	} else {
-		d = path.Join(d, appDir)
+		d = filepath.Join(d, appDir)
 		if err := os.MkdirAll(d, utils.DirMode); err != nil {
 			return nil, err
 		}
 		cfg.ConfigDir = d
-		cfg.path = path.Join(cfg.ConfigDir, configFile)
+		cfg.path = filepath.Join(cfg.ConfigDir, configFile)
 	}
 
 	// Load the config file.

@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
+	"path/filepath"
 	"runtime"
 	"strings"
 
@@ -58,7 +58,7 @@ func untar(r io.Reader, destDir string, cancelCh chan interface{}) error {
 		// routine, because it's fucking retarded.
 		split := strings.Split(name, "/")
 		if len(split) > 1 {
-			return path.Join(split[1:]...)
+			return filepath.Join(split[1:]...)
 		}
 		return ""
 	}
@@ -103,7 +103,7 @@ func untar(r io.Reader, destDir string, cancelCh chan interface{}) error {
 			}
 			return fmt.Errorf("expecting container dir, got file: %v", hdr.Name)
 		}
-		destName := path.Join(destDir, name)
+		destName := filepath.Join(destDir, name)
 
 		if hdr.FileInfo().IsDir() {
 			if err := os.MkdirAll(destName, hdr.FileInfo().Mode()); err != nil {

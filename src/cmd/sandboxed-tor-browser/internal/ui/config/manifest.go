@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -117,7 +117,7 @@ func LoadManifest(cfg *Config) (*Manifest, error) {
 
 	// Somewhere in the 0.0.1-dev era, the location for the manifiest file
 	// changed.  Transition gracefully by moving the file to the new location.
-	oldManifestPath := path.Join(cfg.ConfigDir, manifestFile)
+	oldManifestPath := filepath.Join(cfg.ConfigDir, manifestFile)
 	if _, err := os.Lstat(oldManifestPath); err == nil {
 		if err = os.Rename(oldManifestPath, cfg.manifestPath); err != nil {
 			return nil, fmt.Errorf("failed to move manifest to new location: %v", err)

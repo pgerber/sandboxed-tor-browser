@@ -18,7 +18,7 @@
 package gtk
 
 import (
-	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/gotk3/gotk3/gdk"
@@ -190,7 +190,7 @@ func (ui *gtkUI) pixbufFromAsset(asset string) (*gdk.Pixbuf, error) {
 		return nil, err
 	}
 
-	l, err := gdk.PixbufLoaderNewWithType(strings.TrimLeft(path.Ext(asset), "."))
+	l, err := gdk.PixbufLoaderNewWithType(strings.TrimLeft(filepath.Ext(asset), "."))
 	if err != nil {
 		return nil, err
 	}

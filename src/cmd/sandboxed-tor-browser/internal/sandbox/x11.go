@@ -22,7 +22,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/user"
-	"path"
+	"path/filepath"
 	"strings"
 )
 
@@ -41,9 +41,9 @@ func x11CraftAuthority(h *hugbox, realDisplay string) ([]byte, error) {
 	}
 	xauthPath := os.Getenv("XAUTHORITY")
 	if xauthPath == "" {
-		xauthPath = path.Join(u.HomeDir, ".Xauthority")
+		xauthPath = filepath.Join(u.HomeDir, ".Xauthority")
 	} else if strings.HasPrefix(xauthPath, "~/") {
-		xauthPath = path.Join(u.HomeDir, xauthPath[1:])
+		xauthPath = filepath.Join(u.HomeDir, xauthPath[1:])
 	}
 	real, err := ioutil.ReadFile(xauthPath)
 	if err != nil {
@@ -187,9 +187,9 @@ func (h *hugbox) enableX11(display string) error {
 	// Add the X11 things to the sandbox.
 	h.setenv("DISPLAY", ":0")
 	h.dir(x11SockDir)
-	h.bind(path.Join(x11SockDir, "X"+displayNum), path.Join(x11SockDir, "X0"), false)
+	h.bind(filepath.Join(x11SockDir, "X"+displayNum), filepath.Join(x11SockDir, "X0"), false)
 	if xauth, err := x11CraftAuthority(h, displayNum); err == nil {
-		xauthPath := path.Join(h.homeDir, ".Xauthority")
+		xauthPath := filepath.Join(h.homeDir, ".Xauthority")
 		h.setenv("XAUTHORITY", xauthPath)
 		h.file(xauthPath, xauth)
 	}

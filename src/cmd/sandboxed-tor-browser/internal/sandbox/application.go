@@ -25,7 +25,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"path"
+	"path/filepath"
 	"syscall"
 
 	"cmd/sandboxed-tor-browser/internal/tor"
@@ -67,7 +67,7 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (cm
 	h.roBind("/usr/share/themes", "/usr/share/themes", false)
 	h.roBind("/usr/share/icons", "/usr/share/icons", false)
 	h.roBind("/usr/share/mime", "/usr/share/mime", false)
-	gtkRcPath := path.Join(h.homeDir, ".gtkrc-2.0")
+	gtkRcPath := filepath.Join(h.homeDir, ".gtkrc-2.0")
 	h.setenv("GTK2_RC_FILES", gtkRcPath)
 	h.assetFile(gtkRcPath, "gtkrc-2.0")
 	if cfg.Sandbox.EnablePulseAudio {
@@ -77,12 +77,12 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (cm
 	}
 	h.roBind("/usr/share/libthai/thbrk.tri", "/usr/share/libthai/thbrk.tri", true) // Thai language support (Optional).
 
-	browserHome := path.Join(h.homeDir, "sandboxed-tor-browser", "tor-browser", "Browser")
-	realBrowserHome := path.Join(cfg.BundleInstallDir, "Browser")
-	realProfileDir := path.Join(realBrowserHome, profileSubDir)
-	realCachesDir := path.Join(realBrowserHome, cachesSubDir)
-	realDesktopDir := path.Join(realBrowserHome, "Desktop")
-	realDownloadsDir := path.Join(realBrowserHome, "Downloads")
+	browserHome := filepath.Join(h.homeDir, "sandboxed-tor-browser", "tor-browser", "Browser")
+	realBrowserHome := filepath.Join(cfg.BundleInstallDir, "Browser")
+	realProfileDir := filepath.Join(realBrowserHome, profileSubDir)
+	realCachesDir := filepath.Join(realBrowserHome, cachesSubDir)
+	realDesktopDir := filepath.Join(realBrowserHome, "Desktop")
+	realDownloadsDir := filepath.Join(realBrowserHome, "Downloads")
 
 	// Ensure that the `Downloads` and `Desktop` mount points exist.
 	if err = os.MkdirAll(realDesktopDir, utils.DirMode); err != nil {
@@ -100,28 +100,28 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (cm
 		realDownloadsDir = cfg.Sandbox.DownloadsDir
 	}
 
-	profileDir := path.Join(browserHome, profileSubDir)
-	cachesDir := path.Join(browserHome, cachesSubDir)
-	downloadsDir := path.Join(browserHome, "Downloads")
-	desktopDir := path.Join(browserHome, "Desktop")
+	profileDir := filepath.Join(browserHome, profileSubDir)
+	cachesDir := filepath.Join(browserHome, cachesSubDir)
+	downloadsDir := filepath.Join(browserHome, "Downloads")
+	desktopDir := filepath.Join(browserHome, "Desktop")
 
 	// Filesystem stuff.
-	h.roBind(cfg.BundleInstallDir, path.Join(h.homeDir, "sandboxed-tor-browser", "tor-browser"), false)
+	h.roBind(cfg.BundleInstallDir, filepath.Join(h.homeDir, "sandboxed-tor-browser", "tor-browser"), false)
 	h.bind(realProfileDir, profileDir, false)
 	h.bind(realDesktopDir, desktopDir, false)
 	h.bind(realDownloadsDir, downloadsDir, false)
 	h.bind(realCachesDir, cachesDir, false) // XXX: Do I need this?
-	h.roBind(path.Join(realProfileDir, "preferences"), path.Join(profileDir, "preferences"), false)
+	h.roBind(filepath.Join(realProfileDir, "preferences"), filepath.Join(profileDir, "preferences"), false)
 	h.chdir = browserHome
 	if !cfg.Sandbox.VolatileExtensionsDir {
 		// Unless overridden, the extensions directory should be mounted
 		// read-only.
-		h.roBind(path.Join(realProfileDir, "extensions"), path.Join(profileDir, "extensions"), false)
+		h.roBind(filepath.Join(realProfileDir, "extensions"), filepath.Join(profileDir, "extensions"), false)
 	}
 
 	// Env vars taken from start-tor-browser.
-	h.setenv("LD_LIBRARY_PATH", path.Join(browserHome, "TorBrowser", "Tor"))
-	h.setenv("FONTCONFIG_PATH", path.Join(browserHome, "TorBrowser", "Data", "fontconfig"))
+	h.setenv("LD_LIBRARY_PATH", filepath.Join(browserHome, "TorBrowser", "Tor"))
+	h.setenv("FONTCONFIG_PATH", filepath.Join(browserHome, "TorBrowser", "Data", "fontconfig"))
 	h.setenv("FONTCONFIG_FILE", "fonts.conf")
 	if manif.Channel == "hardened" {
 		h.setenv("ASAN_OPTIONS", "detect_leaks=0")
@@ -150,8 +150,8 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (cm
 
 	// Inject the AF_LOCAL compatibility hack stub into the filesystem, and
 	// supply the relevant args required for functionality.
-	ctrlPath := path.Join(h.runtimeDir, controlSocket)
-	socksPath := path.Join(h.runtimeDir, socksSocket)
+	ctrlPath := filepath.Join(h.runtimeDir, controlSocket)
+	socksPath := filepath.Join(h.runtimeDir, socksSocket)
 	h.setenv("LD_PRELOAD", stubPath)
 	h.setenv("TOR_STUB_CONTROL_SOCKET", ctrlPath)
 	h.setenv("TOR_STUB_SOCKS_SOCKET", socksPath)
@@ -161,12 +161,12 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (cm
 
 	// Tor Browser currently is incompatible with PaX MPROTECT, apply the
 	// override if needed.
-	realFirefoxPath := path.Join(realBrowserHome, "firefox")
+	realFirefoxPath := filepath.Join(realBrowserHome, "firefox")
 	if err = applyPaXAttributes(manif, realFirefoxPath); err != nil {
 		return nil, err
 	}
 
-	h.cmd = path.Join(browserHome, "firefox")
+	h.cmd = filepath.Join(browserHome, "firefox")
 	h.cmdArgs = []string{"--class", "Tor Browser", "-profile", profileDir}
 
 	return h.run()
@@ -227,9 +227,9 @@ func RunUpdate(cfg *config.Config, mar []byte) (err error) {
 		updateDir  = "/home/amnesia/sandboxed-tor-browser/update"
 	)
 
-	browserHome := path.Join(h.homeDir, "sandboxed-tor-browser", "tor-browser", "Browser")
+	browserHome := filepath.Join(h.homeDir, "sandboxed-tor-browser", "tor-browser", "Browser")
 	realInstallDir := cfg.BundleInstallDir
-	realUpdateDir := path.Join(cfg.UserDataDir, "update")
+	realUpdateDir := filepath.Join(cfg.UserDataDir, "update")
 
 	// Do the work neccecary to make the firefox `updater` happy.
 	if err = stageUpdate(realUpdateDir, realInstallDir, mar); err != nil {
@@ -244,7 +244,7 @@ func RunUpdate(cfg *config.Config, mar []byte) (err error) {
 	// 7. For Firefox 40.x and above run the following from the command prompto
 	//    after adding the path to the existing installation directory to the
 	//    LD_LIBRARY_PATH environment variable.
-	h.cmd = path.Join(updateDir, "updater")
+	h.cmd = filepath.Join(updateDir, "updater")
 	h.cmdArgs = []string{updateDir, browserHome, browserHome}
 	cmd, err := h.run()
 	if err != nil {
@@ -254,7 +254,7 @@ func RunUpdate(cfg *config.Config, mar []byte) (err error) {
 
 	// 8. After the update has completed a file named update.status will be
 	//    created in the outside directory.
-	status, err := ioutil.ReadFile(path.Join(realUpdateDir, "update.status"))
+	status, err := ioutil.ReadFile(filepath.Join(realUpdateDir, "update.status"))
 	if err != nil {
 		return err
 	}
@@ -305,14 +305,14 @@ func stageUpdate(updateDir, installDir string, mar []byte) error {
 	//    to be upgraded into the outside directory. If you would like to
 	//    display the updater user interface while it is applying the update
 	//    also copy the updater.ini into the outside directory.
-	if err := copyFile(path.Join(installDir, "Browser", "updater"), path.Join(updateDir, "updater")); err != nil {
+	if err := copyFile(filepath.Join(installDir, "Browser", "updater"), filepath.Join(updateDir, "updater")); err != nil {
 		return err
 	}
 
 	// 3. Download the appropriate .mar file and put it into the outside
 	//    directory you created (see Where to get a mar file).
 	// 4. Rename the mar file you downloaded to update.mar.
-	if err := ioutil.WriteFile(path.Join(updateDir, "update.mar"), mar, utils.FileMode); err != nil {
+	if err := ioutil.WriteFile(filepath.Join(updateDir, "update.mar"), mar, utils.FileMode); err != nil {
 		return err
 	}
 
@@ -346,22 +346,22 @@ func RunTor(cfg *config.Config, torrc []byte) (cmd *exec.Cmd, err error) {
 		return
 	}
 
-	realTorHome := path.Join(cfg.BundleInstallDir, "Browser", "TorBrowser", "Tor")
-	realGeoIPDir := path.Join(cfg.BundleInstallDir, "Browser", "TorBrowser", "Data", "Tor")
-	torDir := path.Join(h.homeDir, "tor")
-	torBinDir := path.Join(torDir, "bin")
-	torrcPath := path.Join(torDir, "etc", "torrc")
+	realTorHome := filepath.Join(cfg.BundleInstallDir, "Browser", "TorBrowser", "Tor")
+	realGeoIPDir := filepath.Join(cfg.BundleInstallDir, "Browser", "TorBrowser", "Data", "Tor")
+	torDir := filepath.Join(h.homeDir, "tor")
+	torBinDir := filepath.Join(torDir, "bin")
+	torrcPath := filepath.Join(torDir, "etc", "torrc")
 
 	h.dir(torDir)
 	h.roBind(realTorHome, torBinDir, false)
 	for _, v := range []string{"geoip", "geoip6"} {
-		h.roBind(path.Join(realGeoIPDir, v), path.Join(torDir, "etc", v), false)
+		h.roBind(filepath.Join(realGeoIPDir, v), filepath.Join(torDir, "etc", v), false)
 	}
-	h.bind(cfg.TorDataDir, path.Join(torDir, "data"), false)
+	h.bind(cfg.TorDataDir, filepath.Join(torDir, "data"), false)
 	h.file(torrcPath, torrc)
 	h.setenv("LD_LIBRARY_PATH", torBinDir)
 
-	h.cmd = path.Join(torBinDir, "tor")
+	h.cmd = filepath.Join(torBinDir, "tor")
 	h.cmdArgs = []string{"-f", torrcPath}
 
 	return h.run()

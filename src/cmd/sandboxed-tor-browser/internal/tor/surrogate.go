@@ -28,7 +28,7 @@ import (
 	"log"
 	"net"
 	"os"
-	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -239,7 +239,7 @@ func launchSocksProxy(cfg *config.Config, tor *Tor) (*socksProxy, error) {
 		return nil, err
 	}
 
-	p.sPath = path.Join(cfg.RuntimeDir, "socks")
+	p.sPath = filepath.Join(cfg.RuntimeDir, "socks")
 	os.Remove(p.sPath)
 	p.l, err = net.Listen("unix", p.sPath)
 	if err != nil {
@@ -561,7 +561,7 @@ func launchCtrlProxy(cfg *config.Config, tor *Tor) (*ctrlProxy, error) {
 	}
 
 	var err error
-	p.cPath = path.Join(cfg.RuntimeDir, "control")
+	p.cPath = filepath.Join(cfg.RuntimeDir, "control")
 	os.Remove(p.cPath)
 	p.l, err = net.Listen("unix", p.cPath)
 	if err != nil {

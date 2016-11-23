@@ -29,7 +29,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"path"
+	"path/filepath"
 	"strings"
 
 	"git.schwanenlied.me/yawning/grab.git"
@@ -67,7 +67,7 @@ const (
 )
 
 func usage() {
-	_, file := path.Split(os.Args[0])
+	_, file := filepath.Split(os.Args[0])
 	fmt.Fprintf(os.Stderr, "Usage: %s [OPTION]... [COMMAND]\n", file)
 	fmt.Fprintf(os.Stderr, "\n Options:\n\n")
 	flag.PrintDefaults()
@@ -327,7 +327,7 @@ func newLockFile(c *Common) (*lockFile, error) {
 	const lockFileName = "lock"
 
 	l := new(lockFile)
-	p := path.Join(c.Cfg.RuntimeDir, lockFileName)
+	p := filepath.Join(c.Cfg.RuntimeDir, lockFileName)
 
 	var err error
 	if l.f, err = os.OpenFile(p, os.O_CREATE|os.O_EXCL, utils.FileMode); err != nil {
