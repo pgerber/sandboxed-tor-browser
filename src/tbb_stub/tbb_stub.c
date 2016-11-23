@@ -145,6 +145,7 @@ has_prefix(const char *a, const char *b) {
 void *
 dlopen(const char *filename, int flags)
 {
+  void *ret;
   pthread_once(&stub_init_once, stub_init);
 
   if (filename != NULL) {
@@ -154,7 +155,10 @@ dlopen(const char *filename, int flags)
       return NULL;
   }
 
-  return real_dlopen(filename, flags);
+  ret = real_dlopen(filename, flags);
+  if (ret == NULL)
+    fprintf(stderr, "tbb_stub: dlopen('%s', %d) returned NULL\n", filename, flags);
+  return ret;
 }
 
 Bool

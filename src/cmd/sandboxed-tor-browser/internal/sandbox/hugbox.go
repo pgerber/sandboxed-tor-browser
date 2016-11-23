@@ -30,6 +30,7 @@ import (
 	"syscall"
 
 	"cmd/sandboxed-tor-browser/internal/data"
+	"cmd/sandboxed-tor-browser/internal/utils"
 )
 
 type unshareOpts struct {
@@ -80,7 +81,8 @@ type hugbox struct {
 	seccompFn  func(*os.File) error
 	pdeathSig  syscall.Signal
 
-	fakeDbus bool
+	fakeDbus     bool
+	standardLibs bool
 
 	// Internal options, not to be modified except via helpers, unless you
 	// know what you are doing.
@@ -102,7 +104,7 @@ func (h *hugbox) symlink(src, dest string) {
 }
 
 func (h *hugbox) bind(src, dest string, optional bool) {
-	if !fileExists(src) {
+	if !utils.FileExists(src) {
 		if !optional {
 			panic(fmt.Errorf("sandbox: bind source does not exist: %v", src))
 		}
@@ -112,7 +114,7 @@ func (h *hugbox) bind(src, dest string, optional bool) {
 }
 
 func (h *hugbox) roBind(src, dest string, optional bool) {
-	if !fileExists(src) {
+	if !utils.FileExists(src) {
 		if !optional {
 			panic(fmt.Errorf("sandbox: roBind source does not exist: %v", src))
 		}
@@ -187,8 +189,6 @@ func (h *hugbox) run() (*exec.Cmd, error) {
 		// Standard things required by most applications.
 		"--dev", "/dev",
 		"--tmpfs", "/tmp",
-		"--ro-bind", "/usr/lib", "/usr/lib",
-		"--ro-bind", "/lib", "/lib",
 
 		"--setenv", "XDG_RUNTIME_DIR", h.runtimeDir,
 		"--dir", h.runtimeDir,
@@ -196,11 +196,17 @@ func (h *hugbox) run() (*exec.Cmd, error) {
 		"--setenv", "HOME", h.homeDir,
 		"--dir", h.homeDir,
 	}
-	if runtime.GOARCH == "amd64" { // 64 bit Linux-ism.
-		fdArgs = append(fdArgs, "--ro-bind", "/lib64", "/lib64")
-		if fileExists("/usr/lib64") {
-			// openSUSE keeps 64 bit libraries here.
-			fdArgs = append(fdArgs, "--ro-bind", "/usr/lib64", "/usr/lib64")
+	if h.standardLibs {
+		fdArgs = append(fdArgs, []string{
+			"--ro-bind", "/usr/lib", "/usr/lib",
+			"--ro-bind", "/lib", "/lib",
+		}...)
+		if runtime.GOARCH == "amd64" { // 64 bit Linux-ism.
+			fdArgs = append(fdArgs, "--ro-bind", "/lib64", "/lib64")
+			if utils.FileExists("/usr/lib64") {
+				// openSUSE keeps 64 bit libraries here.
+				fdArgs = append(fdArgs, "--ro-bind", "/usr/lib64", "/usr/lib64")
+			}
 		}
 	}
 	fdArgs = append(fdArgs, h.unshare.toArgs()...) // unshare(2) options.
@@ -303,11 +309,12 @@ func newHugbox() (*hugbox, error) {
 			uts:    true,
 			cgroup: true,
 		},
-		hostname:   "amnesia",
-		mountProc:  true,
-		runtimeDir: filepath.Join("/run", "user", fmt.Sprintf("%d", os.Getuid())),
-		homeDir:    "/home/amnesia",
-		pdeathSig:  syscall.SIGTERM,
+		hostname:     "amnesia",
+		mountProc:    true,
+		runtimeDir:   filepath.Join("/run", "user", fmt.Sprintf("%d", os.Getuid())),
+		homeDir:      "/home/amnesia",
+		pdeathSig:    syscall.SIGTERM,
+		standardLibs: true,
 	}
 
 	// Look for the bwrap binary in sensible locations.
@@ -316,7 +323,7 @@ func newHugbox() (*hugbox, error) {
 		"/usr/lib/flatpak/flatpak-bwrap", // Arch Linux "flatpak" package.
 	}
 	for _, v := range bwrapPaths {
-		if fileExists(v) {
+		if utils.FileExists(v) {
 			h.bwrapPath = v
 			break
 		}
@@ -394,16 +401,6 @@ func bubblewrapAtLeast(f string, maj, min, pl int) (bool, error) {
 	return false, nil
 }
 
-func fileExists(f string) bool {
-	if _, err := os.Lstat(f); err != nil && os.IsNotExist(err) {
-		// This might be an EPERM, but bubblewrap can have elevated privs,
-		// so this may succeed.  If it doesn't, the error will be caught
-		// later.
-		return false
-	}
-	return true
-}
-
 func writeBuffer(w io.WriteCloser, contents []byte) error {
 	defer w.Close()
 	_, err := w.Write(contents)
@@ -413,5 +410,15 @@ func writeBuffer(w io.WriteCloser, contents []byte) error {
 // IsGrsecKernel returns true if the system appears to be running a grsec
 // kernel.
 func IsGrsecKernel() bool {
-	return fileExists("/proc/sys/kernel/grsecurity") || fileExists("/dev/grsec")
+	grsecFiles := []string{
+		"/proc/sys/kernel/grsecurity",
+		"/proc/sys/kernel/pax",
+		"/dev/grsec",
+	}
+	for _, f := range grsecFiles {
+		if utils.FileExists(f) {
+			return true
+		}
+	}
+	return false
 }

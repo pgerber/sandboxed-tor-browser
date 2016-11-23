@@ -38,3 +38,14 @@ func DirExists(d string) bool {
 	}
 	return fi.IsDir()
 }
+
+// FileExists returns true if the path specified exists.
+func FileExists(f string) bool {
+	if _, err := os.Lstat(f); err != nil && os.IsNotExist(err) {
+		// This might be an EPERM, but bubblewrap can have elevated privs,
+		// so this may succeed.  If it doesn't, the error will be caught
+		// later.
+		return false
+	}
+	return true
+}

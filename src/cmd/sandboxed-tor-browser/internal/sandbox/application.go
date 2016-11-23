@@ -26,12 +26,19 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
+	"sort"
 	"syscall"
 
+	"cmd/sandboxed-tor-browser/internal/dynlib"
 	"cmd/sandboxed-tor-browser/internal/tor"
 	"cmd/sandboxed-tor-browser/internal/ui/config"
 	"cmd/sandboxed-tor-browser/internal/utils"
 )
+
+const restrictedLibDir = "/usr/lib"
+
+var distributionDependentLibSearchPath []string
 
 // RunTorBrowser launches sandboxed Tor Browser.
 func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (cmd *exec.Cmd, err error) {
@@ -70,9 +77,13 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (cm
 	gtkRcPath := filepath.Join(h.homeDir, ".gtkrc-2.0")
 	h.setenv("GTK2_RC_FILES", gtkRcPath)
 	h.assetFile(gtkRcPath, "gtkrc-2.0")
+
+	pulseAudioWorks := false
 	if cfg.Sandbox.EnablePulseAudio {
 		if err = h.enablePulseAudio(); err != nil {
 			log.Printf("sandbox: failed to proxy PulseAudio: %v", err)
+		} else {
+			pulseAudioWorks = true
 		}
 	}
 	h.roBind("/usr/share/libthai/thbrk.tri", "/usr/share/libthai/thbrk.tri", true) // Thai language support (Optional).
@@ -120,6 +131,7 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (cm
 	}
 
 	// Env vars taken from start-tor-browser.
+	// h.setenv("LD_LIBRARY_PATH", filepath.Join(browserHome, "TorBrowser", "Tor"))
 	h.setenv("LD_LIBRARY_PATH", filepath.Join(browserHome, "TorBrowser", "Tor"))
 	h.setenv("FONTCONFIG_PATH", filepath.Join(browserHome, "TorBrowser", "Data", "fontconfig"))
 	h.setenv("FONTCONFIG_FILE", "fonts.conf")
@@ -166,10 +178,104 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (cm
 		return nil, err
 	}
 
+	extraLdLibraryPath := ""
+	if dynlib.IsSupported() {
+		cache, err := dynlib.LoadCache()
+		if err != nil {
+			return nil, err
+		}
+
+		// XXX: It's probably safe to assume that firefox will always link
+		// against libc and libpthread that are required by `tbb_stub.so`.
+		binaries := []string{realFirefoxPath}
+		matches, err := filepath.Glob(realBrowserHome + "/*.so")
+		if err != nil {
+			return nil, err
+		}
+		binaries = append(binaries, matches...)
+		ldLibraryPath := realBrowserHome + ":" + filepath.Join(realBrowserHome, "TorBrowser", "Tor")
+
+		// Extra libraries that firefox dlopen()s.
+		extraLdLibraryPath = extraLdLibraryPath + ":" + restrictedLibDir
+		extraLibs := []string{
+			// These are absolutely required, or libxul.so will crash
+			// the firefox process.  Perhapbs wayland will deliver us
+			// from this evil.
+			"libxcb.so.1",
+			"libXau.so.6",
+			"libXdmcp.so.6",
+
+			// "libXss.so.1", - Not ubiquitous? nsIdleService uses this.
+			// "libc.so", - Uhhhhh.... wtf?
+			// "libcanberra.so.0", - Not ubiquitous.
+		}
+		if cfg.Sandbox.EnablePulseAudio && pulseAudioWorks {
+			const libPulse = "libpulse.so.0"
+
+			paLibsPath := findDistributionDependentLibs("", "pulseaudio")
+			if paLibsPath != "" && cache.GetLibraryPath(libPulse) != "" {
+				const restrictedPulseDir = "/usr/lib/pulseaudio"
+
+				// The library search path ("/usr/lib/pulseaudio"), is
+				// hardcoded into libpulse.so.0, because you suck, and we hate
+				// you.
+				extraLibs = append(extraLibs, libPulse)
+				ldLibraryPath = ldLibraryPath + ":" + paLibsPath
+				h.roBind(paLibsPath, restrictedPulseDir, false)
+				extraLdLibraryPath = extraLdLibraryPath + ":" + restrictedPulseDir
+			} else {
+				log.Printf("sandbox: Failed to find pulse audio libraries.")
+			}
+		}
+		if codec := findBestCodec(cache); codec != "" {
+			extraLibs = append(extraLibs, codec)
+		}
+
+		// Gtk uses plugin libraries and shit for theming, and expecting
+		// them to be in consistent locations, is too much to ask for.
+		gtkExtraLibs, gtkLibPaths, err := h.appendRestrictedGtk2()
+		if err != nil {
+			return nil, err
+		}
+		extraLibs = append(extraLibs, gtkExtraLibs...)
+		ldLibraryPath = ldLibraryPath + gtkLibPaths
+
+		if err := h.appendLibraries(cache, binaries, extraLibs, ldLibraryPath); err != nil {
+			return nil, err
+		}
+	}
+	h.setenv("LD_LIBRARY_PATH", filepath.Join(browserHome, "TorBrowser", "Tor")+extraLdLibraryPath)
+
 	h.cmd = filepath.Join(browserHome, "firefox")
 	h.cmdArgs = []string{"--class", "Tor Browser", "-profile", profileDir}
 
 	return h.run()
+}
+
+func findBestCodec(cache *dynlib.Cache) string {
+	// This needs to be kept in sync with firefox. :(
+	codecs := []string{
+		"libavcodec-ffmpeg.so.57",
+		"libavcodec-ffmpeg.so.56",
+		"libavcodec.so.57",
+		"libavcodec.so.56",
+		"libavcodec.so.55",
+		"libavcodec.so.54",
+		"libavcodec.so.53",
+
+		// Fairly sure upstream firefox is dropping support for these,
+		// and NES emulators considered harmful.
+		//
+		// "libgstreamer-0.10.so.0",
+		// "libgstapp-0.10.so.0",
+		// "libgstvideo-0.10.so.0",
+	}
+	for _, codec := range codecs {
+		if cache.GetLibraryPath(codec) != "" {
+			return codec
+		}
+	}
+	return ""
 }
 
 func applyPaXAttributes(manif *config.Manifest, f string) error {
@@ -230,6 +336,7 @@ func RunUpdate(cfg *config.Config, mar []byte) (err error) {
 	browserHome := filepath.Join(h.homeDir, "sandboxed-tor-browser", "tor-browser", "Browser")
 	realInstallDir := cfg.BundleInstallDir
 	realUpdateDir := filepath.Join(cfg.UserDataDir, "update")
+	realUpdateBin := filepath.Join(realInstallDir, "Browser", "updater")
 
 	// Do the work neccecary to make the firefox `updater` happy.
 	if err = stageUpdate(realUpdateDir, realInstallDir, mar); err != nil {
@@ -239,7 +346,20 @@ func RunUpdate(cfg *config.Config, mar []byte) (err error) {
 	h.bind(realInstallDir, installDir, false)
 	h.bind(realUpdateDir, updateDir, false)
 	h.chdir = browserHome // Required (Step 5.)
-	h.setenv("LD_LIBRARY_PATH", browserHome)
+
+	extraLdLibraryPath := ""
+	if dynlib.IsSupported() {
+		cache, err := dynlib.LoadCache()
+		if err != nil {
+			return err
+		}
+
+		if err := h.appendLibraries(cache, []string{realUpdateBin}, nil, filepath.Join(realInstallDir, "Browser")); err != nil {
+			return err
+		}
+		extraLdLibraryPath = extraLdLibraryPath + ":" + restrictedLibDir
+	}
+	h.setenv("LD_LIBRARY_PATH", browserHome+extraLdLibraryPath)
 
 	// 7. For Firefox 40.x and above run the following from the command prompto
 	//    after adding the path to the existing installation directory to the
@@ -347,6 +467,7 @@ func RunTor(cfg *config.Config, torrc []byte) (cmd *exec.Cmd, err error) {
 	}
 
 	realTorHome := filepath.Join(cfg.BundleInstallDir, "Browser", "TorBrowser", "Tor")
+	realTorBin := filepath.Join(realTorHome, "tor")
 	realGeoIPDir := filepath.Join(cfg.BundleInstallDir, "Browser", "TorBrowser", "Data", "Tor")
 	torDir := filepath.Join(h.homeDir, "tor")
 	torBinDir := filepath.Join(torDir, "bin")
@@ -359,7 +480,24 @@ func RunTor(cfg *config.Config, torrc []byte) (cmd *exec.Cmd, err error) {
 	}
 	h.bind(cfg.TorDataDir, filepath.Join(torDir, "data"), false)
 	h.file(torrcPath, torrc)
-	h.setenv("LD_LIBRARY_PATH", torBinDir)
+
+	// If we have the dynamic linker cache available, only load in the
+	// libraries that matter.
+	extraLdLibraryPath := ""
+	if dynlib.IsSupported() {
+		cache, err := dynlib.LoadCache()
+		if err != nil {
+			return nil, err
+		}
+
+		// XXX: For now assume that PTs will always use a subset of the tor
+		// binaries libraries.
+		if err := h.appendLibraries(cache, []string{realTorBin}, nil, realTorHome); err != nil {
+			return nil, err
+		}
+		extraLdLibraryPath = extraLdLibraryPath + ":" + restrictedLibDir
+	}
+	h.setenv("LD_LIBRARY_PATH", torBinDir+extraLdLibraryPath)
 
 	h.cmd = filepath.Join(torBinDir, "tor")
 	h.cmdArgs = []string{"-f", torrcPath}
@@ -384,4 +522,157 @@ func newConsoleLogger(prefix string) *consoleLogger {
 	l := new(consoleLogger)
 	l.prefix = prefix
 	return l
+}
+
+func findDistributionDependentLibs(subDir, fn string) string {
+	for _, base := range distributionDependentLibSearchPath {
+		candidate := filepath.Join(base, subDir, fn)
+		if utils.FileExists(candidate) {
+			return candidate
+		}
+	}
+	return ""
+}
+
+func (h *hugbox) appendRestrictedGtk2() ([]string, string, error) {
+	const (
+		libAdwaita   = "libadwaita.so"
+		libPixmap    = "libpixmap.so"
+		libPngLoader = "libpixbufloader-png.so"
+
+		gtkSubDir = "gtk-2.0/2.10.0/engines"
+		gdkSubDir = "gdk-pixbuf-2.0/2.10.0/loaders"
+	)
+
+	gtkLibs := []string{}
+	gtkLibPath := ""
+
+	// Figure out where the system keeps the Gtk+-2.0 theme libraries,
+	// and bind mount in Adwaita and Pixmap.
+	adwaitaPath := findDistributionDependentLibs(gtkSubDir, libAdwaita)
+	if adwaitaPath != "" {
+		gtkEngineDir, _ := filepath.Split(adwaitaPath)
+		normGtkEngineDir := filepath.Join(restrictedLibDir, "gtk-2.0", "2.10.0", "engines")
+		h.roBind(adwaitaPath, filepath.Join(normGtkEngineDir, libAdwaita), false)
+		h.roBind(filepath.Join(gtkEngineDir, libPixmap), filepath.Join(normGtkEngineDir, libPixmap), true)
+		h.setenv("GTK_PATH", filepath.Join(restrictedLibDir, "gtk-2.0"))
+
+		gtkLibs = append(gtkLibs, libAdwaita)
+		gtkLibPath = gtkLibPath + ":" + gtkEngineDir
+	} else {
+		log.Printf("sandbox: Failed to find gtk-2.0 libadwaita.so.")
+	}
+
+	// Figure out if the system gdk-pixbuf-2.0 needs loaders for common
+	// file formats.  Arch and Fedora 25 do not.  Debian does.  As far as
+	// I can tell, the only file format we actually care about is PNG.
+	pngLoaderPath := findDistributionDependentLibs(gdkSubDir, libPngLoader)
+	if pngLoaderPath != "" {
+		loaderDir, _ := filepath.Split(pngLoaderPath)
+		normGdkPath := filepath.Join(restrictedLibDir, "gdk-pixbuf-2.0", "2.10.0")
+		normPngLoaderPath := filepath.Join(normGdkPath, "loaders", libPngLoader)
+		h.roBind(pngLoaderPath, normPngLoaderPath, false)
+
+		// GDK doesn't have a nice equivalent to `GTK_PATH`, and instead has
+		// an env var pointing to a `loaders.cache` file.
+		loaderCachePath := filepath.Join(normGdkPath, "loaders.cache")
+		h.assetFile(loaderCachePath, "loader.cache")
+		h.setenv("GDK_PIXBUF_MODULE_FILE", loaderCachePath)
+
+		gtkLibs = append(gtkLibs, libPngLoader)
+		gtkLibPath = gtkLibPath + ":" + loaderDir
+	}
+
+	return gtkLibs, gtkLibPath, nil
+}
+
+func (h *hugbox) appendLibraries(cache *dynlib.Cache, binaries []string, extraLibs []string, ldLibraryPath string) error {
+	defer runtime.GC()
+
+	// ld-linux(-x86-64).so needs special handling since it needs to be in
+	// a precise location on the filesystem.
+	ldSoPath, err := dynlib.FindLdSo()
+	ldSoFile := ""
+	if err != nil {
+		return err
+	} else {
+		log.Printf("sandbox: ld.so appears to be '%v'.", ldSoPath)
+		if ldSoFile, err = filepath.EvalSymlinks(ldSoPath); err != nil {
+			return err
+		}
+	}
+
+	toBindMount, err := cache.ResolveLibraries(binaries, extraLibs, ldLibraryPath)
+	if err != nil {
+		return err
+	}
+
+	// XXX: This needs one more de-dup pass to see if the sandbox expects two
+	// different versions to share an alias.
+
+	// Ensure that bindMounts happen in a consistent order.
+	sortedLibs := []string{}
+	for k, _ := range toBindMount {
+		sortedLibs = append(sortedLibs, k)
+	}
+	sort.Strings(sortedLibs)
+
+	// Append all the things!
+	for _, realLib := range sortedLibs {
+		if realLib == ldSoFile {
+			h.roBind(realLib, ldSoPath, false)
+			continue
+		}
+
+		aliases := toBindMount[realLib]
+		log.Printf("lib: %v", realLib)
+		sort.Strings(aliases) // Likewise, ensure symlink ordering.
+
+		// Avoid leaking information about exact library versions to cursory
+		// inspection by bind mounting libraries in as the first alias, and
+		// then symlinking off that.
+		src := filepath.Join(restrictedLibDir, aliases[0])
+		h.roBind(realLib, src, false)
+		aliases = aliases[1:]
+		if len(aliases) == 0 {
+			continue
+		}
+
+		symlinked := make(map[string]bool) // XXX: Fairly sure this is unneeded.
+		for _, alias := range aliases {
+			dst := filepath.Join(restrictedLibDir, alias)
+			if _, ok := symlinked[dst]; !ok {
+				if dst != src {
+					h.symlink(src, dst)
+					symlinked[dst] = true
+				}
+			}
+		}
+	}
+
+	log.Printf("h.args: %v", h.args)
+
+	h.standardLibs = false
+
+	return nil
+}
+
+func init() {
+	searchPaths := []string{
+		"/usr/lib", // Arch Linux.
+	}
+	switch runtime.GOARCH {
+	case "amd64":
+		searchPaths = append([]string{
+			"/usr/lib64",                // Fedora 25
+			"/usr/lib/x86_64-linux-gnu", // Debian
+		}, searchPaths...)
+	case "386":
+		searchPaths = append([]string{
+			"/usr/lib32",
+			"/usr/lib/i386-linux-gnu", // Debian
+		}, searchPaths...)
+	}
+
+	distributionDependentLibSearchPath = searchPaths
 }
