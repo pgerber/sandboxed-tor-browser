@@ -70,7 +70,7 @@ unlink: 1
 rt_sigprocmask: arg0 == SIG_BLOCK || arg0 == SIG_SETMASK
 time: arg0 == 0
 epoll_ctl: arg1 == EPOLL_CTL_ADD || arg1 == EPOLL_CTL_MOD || arg1 == EPOLL_CTL_DEL
-prctl: arg0 == PR_SET_SECCOMP || arg0 == PR_SET_DUMPABLE || arg0 == PR_SET_PDEATHSIG
+prctl: (arg0 == PR_SET_DUMPABLE && arg1 == 0) || arg0 == PR_SET_PDEATHSIG
 mprotect: arg2 == PROT_READ || arg2 == PROT_NONE
 flock: arg1 == (LOCK_EX | LOCK_NB) || arg1 == LOCK_UN
 # FUTEX_WAIT_BITSET_PRIVATE|FUTEX_CLOCK_REALTIME || FUTEX_WAKE_PRIVATE || FUTEX_WAIT_PRIVATE
@@ -108,7 +108,6 @@ rename: 1
 # by bubblewrap.
 arch_prctl: 1
 unshare: 1
-seccomp: 1
 getpid: 1
 kill: 1
 execve: 1
