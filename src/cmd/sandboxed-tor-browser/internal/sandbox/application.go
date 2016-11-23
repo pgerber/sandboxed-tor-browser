@@ -123,7 +123,10 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (cm
 	h.setenv("LD_LIBRARY_PATH", path.Join(browserHome, "TorBrowser", "Tor"))
 	h.setenv("FONTCONFIG_PATH", path.Join(browserHome, "TorBrowser", "Data", "fontconfig"))
 	h.setenv("FONTCONFIG_FILE", "fonts.conf")
-	h.setenv("ASAN_OPTIONS", "detect_leaks=0") // For hardened.
+	if manif.Channel == "hardened" {
+		h.setenv("ASAN_OPTIONS", "detect_leaks=0")
+		h.setenv("NSS_DISABLE_HW_AES", "1") // For selfrando.
+	}
 
 	// GNOME systems will puke with a read-only home, so instead of setting
 	// $HOME to point to inside the browser bundle, setup a bunch of
