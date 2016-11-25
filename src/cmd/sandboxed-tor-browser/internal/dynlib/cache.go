@@ -25,6 +25,7 @@ import (
 	"io/ioutil"
 	"path/filepath"
 	"runtime"
+	"sort"
 
 	. "cmd/sandboxed-tor-browser/internal/utils"
 )
@@ -61,7 +62,7 @@ const (
 
 // Cache is a representation of the `ld.so.cache` file.
 type Cache struct {
-	store map[string][]*cacheEntry
+	store map[string]cacheEntries
 }
 
 // GetLibraryPath returns the path to the given library, if any.  This routine
@@ -127,12 +128,6 @@ func (c *Cache) ResolveLibraries(binaries []string, extraLibs []string, ldLibrar
 
 				// Look for the library in the ld.so.cache.
 				if libPath == "" {
-					// XXX; Figure out how to disambiguate libraries, most
-					// likely by examining c.store directly instead of via
-					// the public interface.
-					//
-					// ld-linux apparently goes by hwcap, osVersion, search
-					// path (ld.so.conf based -> internal).
 					libPath = c.GetLibraryPath(lib)
 					if libPath == "" {
 						return nil, fmt.Errorf("dynlib: Failed to find library: %v", lib)
@@ -180,6 +175,30 @@ type cacheEntry struct {
 	flags      uint32
 	osVersion  uint32
 	hwcap      uint64
+}
+
+type cacheEntries []*cacheEntry
+
+func (e cacheEntries) Len() int {
+	return len(e)
+}
+
+func (e cacheEntries) Less(i, j int) bool {
+	// Bigger hwcap should come first.
+	if e[i].hwcap > e[j].hwcap {
+		return true
+	}
+	// Bigger osVersion should come first.
+	if e[i].osVersion > e[j].osVersion {
+		return true
+	}
+
+	// Preserve the ordering otherwise.
+	return i < j
+}
+
+func (e cacheEntries) Swap(i, j int) {
+	e[i], e[j] = e[j], e[i]
 }
 
 func getNewLdCache(b []byte) ([]byte, int, error) {
@@ -233,8 +252,11 @@ func LoadCache() (*Cache, error) {
 		return nil, errUnsupported
 	}
 
+	auxvHwcap := getHwcap()
+	Debugf("dynlib: ELF AUXV AT_HWCAP: %08x", auxvHwcap)
+
 	c := new(Cache)
-	c.store = make(map[string][]*cacheEntry)
+	c.store = make(map[string]cacheEntries)
 
 	b, err := ioutil.ReadFile(ldSoCache)
 	if err != nil {
@@ -297,7 +319,31 @@ func LoadCache() (*Cache, error) {
 			// Not used on this arch AFAIK.
 			return true
 		}
-	default: // XXX: Figure out 386.  Probably also need to look at hwcap there.
+	case "386":
+		flagCheckFn = func(flags uint32) bool {
+			// Reject 64 bit libraries.
+			if flags&flagX8664Lib64 == flagX8664Lib64 {
+				return false
+			}
+			return flags&flagElfLibc6 == flags
+		}
+		capCheckFn = func(hwcap uint64) bool {
+			// Filter out libraries we have no hope of using.
+			ourHwcap := auxvHwcap & hwcapMask
+			libHwcap := hwcap & hwcapMask
+			if libHwcap&ourHwcap != libHwcap {
+				return false
+			}
+
+			ourPlatform := auxvHwcap >> x86HwcapFirstPlatform
+			libPlatform := hwcap >> x86HwcapFirstPlatform
+			if ourPlatform < libPlatform {
+				return false
+			}
+
+			return true
+		}
+	default:
 		panic(errUnsupported)
 	}
 
@@ -320,6 +366,8 @@ func LoadCache() (*Cache, error) {
 			return nil, fmt.Errorf("dynlib: failed to query value: %v", err)
 		}
 
+		// XXX: Handle osVersion.
+
 		if flagCheckFn(e.flags) && capCheckFn(e.hwcap) {
 			vec := c.store[e.key]
 			vec = append(vec, e)
@@ -329,20 +377,22 @@ func LoadCache() (*Cache, error) {
 		}
 	}
 
-	// For debugging purposes dump the ambiguous entries.  It would be nice if
-	// we could disambiguate these somehow, but as far as I can tell this is
-	// actually fairly rare, and doesn't directly affect any libraries we
-	// currently care about.
 	for lib, entries := range c.store {
 		if len(entries) == 1 {
 			continue
 		}
+
+		// Sort the entires in order of prefernce similar to what ld-linux.so
+		// will do.
+		sort.Sort(entries)
+		c.store[lib] = entries
+
 		paths := []string{}
 		for _, e := range entries {
 			paths = append(paths, e.value)
 		}
 
-		Debugf("dynlib: debug: Ambiguous entry: %v: %v", lib, paths)
+		Debugf("dynlib: debug: Multiple entry: %v: %v", lib, paths)
 	}
 
 	return c, nil

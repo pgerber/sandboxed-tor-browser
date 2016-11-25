@@ -81,6 +81,5 @@ func FindLdSo(cache *Cache) (string, string, error) {
 // IsSupported returns true if the architecture/os combination has dynlib
 // sypport.
 func IsSupported() bool {
-	// XXX: 386 eventually.
-	return runtime.GOOS == "linux" && runtime.GOARCH == "amd64"
+	return runtime.GOOS == "linux" && (runtime.GOARCH == "amd64" || runtime.GOARCH == "386")
 }
