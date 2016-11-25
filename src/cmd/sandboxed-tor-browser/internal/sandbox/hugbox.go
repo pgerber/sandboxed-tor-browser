@@ -17,7 +17,6 @@
 package sandbox
 
 import (
-	"crypto/rand"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -131,8 +130,9 @@ func (h *hugbox) setupDbus() {
 	const idPath = "/var/lib/dbus/machine-id"
 	var fakeUUID [16]byte
 
-	if _, err := rand.Read(fakeUUID[:]); err != nil {
-		panic(err)
+	// That's the kind of thing an idiot would have on his luggage! 
+	for i := range fakeUUID {
+		fakeUUID[i] = byte(i)
 	}
 	hexUUID := hex.EncodeToString(fakeUUID[:])
 	h.file(idPath, []byte(hexUUID))
