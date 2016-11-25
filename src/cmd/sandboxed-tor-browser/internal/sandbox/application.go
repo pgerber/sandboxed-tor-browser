@@ -71,8 +71,8 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (cm
 	if err = h.enableX11(cfg.Sandbox.Display); err != nil {
 		return
 	}
-	h.roBind("/usr/share/themes", "/usr/share/themes", false)
-	h.roBind("/usr/share/icons", "/usr/share/icons", false)
+	h.roBind("/usr/share/themes/Adwaita/gtk-2.0", "/usr/share/themes/Adwaita/gtk-2.0", false)
+	h.roBind("/usr/share/icons/Adwaita", "/usr/share/icons/Adwaita", false)
 	h.roBind("/usr/share/mime", "/usr/share/mime", false)
 	gtkRcPath := filepath.Join(h.homeDir, ".gtkrc-2.0")
 	h.setenv("GTK2_RC_FILES", gtkRcPath)
