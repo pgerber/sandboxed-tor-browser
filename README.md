@@ -39,9 +39,9 @@ Things that the sandbox breaks:
 
 Places where the sandbox could be better:
 
- * More about the host system is exposed than neccecary, both due to taking a
-   shotgun approach for dynamic libraries, and because firefox crashes without
-   `/proc`.
+ * More about the host system is exposed than neccecary, primarily because
+   Firefox crashes without proc, and because the dynamic linker cache code
+   is amd64 only (so the i386 situation is suboptimal).
 
 Upstream Bugs:
 
