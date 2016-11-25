@@ -131,7 +131,7 @@ func (h *hugbox) setupDbus() {
 	const idPath = "/var/lib/dbus/machine-id"
 	var fakeUUID [16]byte
 
-	// That's the kind of thing an idiot would have on his luggage! 
+	// That's the kind of thing an idiot would have on his luggage!
 	for i := range fakeUUID {
 		fakeUUID[i] = byte(i)
 	}

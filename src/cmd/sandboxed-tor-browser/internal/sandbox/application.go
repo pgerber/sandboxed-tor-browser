@@ -591,15 +591,15 @@ func (h *hugbox) appendLibraries(cache *dynlib.Cache, binaries []string, extraLi
 
 	// ld-linux(-x86-64).so needs special handling since it needs to be in
 	// a precise location on the filesystem.
-	ldSoPath, err := dynlib.FindLdSo()
-	ldSoFile := ""
+	ldSoPath, ldSoAlias, err := dynlib.FindLdSo(cache)
 	if err != nil {
 		return err
 	} else {
-		Debugf("sandbox: ld.so appears to be '%v'.", ldSoPath)
-		if ldSoFile, err = filepath.EvalSymlinks(ldSoPath); err != nil {
-			return err
-		}
+		Debugf("sandbox: ld.so appears to be '%v' -> %v.", ldSoAlias, ldSoPath)
+
+		// Normalize.
+		_, ldSoAliasFn := filepath.Split(ldSoAlias)
+		ldSoAlias = filepath.Join("/lib", ldSoAliasFn)
 	}
 
 	toBindMount, err := cache.ResolveLibraries(binaries, extraLibs, ldLibraryPath)
@@ -619,8 +619,8 @@ func (h *hugbox) appendLibraries(cache *dynlib.Cache, binaries []string, extraLi
 
 	// Append all the things!
 	for _, realLib := range sortedLibs {
-		if realLib == ldSoFile {
-			h.roBind(realLib, ldSoPath, false)
+		if realLib == ldSoPath { // Special handling.
+			h.roBind(realLib, ldSoAlias, false)
 			continue
 		}
 
@@ -648,6 +648,14 @@ func (h *hugbox) appendLibraries(cache *dynlib.Cache, binaries []string, extraLi
 				}
 			}
 		}
+	}
+
+	// This being at least symlinked to exactly the right spot matters.
+	switch runtime.GOARCH {
+	case "amd64":
+		h.symlink("/lib", "/lib64")
+	case "386":
+		h.symlink("/lib", "/lib32")
 	}
 
 	h.standardLibs = false

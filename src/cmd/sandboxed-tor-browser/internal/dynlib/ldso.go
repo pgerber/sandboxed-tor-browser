@@ -20,7 +20,7 @@ import (
 	"debug/elf"
 	"errors"
 	"os"
-	"path"
+	"path/filepath"
 	"runtime"
 )
 
@@ -40,9 +40,9 @@ func GetLibraries(fn string) ([]string, error) {
 
 // FindLdSo returns the path to the `ld.so` dynamic linker for the current
 // architecture, which is usually a symlink
-func FindLdSo() (string, error) {
+func FindLdSo(cache *Cache) (string, string, error) {
 	if !IsSupported() {
-		return "", errUnsupported
+		return "", "", errUnsupported
 	}
 
 	name := ""
@@ -60,13 +60,22 @@ func FindLdSo() (string, error) {
 	searchPaths = append(searchPaths, "/lib")
 
 	for _, d := range searchPaths {
-		candidate := path.Join(d, name)
-		if _, err := os.Stat(candidate); err == nil {
-			return candidate, nil
+		candidate := filepath.Join(d, name)
+		_, err := os.Stat(candidate)
+		if err != nil {
+			continue
 		}
+
+		actual := cache.GetLibraryPath(name)
+		if actual == "" {
+			continue
+		}
+		actual, err = filepath.EvalSymlinks(actual)
+
+		return actual, candidate, err
 	}
 
-	return "", os.ErrNotExist
+	return "", "", os.ErrNotExist
 }
 
 // IsSupported returns true if the architecture/os combination has dynlib
