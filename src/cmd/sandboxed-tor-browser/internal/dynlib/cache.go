@@ -253,7 +253,10 @@ func LoadCache() (*Cache, error) {
 	}
 
 	auxvHwcap := getHwcap()
-	Debugf("dynlib: ELF AUXV AT_HWCAP: %08x", auxvHwcap)
+	Debugf("dynlib: ELF AUXV AT_HWCAP: %016x", auxvHwcap)
+
+	ourOsVersion := getOsVersion()
+	Debugf("dynlib: osVersion: %08x", ourOsVersion)
 
 	c := new(Cache)
 	c.store = make(map[string]cacheEntries)
@@ -366,9 +369,11 @@ func LoadCache() (*Cache, error) {
 			return nil, fmt.Errorf("dynlib: failed to query value: %v", err)
 		}
 
-		// XXX: Handle osVersion.
-
-		if flagCheckFn(e.flags) && capCheckFn(e.hwcap) {
+		// Discard libraries we have no hope of using, either due to
+		// osVersion, or hwcap.
+		if ourOsVersion < e.osVersion {
+			Debugf("dynlib: ignoring library: %v (osVersion: %x)", e.key, e.osVersion)
+		} else if flagCheckFn(e.flags) && capCheckFn(e.hwcap) {
 			vec := c.store[e.key]
 			vec = append(vec, e)
 			c.store[e.key] = vec

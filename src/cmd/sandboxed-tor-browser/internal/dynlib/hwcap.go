@@ -24,7 +24,11 @@ package dynlib
 //
 import "C"
 
-import "runtime"
+import (
+	"bytes"
+	"runtime"
+	"syscall"
+)
 
 const (
 	x86HwcapFirstPlatform = 48
@@ -54,4 +58,43 @@ func getHwcap() uint64 {
 	}
 
 	return hwcap
+}
+
+func getOsVersion() uint32 {
+	var buf syscall.Utsname
+	err := syscall.Uname(&buf)
+	if err != nil {
+		panic(err)
+	}
+
+	// Split into a slice of digits, stopping when the first non-digit is
+	// encountered.
+	var relBuf []byte
+	for _, v := range buf.Release {
+		if v < '0' && v > '9' && v != '.' {
+			break
+		}
+		relBuf = append(relBuf, byte(v))
+	}
+
+	// Parse major, minor, pl into bytes, and jam them together.
+	//
+	// glibc as far as I can tell doesn't handle any of versions being larger
+	// than 256 at all.
+	var ret uint32
+	appended := uint(0)
+	for i, v := range bytes.Split(relBuf, []byte{'.'}) {
+		if i > 2 {
+			break
+		}
+		var subVer uint8
+		for _, b := range v {
+			subVer = subVer * 10
+			subVer = subVer + (b - '0')
+		}
+		ret = ret << 8
+		ret = ret | uint32(subVer)
+		appended++
+	}
+	return ret << (8 * (3 - appended))
 }
