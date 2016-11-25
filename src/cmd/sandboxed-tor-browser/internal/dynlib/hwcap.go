@@ -71,7 +71,7 @@ func getOsVersion() uint32 {
 	// encountered.
 	var relBuf []byte
 	for _, v := range buf.Release {
-		if v < '0' && v > '9' && v != '.' {
+		if (v < '0' || v > '9') && v != '.' {
 			break
 		}
 		relBuf = append(relBuf, byte(v))
