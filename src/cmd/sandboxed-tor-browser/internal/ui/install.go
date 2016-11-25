@@ -269,6 +269,11 @@ func (c *Common) doUpdate(async *Async, dialFn dialFunc) {
 		return
 	}
 
+	// Reinstall the autoconfig stuff.
+	if async.Err = writeAutoconfig(c.Cfg); async.Err != nil {
+		return
+	}
+
 	// Update the maniftest and config.
 	c.Manif.SetVersion(update.AppVersion)
 	if async.Err = c.Manif.Sync(); async.Err != nil {
