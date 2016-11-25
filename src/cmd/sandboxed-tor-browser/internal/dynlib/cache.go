@@ -23,11 +23,10 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"path/filepath"
 	"runtime"
 
-	"cmd/sandboxed-tor-browser/internal/utils"
+	. "cmd/sandboxed-tor-browser/internal/utils"
 )
 
 const (
@@ -98,13 +97,13 @@ func (c *Cache) ResolveLibraries(binaries []string, extraLibs []string, ldLibrar
 			if err != nil {
 				return nil, err
 			}
-			log.Printf("dynlib: %v imports: %v", fn, impLibs)
+			Debugf("dynlib: %v imports: %v", fn, impLibs)
 			checkedFile[fn] = true
 
 			// The internal libraries also need recursive resolution,
 			// so just append them to the first binary.
 			if extraLibs != nil {
-				log.Printf("dynlib: Appending extra libs: %v", extraLibs)
+				Debugf("dynlib: Appending extra libs: %v", extraLibs)
 				impLibs = append(impLibs, extraLibs...)
 				extraLibs = nil
 			}
@@ -119,7 +118,7 @@ func (c *Cache) ResolveLibraries(binaries []string, extraLibs []string, ldLibrar
 				inLdLibraryPath := false
 				for _, d := range searchPaths {
 					maybePath := filepath.Join(d, lib)
-					if utils.FileExists(maybePath) {
+					if FileExists(maybePath) {
 						libPath = maybePath
 						inLdLibraryPath = true
 						break
@@ -326,7 +325,7 @@ func LoadCache() (*Cache, error) {
 			vec = append(vec, e)
 			c.store[e.key] = vec
 		} else {
-			log.Printf("dynlib: ignoring library: %v (flags: %x, hwcap: %x)", e.key, e.flags, e.hwcap)
+			Debugf("dynlib: ignoring library: %v (flags: %x, hwcap: %x)", e.key, e.flags, e.hwcap)
 		}
 	}
 
@@ -343,7 +342,7 @@ func LoadCache() (*Cache, error) {
 			paths = append(paths, e.value)
 		}
 
-		log.Printf("dynlib: debug: Ambiguous entry: %v: %v", lib, paths)
+		Debugf("dynlib: debug: Ambiguous entry: %v: %v", lib, paths)
 	}
 
 	return c, nil

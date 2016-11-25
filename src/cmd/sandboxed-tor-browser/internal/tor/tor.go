@@ -43,6 +43,7 @@ import (
 	"cmd/sandboxed-tor-browser/internal/data"
 	. "cmd/sandboxed-tor-browser/internal/ui/async"
 	"cmd/sandboxed-tor-browser/internal/ui/config"
+	. "cmd/sandboxed-tor-browser/internal/utils"
 )
 
 // ErrTorNotRunning is the error returned when the tor is not running.
@@ -302,7 +303,7 @@ func NewSandboxedTor(cfg *config.Config, async *Async, cmd *exec.Cmd) (t *Tor, e
 		return nil, fmt.Errorf("tor: timeout waiting for the control port")
 	}
 
-	log.Printf("tor: control port is: %v", string(ctrlPortAddr))
+	Debugf("tor: control port is: %v", string(ctrlPortAddr))
 
 	// Dial the control port.
 	async.UpdateProgress("Connecting to the Tor Control Port.")

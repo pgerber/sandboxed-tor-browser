@@ -20,7 +20,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -30,7 +29,7 @@ import (
 	"syscall"
 
 	"cmd/sandboxed-tor-browser/internal/data"
-	"cmd/sandboxed-tor-browser/internal/utils"
+	. "cmd/sandboxed-tor-browser/internal/utils"
 )
 
 type unshareOpts struct {
@@ -104,7 +103,7 @@ func (h *hugbox) symlink(src, dest string) {
 }
 
 func (h *hugbox) bind(src, dest string, optional bool) {
-	if !utils.FileExists(src) {
+	if !FileExists(src) {
 		if !optional {
 			panic(fmt.Errorf("sandbox: bind source does not exist: %v", src))
 		}
@@ -114,7 +113,7 @@ func (h *hugbox) bind(src, dest string, optional bool) {
 }
 
 func (h *hugbox) roBind(src, dest string, optional bool) {
-	if !utils.FileExists(src) {
+	if !FileExists(src) {
 		if !optional {
 			panic(fmt.Errorf("sandbox: roBind source does not exist: %v", src))
 		}
@@ -203,7 +202,7 @@ func (h *hugbox) run() (*exec.Cmd, error) {
 		}...)
 		if runtime.GOARCH == "amd64" { // 64 bit Linux-ism.
 			fdArgs = append(fdArgs, "--ro-bind", "/lib64", "/lib64")
-			if utils.FileExists("/usr/lib64") {
+			if FileExists("/usr/lib64") {
 				// openSUSE keeps 64 bit libraries here.
 				fdArgs = append(fdArgs, "--ro-bind", "/usr/lib64", "/usr/lib64")
 			}
@@ -266,6 +265,8 @@ func (h *hugbox) run() (*exec.Cmd, error) {
 	pendingWrites := [][]byte{argsBuf}
 	pendingWrites = append(pendingWrites, h.fileData...)
 
+	Debugf("sandbox: fdArgs: %v", h.args)
+
 	// Fork/exec.
 	cmd.Start()
 
@@ -323,7 +324,7 @@ func newHugbox() (*hugbox, error) {
 		"/usr/lib/flatpak/flatpak-bwrap", // Arch Linux "flatpak" package.
 	}
 	for _, v := range bwrapPaths {
-		if utils.FileExists(v) {
+		if FileExists(v) {
 			h.bwrapPath = v
 			break
 		}
@@ -359,8 +360,7 @@ func getBubblewrapVersion(f string) (int, int, int, error) {
 	}
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Printf("out: %v", string(out))
-		return 0, 0, 0, err
+		return 0, 0, 0, fmt.Errorf("sandbox: failed to query bubblewrap version: %v", string(out))
 	}
 	vStr := strings.TrimPrefix(string(out), "bubblewrap ")
 	vStr = strings.TrimSpace(vStr)
@@ -416,7 +416,7 @@ func IsGrsecKernel() bool {
 		"/dev/grsec",
 	}
 	for _, f := range grsecFiles {
-		if utils.FileExists(f) {
+		if FileExists(f) {
 			return true
 		}
 	}

@@ -33,7 +33,7 @@ import (
 	"cmd/sandboxed-tor-browser/internal/dynlib"
 	"cmd/sandboxed-tor-browser/internal/tor"
 	"cmd/sandboxed-tor-browser/internal/ui/config"
-	"cmd/sandboxed-tor-browser/internal/utils"
+	. "cmd/sandboxed-tor-browser/internal/utils"
 )
 
 const restrictedLibDir = "/usr/lib"
@@ -96,10 +96,10 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (cm
 	realDownloadsDir := filepath.Join(realBrowserHome, "Downloads")
 
 	// Ensure that the `Downloads` and `Desktop` mount points exist.
-	if err = os.MkdirAll(realDesktopDir, utils.DirMode); err != nil {
+	if err = os.MkdirAll(realDesktopDir, DirMode); err != nil {
 		return
 	}
-	if err = os.MkdirAll(realDownloadsDir, utils.DirMode); err != nil {
+	if err = os.MkdirAll(realDownloadsDir, DirMode); err != nil {
 		return
 	}
 
@@ -417,7 +417,7 @@ func stageUpdate(updateDir, installDir string, mar []byte) error {
 
 	// 1. Create a directory outside of the application's installation
 	//    directory to be updated.
-	if err := os.MkdirAll(updateDir, utils.DirMode); err != nil {
+	if err := os.MkdirAll(updateDir, DirMode); err != nil {
 		return err
 	}
 
@@ -432,7 +432,7 @@ func stageUpdate(updateDir, installDir string, mar []byte) error {
 	// 3. Download the appropriate .mar file and put it into the outside
 	//    directory you created (see Where to get a mar file).
 	// 4. Rename the mar file you downloaded to update.mar.
-	if err := ioutil.WriteFile(filepath.Join(updateDir, "update.mar"), mar, utils.FileMode); err != nil {
+	if err := ioutil.WriteFile(filepath.Join(updateDir, "update.mar"), mar, FileMode); err != nil {
 		return err
 	}
 
@@ -462,7 +462,7 @@ func RunTor(cfg *config.Config, torrc []byte) (cmd *exec.Cmd, err error) {
 	}
 	h.unshare.net = false // Tor needs host network access.
 
-	if err = os.MkdirAll(cfg.TorDataDir, utils.DirMode); err != nil {
+	if err = os.MkdirAll(cfg.TorDataDir, DirMode); err != nil {
 		return
 	}
 
@@ -527,7 +527,7 @@ func newConsoleLogger(prefix string) *consoleLogger {
 func findDistributionDependentLibs(subDir, fn string) string {
 	for _, base := range distributionDependentLibSearchPath {
 		candidate := filepath.Join(base, subDir, fn)
-		if utils.FileExists(candidate) {
+		if FileExists(candidate) {
 			return candidate
 		}
 	}
@@ -596,7 +596,7 @@ func (h *hugbox) appendLibraries(cache *dynlib.Cache, binaries []string, extraLi
 	if err != nil {
 		return err
 	} else {
-		log.Printf("sandbox: ld.so appears to be '%v'.", ldSoPath)
+		Debugf("sandbox: ld.so appears to be '%v'.", ldSoPath)
 		if ldSoFile, err = filepath.EvalSymlinks(ldSoPath); err != nil {
 			return err
 		}
@@ -625,7 +625,7 @@ func (h *hugbox) appendLibraries(cache *dynlib.Cache, binaries []string, extraLi
 		}
 
 		aliases := toBindMount[realLib]
-		log.Printf("lib: %v", realLib)
+		Debugf("sandbox: lib: %v", realLib)
 		sort.Strings(aliases) // Likewise, ensure symlink ordering.
 
 		// Avoid leaking information about exact library versions to cursory
@@ -649,8 +649,6 @@ func (h *hugbox) appendLibraries(cache *dynlib.Cache, binaries []string, extraLi
 			}
 		}
 	}
-
-	log.Printf("h.args: %v", h.args)
 
 	h.standardLibs = false
 

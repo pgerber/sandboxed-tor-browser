@@ -17,7 +17,11 @@
 // Package utils provides misc. utility routines.
 package utils
 
-import "os"
+import (
+	"flag"
+	"log"
+	"os"
+)
 
 const (
 	// DirMode is the permissions used when making directories.
@@ -26,6 +30,8 @@ const (
 	// FileMode is the permissions used when making files.
 	FileMode = 0600
 )
+
+var enableDebugSpew = false
 
 // DirExists returns true if the path specified exists, and is a directory.
 func DirExists(d string) bool {
@@ -48,4 +54,15 @@ func FileExists(f string) bool {
 		return false
 	}
 	return true
+}
+
+// Debugf logs at the debug level.
+func Debugf(format string, v ...interface{}) {
+	if enableDebugSpew {
+		log.Printf(format, v...)
+	}
+}
+
+func init() {
+	flag.BoolVar(&enableDebugSpew, "debug", false, "Enable debug logging.")
 }
