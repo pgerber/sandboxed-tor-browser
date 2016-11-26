@@ -458,18 +458,23 @@ func RunTor(cfg *config.Config, torrc []byte) (cmd *exec.Cmd, err error) {
 	h.stderr = logger
 	if !cfg.Tor.UseBridges {
 		h.seccompFn = installTorSeccompProfile
-
-		// The tor daemon only uses this to calculate MaxMemInQueues,
-		// which is a relay thing, so this can safely be disabled.
-		//
-		// Not sure about what to do wrt pluggable transports yet,
-		// obfs4proxy seems to function fine, and the reads it does
-		// look innocent enough, but more investigation is needed.
-		h.mountProc = false
 	} else {
 		h.seccompFn = installBasicSeccompBlacklist
 	}
 	h.unshare.net = false // Tor needs host network access.
+
+	// Regarding `/proc`...
+	//
+	// `/proc/meminfo` - tor dameon, used to calculate `MaxMemInQueues`,
+	//    fails gracefully.
+	// `/proc/sys/kernel/hostname` - obfs4proxy, Go runtime uses this to
+	//    determine hostname, 99% sure this is in the binary but not used
+	//    due to the `log` package's syslog target.
+	// `/proc/sys/net/core/somaxconn` - obfs4proxy, Go runtime uses this to
+	//    determine listener backlog, but will default to `128` on errors.
+	//
+	// See: https://bugs.torproject.org/20773
+	h.mountProc = false
 
 	if err = os.MkdirAll(cfg.TorDataDir, DirMode); err != nil {
 		return
