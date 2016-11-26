@@ -465,7 +465,7 @@ func RunTor(cfg *config.Config, torrc []byte) (cmd *exec.Cmd, err error) {
 
 	// Regarding `/proc`...
 	//
-	// `/proc/meminfo` - tor dameon, used to calculate `MaxMemInQueues`,
+	// `/proc/meminfo` - tor daemon, used to calculate `MaxMemInQueues`,
 	//    fails gracefully.
 	// `/proc/sys/kernel/hostname` - obfs4proxy, Go runtime uses this to
 	//    determine hostname, 99% sure this is in the binary but not used
