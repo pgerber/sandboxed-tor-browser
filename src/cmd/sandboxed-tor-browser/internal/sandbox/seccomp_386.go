@@ -59,7 +59,8 @@ func installSeccomp(fd *os.File, assets []string, isBlacklist bool) error {
 		rules = append(rules, '\n')
 	}
 
-	defaultAct, ruleAct := seccomp.ActTrace, seccomp.ActAllow
+	actENOSYS := seccomp.ActErrno.SetReturnCode(38)
+	defaultAct, ruleAct := actENOSYS, seccomp.ActAllow
 	if isBlacklist {
 		defaultAct, ruleAct = ruleAct, defaultAct
 	}
