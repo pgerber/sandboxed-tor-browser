@@ -73,6 +73,7 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (cm
 	}
 	h.roBind("/usr/share/themes/Adwaita/gtk-2.0", "/usr/share/themes/Adwaita/gtk-2.0", false)
 	h.roBind("/usr/share/icons/Adwaita", "/usr/share/icons/Adwaita", false)
+	h.roBind("/usr/share/icons/hicolor", "/usr/share/icons/hicolor", true)
 	h.roBind("/usr/share/mime", "/usr/share/mime", false)
 	gtkRcPath := filepath.Join(h.homeDir, ".gtkrc-2.0")
 	h.setenv("GTK2_RC_FILES", gtkRcPath)
@@ -650,12 +651,17 @@ func (h *hugbox) appendLibraries(cache *dynlib.Cache, binaries []string, extraLi
 		}
 	}
 
-	// This being at least symlinked to exactly the right spot matters.
+	// Some systems are really stubborn about searching for certain things
+	// in the qualified lib directories.  In particular ld-linux.so needs to
+	// be in exactly the right place, and openSUSE seems to really want to
+	// use "/usr/lib64" for certain things.
 	switch runtime.GOARCH {
 	case "amd64":
 		h.symlink("/lib", "/lib64")
+		h.symlink(restrictedLibDir, "/usr/lib64")
 	case "386":
 		h.symlink("/lib", "/lib32")
+		h.symlink(restrictedLibDir, "/usr/lib32")
 	}
 
 	h.standardLibs = false
