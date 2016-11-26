@@ -458,6 +458,14 @@ func RunTor(cfg *config.Config, torrc []byte) (cmd *exec.Cmd, err error) {
 	h.stderr = logger
 	if !cfg.Tor.UseBridges {
 		h.seccompFn = installTorSeccompProfile
+
+		// The tor daemon only uses this to calculate MaxMemInQueues,
+		// which is a relay thing, so this can safely be disabled.
+		//
+		// Not sure about what to do wrt pluggable transports yet,
+		// obfs4proxy seems to function fine, and the reads it does
+		// look innocent enough, but more investigation is needed.
+		h.mountProc = false
 	} else {
 		h.seccompFn = installBasicSeccompBlacklist
 	}

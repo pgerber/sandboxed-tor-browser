@@ -265,7 +265,7 @@ func (h *hugbox) run() (*exec.Cmd, error) {
 	pendingWrites := [][]byte{argsBuf}
 	pendingWrites = append(pendingWrites, h.fileData...)
 
-	Debugf("sandbox: fdArgs: %v", h.args)
+	Debugf("sandbox: fdArgs: %v", fdArgs)
 
 	// Fork/exec.
 	cmd.Start()
