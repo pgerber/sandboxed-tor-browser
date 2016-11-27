@@ -31,6 +31,9 @@ import (
 func (c *Common) DoLaunch(async *Async, checkUpdates bool) {
 	async.Err = nil
 	defer func() {
+		if len(async.Cancel) > 0 {
+			<- async.Cancel
+		}
 		if async.Err != nil {
 			log.Printf("launch: Failing with error: %v", async.Err)
 			if c.tor != nil {
