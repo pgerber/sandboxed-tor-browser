@@ -287,7 +287,10 @@ func (c *Common) launchTor(async *Async, onlySystem bool) (dialFunc, error) {
 		}
 
 		async.UpdateProgress("Waiting on Tor bootstrap.")
-		if c.tor, err = tor.NewSandboxedTor(c.Cfg, async, cmd); err != nil {
+		c.tor = tor.NewSandboxedTor(c.Cfg, cmd)
+		if err = c.tor.DoBootstrap(c.Cfg, async); err != nil {
+			c.tor.Shutdown()
+			c.tor = nil
 			async.Err = err
 			return nil, err
 		}

@@ -18,6 +18,7 @@ package sandbox
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -231,6 +232,7 @@ func (h *hugbox) run() (*exec.Cmd, error) {
 	}
 
 	// Handle the files to be injected via pipes.
+	fdIdx := 4
 	pendingWriteFds := []*os.File{argsWrFd}
 	for i := 0; i < len(h.fileData); i++ {
 		r, w, err := os.Pipe()
@@ -239,6 +241,7 @@ func (h *hugbox) run() (*exec.Cmd, error) {
 		}
 		cmd.ExtraFiles = append(cmd.ExtraFiles, r)
 		pendingWriteFds = append(pendingWriteFds, w)
+		fdIdx++
 	}
 
 	// Prep the seccomp pipe if required.
@@ -248,10 +251,20 @@ func (h *hugbox) run() (*exec.Cmd, error) {
 		if err != nil {
 			return nil, err
 		}
-		// The `-1` is because the args fd is added at this point...
-		fdArgs = append(fdArgs, "--seccomp", fmt.Sprintf("%d", 4+len(cmd.ExtraFiles)-1))
+		fdArgs = append(fdArgs, "--seccomp", fmt.Sprintf("%d", fdIdx))
 		cmd.ExtraFiles = append(cmd.ExtraFiles, r)
 		seccompWrFd = w
+		fdIdx++
+	}
+
+	// Prep the info pipe.
+	var infoRdFd *os.File
+	if r, w, err := os.Pipe(); err != nil {
+		return nil, err
+	} else {
+		cmd.ExtraFiles = append(cmd.ExtraFiles, w)
+		fdArgs = append(fdArgs, "--info-fd", fmt.Sprintf("%d", fdIdx))
+		infoRdFd = r
 	}
 
 	// Convert the arg vector to a format fit for bubblewrap, and schedule the
@@ -283,7 +296,7 @@ func (h *hugbox) run() (*exec.Cmd, error) {
 	// Write the seccomp rules.
 	if h.seccompFn != nil {
 		// This should be the one and only remaining extra file.
-		if len(cmd.ExtraFiles) != 1 {
+		if len(cmd.ExtraFiles) != 2 {
 			panic("sandbox: unexpected extra files when writing seccomp rules")
 		} else if seccompWrFd == nil {
 			panic("sandbox: missing fd when writing seccomp rules")
@@ -292,12 +305,29 @@ func (h *hugbox) run() (*exec.Cmd, error) {
 			cmd.Process.Kill()
 			return nil, err
 		}
-		cmd.ExtraFiles = nil
+		cmd.ExtraFiles = cmd.ExtraFiles[1:]
 	} else if seccompWrFd != nil {
 		panic("sandbox: seccomp fd exists when there are no rules to be written")
 	}
 
+	// Read back the child pid.
+	decoder := json.NewDecoder(infoRdFd)
+	info := &bwrapInfo{}
+	if err := decoder.Decode(info); err != nil {
+		return nil, err
+	}
+
+	Debugf("sandbox: bwrap pid is: %v", cmd.Process.Pid)
+	Debugf("sandbox: child pid is: %v", info.Pid)
+
+	// This is more useful to us.
+	cmd.Process.Pid = info.Pid
+
 	return cmd, nil
+}
+
+type bwrapInfo struct {
+	Pid int `json:"child-pid"`
 }
 
 func newHugbox() (*hugbox, error) {

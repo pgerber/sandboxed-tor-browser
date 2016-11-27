@@ -53,7 +53,8 @@ var ErrTorNotRunning = errors.New("tor not running")
 type Tor struct {
 	sync.Mutex
 
-	isSystem bool
+	isSystem       bool
+	isBootstrapped bool
 
 	cmd        *exec.Cmd
 	ctrl       *bulb.Conn
@@ -157,7 +158,7 @@ func (t *Tor) Shutdown() {
 	}
 
 	if t.cmd != nil {
-		t.cmd.Process.Signal(syscall.SIGTERM)
+		t.cmd.Process.Signal(syscall.SIGKILL)
 		t.ctrl = nil
 	}
 
@@ -229,6 +230,7 @@ func NewSystemTor(cfg *config.Config) (*Tor, error) {
 	t := new(Tor)
 	t.isSystem = true
 	t.ctrlEvents = make(chan *bulb.Response, 16)
+	t.isBootstrapped = true
 
 	net := cfg.SystemTorControlNet
 	addr := cfg.SystemTorControlAddr
@@ -257,26 +259,24 @@ func NewSystemTor(cfg *config.Config) (*Tor, error) {
 	return t, nil
 }
 
-// NewSandboxedTor creates a Tor struct around a sandboxed tor instance,
-// and boostraps.
-func NewSandboxedTor(cfg *config.Config, async *Async, cmd *exec.Cmd) (t *Tor, err error) {
-	var torCleanup *Tor
-	defer func() { // Automagically handle async error propagation.
-		if err != nil {
-			async.Err = err
-			if torCleanup != nil {
-				torCleanup.Shutdown()
-			}
-		}
-	}()
-
-	t = new(Tor)
-	torCleanup = t
+// NewSandboxedTor creates a Tor struct around a sandboxed tor instance.
+func NewSandboxedTor(cfg *config.Config, cmd *exec.Cmd) *Tor {
+	t := new(Tor)
 	t.isSystem = false
 	t.cmd = cmd
 	t.socksNet = "unix"
 	t.socksAddr = filepath.Join(cfg.TorDataDir, "socks")
 	t.ctrlEvents = make(chan *bulb.Response, 16)
+
+	return t
+}
+
+// DoBootstrap will bootstrap a tor instance, if it is one that is lauched
+// by us.
+func (t *Tor) DoBootstrap(cfg *config.Config, async *Async) (err error) {
+	if t.isBootstrapped {
+		return nil
+	}
 
 	hz := time.NewTicker(1 * time.Second)
 	defer hz.Stop()
@@ -294,13 +294,13 @@ func NewSandboxedTor(cfg *config.Config, async *Async, cmd *exec.Cmd) (t *Tor, e
 				nTicks++
 				continue
 			case <-async.Cancel:
-				return nil, ErrCanceled
+				return ErrCanceled
 			}
 		}
-		return nil, err
+		return err
 	}
 	if ctrlPortAddr == nil {
-		return nil, fmt.Errorf("tor: timeout waiting for the control port")
+		return fmt.Errorf("tor: timeout waiting for the control port")
 	}
 
 	Debugf("tor: control port is: %v", string(ctrlPortAddr))
@@ -308,12 +308,12 @@ func NewSandboxedTor(cfg *config.Config, async *Async, cmd *exec.Cmd) (t *Tor, e
 	// Dial the control port.
 	async.UpdateProgress("Connecting to the Tor Control Port.")
 	if t.ctrl, err = bulb.Dial("unix", filepath.Join(cfg.TorDataDir, "control")); err != nil {
-		return nil, err
+		return err
 	}
 
 	// Authenticate with the control port.
 	if err = t.ctrl.Authenticate(cfg.Tor.CtrlPassword); err != nil {
-		return nil, err
+		return err
 	}
 
 	// Take ownership of the tor process such that it will self terminate
@@ -322,7 +322,7 @@ func NewSandboxedTor(cfg *config.Config, async *Async, cmd *exec.Cmd) (t *Tor, e
 	// occaision. :(
 	log.Printf("tor: Taking ownership of the tor process")
 	if _, err = t.ctrl.Request("TAKEOWNERSHIP"); err != nil {
-		return nil, err
+		return err
 	}
 
 	// Start the event async reader.
@@ -331,13 +331,13 @@ func NewSandboxedTor(cfg *config.Config, async *Async, cmd *exec.Cmd) (t *Tor, e
 
 	// Register the `STATUS_CLIENT` event handler.
 	if _, err = t.ctrl.Request("SETEVENTS STATUS_CLIENT"); err != nil {
-		return nil, err
+		return err
 	}
 
 	// Start the bootstrap.
 	async.UpdateProgress("Connecting to the Tor network.")
 	if _, err = t.ctrl.Request("RESETCONF DisableNetwork"); err != nil {
-		return nil, err
+		return err
 	}
 
 	// Wait for bootstrap to finish.
@@ -353,15 +353,15 @@ func NewSandboxedTor(cfg *config.Config, async *Async, cmd *exec.Cmd) (t *Tor, e
 			}
 			bootstrapFinished, newPct = handleBootstrapEvent(async, strings.TrimPrefix(ev.Reply, evPrefix))
 		case <-async.Cancel:
-			return nil, ErrCanceled
+			return ErrCanceled
 		case <-hz.C:
 			const statusPrefix = "status/bootstrap-phase="
 
 			// As a fallback, use kill(pid, 0) to detect if the process has
 			// puked.  waitpid(2) is probably better since it's a child, but
 			// this should be good enough, and is only to catch tor crashing.
-			if err := syscall.Kill(cmd.Process.Pid, 0); err == syscall.ESRCH {
-				return nil, fmt.Errorf("tor process appears to have crashed.")
+			if err := syscall.Kill(t.cmd.Process.Pid, 0); err == syscall.ESRCH {
+				return fmt.Errorf("tor process appears to have crashed.")
 			}
 
 			// Fallback in case something goes wrong, poll the bootstrap status
@@ -373,7 +373,7 @@ func NewSandboxedTor(cfg *config.Config, async *Async, cmd *exec.Cmd) (t *Tor, e
 
 			resp, err := t.getinfo("status/bootstrap-phase")
 			if err != nil {
-				return nil, err
+				return err
 			}
 			bootstrapFinished, newPct = handleBootstrapEvent(async, strings.TrimPrefix(resp.Data[0], statusPrefix))
 		}
@@ -384,12 +384,12 @@ func NewSandboxedTor(cfg *config.Config, async *Async, cmd *exec.Cmd) (t *Tor, e
 		}
 	}
 	if !bootstrapFinished {
-		return nil, fmt.Errorf("tor: timeout connecting to the tor network")
+		return fmt.Errorf("tor: timeout connecting to the tor network")
 	}
 
 	// Squelch the events, and drain the event queue.
 	if _, err = t.ctrl.Request("SETEVENTS"); err != nil {
-		return nil, err
+		return err
 	}
 	for len(t.ctrlEvents) > 0 {
 		<-t.ctrlEvents
@@ -397,10 +397,12 @@ func NewSandboxedTor(cfg *config.Config, async *Async, cmd *exec.Cmd) (t *Tor, e
 
 	// Launch the surrogates.
 	if err = t.launchSurrogates(cfg); err != nil {
-		return nil, err
+		return err
 	}
 
-	return t, nil
+	t.isBootstrapped = true
+
+	return nil
 }
 
 // CfgToSandboxTorrc converts the `ui/config/Config` to a sandboxed tor ready
