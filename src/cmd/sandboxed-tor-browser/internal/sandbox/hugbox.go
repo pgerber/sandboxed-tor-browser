@@ -388,7 +388,6 @@ func newHugbox() (*hugbox, error) {
 	// Look for the bwrap binary in sensible locations.
 	bwrapPaths := []string{
 		"/usr/bin/bwrap",
-		"/usr/lib/flatpak/flatpak-bwrap", // Arch Linux "flatpak" package.
 	}
 	for _, v := range bwrapPaths {
 		if FileExists(v) {
