@@ -441,7 +441,7 @@ func stageUpdate(updateDir, installDir string, mar []byte) error {
 }
 
 // RunTor launches sandboxeed Tor.
-func RunTor(cfg *config.Config, torrc []byte) (cmd *exec.Cmd, err error) {
+func RunTor(cfg *config.Config, manif *config.Manifest, torrc []byte) (cmd *exec.Cmd, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("%v", r)
@@ -473,8 +473,13 @@ func RunTor(cfg *config.Config, torrc []byte) (cmd *exec.Cmd, err error) {
 	// `/proc/sys/net/core/somaxconn` - obfs4proxy, Go runtime uses this to
 	//    determine listener backlog, but will default to `128` on errors.
 	//
+	// Hardened builds are special cased because asan crashes the binary
+	// if it can't read `/proc/self/maps`.
+	//
 	// See: https://bugs.torproject.org/20773
-	h.mountProc = false
+	if manif.Channel != "hardened" {
+		h.mountProc = false
+	}
 
 	if err = os.MkdirAll(cfg.TorDataDir, DirMode); err != nil {
 		return
