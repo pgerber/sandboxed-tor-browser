@@ -28,6 +28,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"cmd/sandboxed-tor-browser/internal/data"
 	. "cmd/sandboxed-tor-browser/internal/utils"
@@ -283,47 +284,83 @@ func (h *hugbox) run() (*exec.Cmd, error) {
 	// Fork/exec.
 	cmd.Start()
 
-	// Flush the pending writes.
-	for i, wrFd := range pendingWriteFds {
-		d := pendingWrites[i]
-		if err := writeBuffer(wrFd, d); err != nil {
-			cmd.Process.Kill()
-			return nil, err
+	// Do the rest of the setup in a go routine, and monitor completion and
+	// a watchdog timer.
+	doneCh := make(chan error)
+	bwrapPid := cmd.Process.Pid
+	hz := time.NewTicker(1 * time.Second)
+	defer hz.Stop()
+
+	go func() {
+		// Flush the pending writes.
+		for i, wrFd := range pendingWriteFds {
+			d := pendingWrites[i]
+			if err := writeBuffer(wrFd, d); err != nil {
+				doneCh <- err
+				return
+			}
+			cmd.ExtraFiles = cmd.ExtraFiles[1:]
 		}
-		cmd.ExtraFiles = cmd.ExtraFiles[1:]
+
+		// Write the seccomp rules.
+		if h.seccompFn != nil {
+			// This should be the one and only remaining extra file.
+			if len(cmd.ExtraFiles) != 2 {
+				panic("sandbox: unexpected extra files when writing seccomp rules")
+			} else if seccompWrFd == nil {
+				panic("sandbox: missing fd when writing seccomp rules")
+			}
+			if err := h.seccompFn(seccompWrFd); err != nil {
+				doneCh <- err
+				return
+			}
+			cmd.ExtraFiles = cmd.ExtraFiles[1:]
+		} else if seccompWrFd != nil {
+			panic("sandbox: seccomp fd exists when there are no rules to be written")
+		}
+
+		// Read back the child pid.
+		decoder := json.NewDecoder(infoRdFd)
+		info := &bwrapInfo{}
+		if err := decoder.Decode(info); err != nil {
+			doneCh <- err
+			return
+		}
+
+		Debugf("sandbox: bwrap pid is: %v", cmd.Process.Pid)
+		Debugf("sandbox: child pid is: %v", info.Pid)
+
+		// This is more useful to us, since it's fork of bubblewrap that will
+		// execvp.
+		cmd.Process.Pid = info.Pid
+
+		doneCh <- nil
+	}()
+
+	err := fmt.Errorf("sandbox: timeout waiting for bubblewrap to start")
+timeoutLoop:
+	for nTicks := 0; nTicks < 10; { // 10 second timeout, probably excessive.
+		select {
+		case err = <-doneCh:
+			if err == nil {
+				return cmd, nil
+			}
+			break timeoutLoop
+		case <-hz.C:
+			var wstatus syscall.WaitStatus
+			_, err = syscall.Wait4(bwrapPid, &wstatus, syscall.WNOHANG, nil)
+			if err != nil {
+				break timeoutLoop
+			} else if wstatus.Exited() {
+				err = fmt.Errorf("sandbox: bubblewrap exited unexpectedly")
+				break timeoutLoop
+			}
+			nTicks++
+		}
 	}
 
-	// Write the seccomp rules.
-	if h.seccompFn != nil {
-		// This should be the one and only remaining extra file.
-		if len(cmd.ExtraFiles) != 2 {
-			panic("sandbox: unexpected extra files when writing seccomp rules")
-		} else if seccompWrFd == nil {
-			panic("sandbox: missing fd when writing seccomp rules")
-		}
-		if err := h.seccompFn(seccompWrFd); err != nil {
-			cmd.Process.Kill()
-			return nil, err
-		}
-		cmd.ExtraFiles = cmd.ExtraFiles[1:]
-	} else if seccompWrFd != nil {
-		panic("sandbox: seccomp fd exists when there are no rules to be written")
-	}
-
-	// Read back the child pid.
-	decoder := json.NewDecoder(infoRdFd)
-	info := &bwrapInfo{}
-	if err := decoder.Decode(info); err != nil {
-		return nil, err
-	}
-
-	Debugf("sandbox: bwrap pid is: %v", cmd.Process.Pid)
-	Debugf("sandbox: child pid is: %v", info.Pid)
-
-	// This is more useful to us.
-	cmd.Process.Pid = info.Pid
-
-	return cmd, nil
+	cmd.Process.Kill()
+	return nil, err
 }
 
 type bwrapInfo struct {
