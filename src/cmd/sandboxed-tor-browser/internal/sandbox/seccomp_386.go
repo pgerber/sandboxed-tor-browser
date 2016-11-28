@@ -37,6 +37,7 @@ const (
 
 var torBrowserSeccompAssets = []string{torBrowserWhitelist, torBrowserExtraWhitelist}
 var torSeccompAssets = []string{torWhitelist, torExtraWhitelist}
+var torObfs4SeccompAssets = []string{torObfs4Whitelist, torExtraWhitelist}
 var blacklistSeccompAssets = []string{basicBlacklist, basicExtraBlacklist}
 
 // installSeccomp on i386 implements a minimal subset of the gosecco

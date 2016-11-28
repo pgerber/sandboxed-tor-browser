@@ -1,0 +1,147 @@
+# tor +obfs4proxy binary seccomp rules based off the tor sandbox and the
+# subgraph tor-browser-launcher rules, along with some quality time with
+# strace.
+
+#
+# WARNING: This is a stopgap.  In an ideal world, tor and obfs4proxy will
+# have separate containers, with their own seccomp rules.
+#
+
+# Constants used for argument comparisons.
+SIG_BLOCK=1
+SIG_SETMASK=2
+MREMAP_MAYMOVE=1
+PF_LOCAL=AF_LOCAL
+POLLIN=1
+
+# The tor stage 1 set.
+access: 1
+brk: 1
+clock_gettime: 1
+close: 1
+clone: 1
+epoll_create: 1
+epoll_wait: 1
+eventfd2: 1
+pipe2: 1
+pipe: 1
+fcntl: 1
+fstat: 1
+# fstat64: 1
+getdents: 1
+getdents64: 1
+getegid: 1
+# getegid32: 1
+geteuid: 1
+# geteuid32: 1
+getgid: 1
+# getgid32: 1
+getrlimit: 1
+gettimeofday: 1
+gettid: 1
+getuid: 1
+# getuid32: 1
+lseek: 1
+#_llseek: 1
+mkdir: 1
+munmap: 1
+prlimit64: 1
+read: 1
+rt_sigreturn: 1
+sched_getaffinity: 1
+sched_yield: 1
+sendmsg: 1
+set_robust_list: 1
+setrlimit: 1
+sigaltstack: 1
+# sigreturn: 1
+stat: 1
+uname: 1
+wait4: 1
+write: 1
+writev: 1
+exit_group: 1
+exit: 1
+madvise: arg2 == 8
+getrandom: 1
+sysinfo: 1
+bind: 1
+listen: 1
+connect: 1
+getsockname: 1
+recvmsg: 1
+recvfrom: 1
+sendto: 1
+unlink: 1
+
+# System calls that tor restricts by argument.
+rt_sigprocmask: arg0 == SIG_BLOCK || arg0 == SIG_SETMASK
+time: arg0 == 0
+epoll_ctl: arg1 == EPOLL_CTL_ADD || arg1 == EPOLL_CTL_MOD || arg1 == EPOLL_CTL_DEL
+prctl: (arg0 == PR_SET_DUMPABLE && arg1 == 0) || arg0 == PR_SET_PDEATHSIG
+mprotect: arg2 == PROT_READ || arg2 == PROT_NONE || arg2 == PROT_READ | PROT_WRITE
+flock: arg1 == (LOCK_EX | LOCK_NB) || arg1 == LOCK_UN
+# FUTEX_WAIT_BITSET_PRIVATE|FUTEX_CLOCK_REALTIME || FUTEX_WAKE_PRIVATE || FUTEX_WAIT_PRIVATE
+futex: arg1 == 393 || arg1 == 128 || arg1 == 129 || arg1 == 1 || arg1 == 0
+mremap: arg3 == MREMAP_MAYMOVE
+poll: arg1 == POLLIN && arg2 == 10
+socket: arg0 == AF_UNIX || arg0 == AF_INET || arg0 == AF_INET6 || arg0 == AF_NETLINK
+setsockopt: (arg1 == SOL_SOCKET && (arg2 == SO_REUSEADDR || arg2 == SO_SNDBUF || arg2 == SO_RCVBUF || arg2 == SO_BROADCAST)) || (arg1 == SOL_TCP && arg2 == TCP_NODELAY) || (arg1 == SOL_IPV6 && arg2 == IPV6_V6ONLY)
+getsockopt: arg1 == SOL_SOCKET && arg2 == SO_ERROR
+# XXX: src/common/compat.c:tor_socketpair looks like it uses SOCK_CLOEXEC,
+# but according to strace, fcntl is used to actually set the flag (6.0.6).
+socketpair: arg0 == PF_LOCAL && (arg1 == SOCK_STREAM || arg1 == SOCK_STREAM | SOCK_CLOEXEC)
+# XXX/yawning: Tor doesn't have filters for this, but does for mmap2, but mmap2
+# is an x86-ism, so can't filter args.
+#
+# (PROT_READ|PROT_EXEC, MAP_PRIVATE | MAP_DENYWRITE) is needed for ld-linux.so
+mmap: (arg2 == PROT_READ && arg3 == MAP_PRIVATE) || (arg2 == PROT_NONE && (arg3 == MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE || arg3 == MAP_PRIVATE | MAP_ANONYMOUS || arg3 == MAP_PRIVATE | MAP_FIXED | MAP_ANONYMOUS)) || (arg2 == PROT_READ | PROT_WRITE && ((arg3 == MAP_PRIVATE | MAP_ANONYMOUS) || (arg3 == MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK) || (arg3 == MAP_PRIVATE | MAP_FIXED | MAP_DENYWRITE) || (arg3 == MAP_PRIVATE | MAP_FIXED | MAP_ANONYMOUS) || (arg3 == MAP_PRIVATE | MAP_DENYWRITE))) || (arg2 == PROT_READ | PROT_EXEC && arg3 == MAP_PRIVATE | MAP_DENYWRITE)
+
+# System calls that tor has filters for, that we do not due to:
+#  * Yawning being too dumb/lazy to convert the rules (accept4, mmap2,
+#    rt_sigaction).
+rt_sigaction: 1
+accept4: 1
+# mmap2: 1
+# fcntl64: 1
+
+# System calls that tor restricts by argument, but that need to be done by the
+# tor binary, because the restriction is by pointer.
+chown: 1
+chmod: 1
+open: 1
+openat: 1
+rename: 1
+# stat64: 1
+
+# System calls that tor needs, but doesn't know it needs, because they are made
+# prior to Tor's sandbox enforcement, either by tor, it's dependencies, or even
+# by bubblewrap.
+arch_prctl: 1
+unshare: 1
+getpid: 1
+kill: 1
+execve: 1
+restart_syscall: 1
+set_tid_address: 1
+chdir: 1
+umask: arg0 == 022
+
+# obfs4proxy requires the following:
+#
+# Note that it also requires additional things to be allowed in the various
+# arg filters, which are made at the pre-existing locations.
+# `mprotect` -> `arg2 == PROT_READ | PROT_WRITE`
+# `futex` -> `arg1 == 1 || arg1 == 0` (FUTEX_WAKE, FUTEX_WAIT)
+# `setsockopt` -> `arg1 == SOL_TCP && arg2 == TCP_NODELAY`
+#                 `arg1 == SOL_SOCKET && arg2 == SO_BROADCAST`
+#                 `arg1 == SOL_IPV6 && arg2 == IPV6_V6ONLY`
+# `mmap` -> `arg2 == PROT_NONE && (arg3 == MAP_PRIVATE|MAP_ANONYMOUS || arg3 == MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS)`
+mincore: 1
+dup2: 1
+select: 1
+mkdirat: 1
+fsync: 1
+epoll_create1: arg0 == EPOLL_CLOEXEC
+getpeername: 1
+getppid: 1

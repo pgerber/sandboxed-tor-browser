@@ -55,6 +55,7 @@ var blacklistSettings = &gosecco.SeccompSettings{
 
 var torBrowserSeccompAssets = []string{torBrowserWhitelist}
 var torSeccompAssets = []string{torWhitelist}
+var torObfs4SeccompAssets = []string{torObfs4Whitelist}
 var blacklistSeccompAssets = []string{basicBlacklist}
 
 func installSeccomp(fd *os.File, assets []string, isBlacklist bool) error {
@@ -65,6 +66,7 @@ func installSeccomp(fd *os.File, assets []string, isBlacklist bool) error {
 		settings = blacklistSettings
 	}
 
+	// XXX: This really should support multile assets.
 	if len(assets) != 1 {
 		return fmt.Errorf("seccomp: asset vector length > 1: %d", len(assets))
 	}

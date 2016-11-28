@@ -21,6 +21,7 @@ import "os"
 const (
 	torBrowserWhitelist = "torbrowser-launcher-whitelist.seccomp"
 	torWhitelist        = "tor-whitelist.seccomp"
+	torObfs4Whitelist   = "tor-obfs4-whitelist.seccomp"
 	basicBlacklist      = "blacklist.seccomp"
 )
 
@@ -28,8 +29,13 @@ func installTorBrowserSeccompProfile(fd *os.File) error {
 	return installSeccomp(fd, torBrowserSeccompAssets, false)
 }
 
-func installTorSeccompProfile(fd *os.File) error {
-	return installSeccomp(fd, torSeccompAssets, false)
+func installTorSeccompProfile(fd *os.File, useBridges bool) error {
+	assets := torSeccompAssets
+	if useBridges {
+		assets = torObfs4SeccompAssets
+	}
+
+	return installSeccomp(fd, assets, false)
 }
 
 func installBasicSeccompBlacklist(fd *os.File) error {

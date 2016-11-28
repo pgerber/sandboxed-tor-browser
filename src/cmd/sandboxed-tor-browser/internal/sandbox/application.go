@@ -456,11 +456,7 @@ func RunTor(cfg *config.Config, manif *config.Manifest, torrc []byte) (cmd *exec
 	logger := newConsoleLogger("tor")
 	h.stdout = logger
 	h.stderr = logger
-	if !cfg.Tor.UseBridges {
-		h.seccompFn = installTorSeccompProfile
-	} else {
-		h.seccompFn = installBasicSeccompBlacklist
-	}
+	h.seccompFn = func(fd *os.File) error { return installTorSeccompProfile(fd, cfg.Tor.UseBridges) }
 	h.unshare.net = false // Tor needs host network access.
 
 	// Regarding `/proc`...
