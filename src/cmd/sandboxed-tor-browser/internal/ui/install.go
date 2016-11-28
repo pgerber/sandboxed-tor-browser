@@ -43,7 +43,7 @@ func (c *Common) DoInstall(async *Async) {
 	async.Err = nil
 	defer func() {
 		if len(async.Cancel) > 0 {
-			<- async.Cancel
+			<-async.Cancel
 		}
 		if async.Err != nil {
 			log.Printf("install: Failing with error: %v", async.Err)

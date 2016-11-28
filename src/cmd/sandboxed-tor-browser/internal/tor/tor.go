@@ -62,10 +62,13 @@ type Tor struct {
 
 	socksNet  string
 	socksAddr string
+	ctrlAddr  string
 
 	ctrlSurrogate    *ctrlProxy
 	socksSurrogate   *socksProxy
 	socksPassthrough *passthroughProxy
+
+	unlinkOnExit []string
 }
 
 // IsSystem returns if the tor instance is a OS service not being actively
@@ -176,6 +179,10 @@ func (t *Tor) Shutdown() {
 		t.socksPassthrough.close()
 		t.socksPassthrough = nil
 	}
+
+	for _, fn := range t.unlinkOnExit {
+		os.Remove(fn)
+	}
 }
 
 // SocksSurrogatePath returns the socks port surrogate AF_UNIX path.
@@ -266,7 +273,9 @@ func NewSandboxedTor(cfg *config.Config, cmd *exec.Cmd) *Tor {
 	t.cmd = cmd
 	t.socksNet = "unix"
 	t.socksAddr = filepath.Join(cfg.TorDataDir, "socks")
+	t.ctrlAddr = filepath.Join(cfg.TorDataDir, "control")
 	t.ctrlEvents = make(chan *bulb.Response, 16)
+	t.unlinkOnExit = []string{t.socksAddr, t.ctrlAddr}
 
 	return t
 }
@@ -307,7 +316,7 @@ func (t *Tor) DoBootstrap(cfg *config.Config, async *Async) (err error) {
 
 	// Dial the control port.
 	async.UpdateProgress("Connecting to the Tor Control Port.")
-	if t.ctrl, err = bulb.Dial("unix", filepath.Join(cfg.TorDataDir, "control")); err != nil {
+	if t.ctrl, err = bulb.Dial("unix", t.ctrlAddr); err != nil {
 		return err
 	}
 
