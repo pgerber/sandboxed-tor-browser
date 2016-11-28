@@ -279,6 +279,8 @@ func (c *Common) launchTor(async *Async, onlySystem bool) (dialFunc, error) {
 			return nil, err
 		}
 
+		os.Remove(filepath.Join(c.Cfg.TorDataDir, "control_port"))
+
 		async.UpdateProgress("Launching Tor executable.")
 		cmd, err := sandbox.RunTor(c.Cfg, torrc)
 		if err != nil {
