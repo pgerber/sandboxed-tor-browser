@@ -98,9 +98,13 @@ func (async *Async) Grab(client *grab.Client, url string, hzFn func(string)) []b
 
 // NewAsync creates a new Async structure.
 func NewAsync() *Async {
+	// XXX; Temporarily work around bug #20804, by oversizing
+	// the channels a bit.  Things end up getting stuck on channel
+	// writes because it's kludged together, this should ensure that
+	// the writes succeed.
 	async := new(Async)
-	async.Cancel = make(chan interface{})
-	async.Done = make(chan interface{})
+	async.Cancel = make(chan interface{}, 2)
+	async.Done = make(chan interface{}, 2)
 	async.ToUI = make(chan interface{})
 	return async
 }
