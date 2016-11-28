@@ -85,14 +85,17 @@ getsockopt: arg1 == SOL_SOCKET && arg2 == SO_ERROR
 # XXX: src/common/compat.c:tor_socketpair looks like it uses SOCK_CLOEXEC,
 # but according to strace, fcntl is used to actually set the flag (6.0.6).
 socketpair: arg0 == PF_LOCAL && (arg1 == SOCK_STREAM || arg1 == SOCK_STREAM | SOCK_CLOEXEC)
+# XXX/yawning: Tor doesn't have filters for this, but does for mmap2, but mmap2
+# is an x86-ism, so can't filter args.
+#
+# (PROT_READ|PROT_EXEC, MAP_PRIVATE | MAP_DENYWRITE) is needed for ld-linux.so
+mmap: (arg2 == PROT_READ && arg3 == MAP_PRIVATE) || (arg2 == PROT_NONE && arg3 == MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE) || (arg2 == PROT_READ | PROT_WRITE && ((arg3 == MAP_PRIVATE | MAP_ANONYMOUS) || (arg3 == MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK) || (arg3 == MAP_PRIVATE | MAP_FIXED | MAP_DENYWRITE) || (arg3 == MAP_PRIVATE | MAP_FIXED | MAP_ANONYMOUS) || (arg3 == MAP_PRIVATE | MAP_DENYWRITE))) || (arg2 == PROT_READ | PROT_EXEC && arg3 == MAP_PRIVATE | MAP_DENYWRITE)
 
 # System calls that tor has filters for, that we do not due to:
 #  * Yawning being too dumb/lazy to convert the rules (accept4, mmap2,
 #    rt_sigaction).
-#  * Tor has a comment to filter, but doesn't yet (mmap).
 rt_sigaction: 1
 accept4: 1
-mmap: 1
 # mmap2: 1
 # fcntl64: 1
 
