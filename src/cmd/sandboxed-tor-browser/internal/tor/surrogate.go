@@ -401,7 +401,7 @@ func (c *ctrlProxyConn) onCmdGetinfo(splitCmd []string, raw []byte) error {
 		return c.sendErrUnexpectedArgCount(cmdGetinfo, 2, len(splitCmd))
 	}
 
-	if strings.HasPrefix(splitCmd[1], prefixGetinfoNsId) || strings.HasPrefix(splitCmd[1], prefixGetinfoIpToCountry) {
+	if c.p.circuitMonitorEnabled && (strings.HasPrefix(splitCmd[1], prefixGetinfoNsId) || strings.HasPrefix(splitCmd[1], prefixGetinfoIpToCountry)) {
 		// This *could* filter the relevant results to those that are actually
 		// part of circuits that the user has, but that seems overly paranoid,
 		// and ironically leaks more information.
@@ -472,10 +472,12 @@ func (c *ctrlProxyConn) onCmdSignal(splitCmd []string, raw []byte) error {
 }
 
 func (c *ctrlProxyConn) onCmdSetEvents(splitCmd []string, raw []byte) error {
+	if !c.p.circuitMonitorEnabled {
+		return c.sendErrUnrecognizedCommand()
+	}
+
 	if len(splitCmd) == 1 {
-		if c.p.circuitMonitorEnabled {
-			c.p.circuitMonitor.deregister(c)
-		}
+		c.p.circuitMonitor.deregister(c)
 		_, err := c.appConnWrite([]byte(responseOk))
 		return err
 	} else if len(splitCmd) != 2 {
@@ -485,8 +487,6 @@ func (c *ctrlProxyConn) onCmdSetEvents(splitCmd []string, raw []byte) error {
 		respStr := "552 Unrecognized event \"" + splitCmd[1] + "\"" + crLf
 		_, err := c.appConnWrite([]byte(respStr))
 		return err
-	} else if !c.p.circuitMonitorEnabled {
-		return c.sendErrUnrecognizedCommand()
 	}
 	c.p.circuitMonitor.register(c)
 	_, err := c.appConnWrite([]byte(responseOk))
@@ -568,11 +568,13 @@ func launchCtrlProxy(cfg *config.Config, tor *Tor) (*ctrlProxy, error) {
 		return nil, err
 	}
 
-	p.circuitMonitor, err = initCircuitMonitor(p)
-	p.circuitMonitorEnabled = err == nil
-	if err != nil {
-		log.Printf("tor: failed to launch circuit display helper: %v", err)
+	if cfg.Sandbox.EnableCircuitDisplay {
+		p.circuitMonitor, err = initCircuitMonitor(p)
+		if err != nil {
+			log.Printf("tor: failed to launch circuit display helper: %v", err)
+		}
 	}
+	p.circuitMonitorEnabled = p.circuitMonitor != nil && err == nil
 
 	go p.acceptLoop()
 

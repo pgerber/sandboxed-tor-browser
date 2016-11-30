@@ -195,6 +195,9 @@ type Sandbox struct {
 	// sandbox.
 	EnablePulseAudio bool `json:"enablePulseAudio"`
 
+	// EnableCircuitDisplay enables the Tor Browser circuit display.
+	EnableCircuitDisplay bool `json:"enableCircuitDisplay"`
+
 	// DesktopDir is the directory to be bind mounted instead of the default
 	// bundle Desktop directory.
 	DesktopDir string `json:"desktopDir,omitEmpty"`
@@ -217,6 +220,15 @@ func (sb *Sandbox) SetDisplay(s string) {
 func (sb *Sandbox) SetEnablePulseAudio(b bool) {
 	if sb.EnablePulseAudio != b {
 		sb.EnablePulseAudio = b
+		sb.cfg.isDirty = true
+	}
+}
+
+// SetEnableCircuitDisplay sets tthe circit display enable and marks the config
+// dirty.
+func (sb *Sandbox) SetEnableCircuitDisplay(b bool) {
+	if sb.EnableCircuitDisplay != b {
+		sb.EnableCircuitDisplay = b
 		sb.cfg.isDirty = true
 	}
 }
