@@ -161,8 +161,22 @@ func (t *Tor) Shutdown() {
 	}
 
 	if t.cmd != nil {
-		t.cmd.Process.Signal(syscall.SIGKILL)
-		t.ctrl = nil
+		waitCh := make(chan bool)
+		go func() {
+			t.cmd.Process.Signal(syscall.SIGTERM)
+			t.cmd.Process.Wait()
+			waitCh <- true
+		}()
+
+		select {
+		case <-waitCh:
+			Debugf("tor: Process exited after SIGTERM")
+		case <-time.After(5 * time.Second):
+			Debugf("tor: Process timed out waiting after SIGTERM, killing.")
+			t.cmd.Process.Signal(syscall.SIGKILL)
+		}
+
+		t.cmd = nil
 	}
 
 	if t.ctrlSurrogate != nil {
