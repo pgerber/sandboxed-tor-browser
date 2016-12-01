@@ -210,11 +210,18 @@ func (c *Common) doUpdate(async *Async, dialFn dialFunc) {
 		return
 	}
 
+	// Ensure that the update entry version is actually neweer.
+	if !c.Manif.BundleUpdateVersionValid(update.AppVersion) {
+		log.Printf("launch: Update server provided a downgrade: '%v'", update.AppVersion)
+		async.Err = fmt.Errorf("update server provided a downgrade: '%v'", update.AppVersion)
+		return
+	}
+
 	// Figure out the best MAR to download.
 	patches := make(map[string]*installer.Patch)
 	for _, v := range update.Patch {
 		if patches[v.Type] != nil {
-			async.Err = fmt.Errorf("duplicate patch entry for kind: %v", v.Type)
+			async.Err = fmt.Errorf("duplicate patch entry for kind: '%v'", v.Type)
 			return
 		}
 		patches[v.Type] = &v
@@ -253,7 +260,7 @@ func (c *Common) doUpdate(async *Async, dialFn dialFunc) {
 			return
 		}
 	default:
-		async.Err = fmt.Errorf("unsupported hash function: %v", patch.HashFunction)
+		async.Err = fmt.Errorf("unsupported hash function: '%v'", patch.HashFunction)
 		return
 	}
 

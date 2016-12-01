@@ -71,38 +71,84 @@ func (m *Manifest) Sync() error {
 
 // BundleVersionAtLeast returns true if the bundle version is greater than or
 // equal to the specified version.
-func (m *Manifest) BundleVersionAtLeast(major, minor int) bool {
-	vStr := strings.TrimSuffix(m.Version, "-hardened")
-	if m.Version == "" {
-		return false
-	}
-	if m.Channel == "alpha" || m.Channel == "hardened" {
-		vStr = strings.Replace(vStr, "a", ".", 1)
-	}
-
-	// Split into major/minor/pl.
-	v := strings.Split(vStr, ".")
-	if len(v) < 2 { // Need at least a major/minor.
-		return false
-	}
-
-	iMaj, err := strconv.Atoi(v[0])
+func (m *Manifest) BundleVersionAtLeast(vStr string) bool {
+	cmp, err := bundleVersionCompare(m.Version, vStr)
 	if err != nil {
 		return false
 	}
-	iMin, err := strconv.Atoi(v[1])
+	return cmp >= 0
+}
+
+// BundleUpdateVersionValid returns true if the proposed update version is
+// actually an update.
+func (m *Manifest) BundleUpdateVersionValid(vStr string) bool {
+	cmp, err := bundleVersionCompare(m.Version, vStr)
 	if err != nil {
 		return false
 	}
+	return cmp < 0
+}
 
-	// Do the version comparison.
-	if iMaj > major {
-		return true
+func bundleVersionParse(vStr string) (*[4]int, error) {
+	vStr = strings.TrimSuffix(vStr, "-hardened")
+	vStr = strings.Replace(vStr, "a", ".0.", 1)
+
+	var out [4]int
+	for idx, s := range strings.Split(vStr, ".") {
+		i, err := strconv.Atoi(s)
+		if err != nil {
+			return nil, err
+		}
+		out[idx] = i
 	}
-	if iMaj == major && iMin >= minor {
-		return true
+	out[3] = -out[3] // XXX: I hope there never is "7.0a" or "7.0a0"
+
+	return &out, nil
+}
+
+func bundleVersionCompare(a, b string) (int, error) {
+	a = strings.ToLower(strings.TrimSpace(a))
+	b = strings.ToLower(strings.TrimSpace(b))
+
+	if a == b {
+		return 0, nil // Equal.
 	}
-	return false
+
+	aVer, err := bundleVersionParse(a)
+	if err != nil {
+		return 0, err
+	}
+	bVer, err := bundleVersionParse(b)
+	if err != nil {
+		return 0, err
+	}
+
+	for i := 0; i < 3; i++ {
+		if aVer[i] > bVer[i] {
+			return 1, nil
+		}
+		if aVer[i] < bVer[i] {
+			return -1, nil
+		}
+	}
+
+	if aVer[3] < 0 && bVer[3] >= 0 { // Alpha vs Release.
+		return -1, nil
+	}
+	if aVer[3] >= 0 && bVer[3] < 0 { // Release vs Alpha.
+		return 1, nil
+	}
+
+	// Alpha vs Alpha.
+	aVer[3], bVer[3] = -aVer[3], -bVer[3]
+	if aVer[3] < bVer[3] {
+		return -1, nil
+	}
+	if bVer[3] < aVer[3] {
+		return 1, nil
+	}
+
+	return 0, nil // One is probably hardened, the other isn't.
 }
 
 // Purge deletes the manifest.
