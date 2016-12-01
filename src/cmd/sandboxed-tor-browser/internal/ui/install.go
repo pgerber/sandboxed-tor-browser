@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"os"
 	"path/filepath"
 	"runtime"
 	"time"
@@ -119,6 +120,8 @@ func (c *Common) DoInstall(async *Async) {
 	// Install the bundle.
 	log.Printf("install: Installing Tor Browser.")
 	async.UpdateProgress("Installing Tor Browser.")
+
+	os.RemoveAll(c.Cfg.TorDataDir) // Remove the tor directory.
 
 	if err := installer.ExtractBundle(c.Cfg.BundleInstallDir, bundleTarXz, async.Cancel); err != nil {
 		async.Err = err
