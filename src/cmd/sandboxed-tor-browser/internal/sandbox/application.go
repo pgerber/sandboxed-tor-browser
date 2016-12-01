@@ -613,7 +613,7 @@ func (h *hugbox) appendRestrictedGtk2() ([]string, string, error) {
 		// GDK doesn't have a nice equivalent to `GTK_PATH`, and instead has
 		// an env var pointing to a `loaders.cache` file.
 		loaderCachePath := filepath.Join(normGdkPath, "loaders.cache")
-		h.assetFile(loaderCachePath, "loader.cache")
+		h.assetFile(loaderCachePath, "loaders.cache")
 		h.setenv("GDK_PIXBUF_MODULE_FILE", loaderCachePath)
 
 		gtkLibs = append(gtkLibs, libPngLoader)
