@@ -554,28 +554,50 @@ func (h *hugbox) appendRestrictedGtk2() ([]string, string, error) {
 		libAdwaita   = "libadwaita.so"
 		libPixmap    = "libpixmap.so"
 		libPngLoader = "libpixbufloader-png.so"
+		libPrintFile = "libprintbackend-file.so"
 
-		gtkSubDir = "gtk-2.0/2.10.0/engines"
-		gdkSubDir = "gdk-pixbuf-2.0/2.10.0/loaders"
+		engineSubDir = "gtk-2.0/2.10.0/engines"
+		printSubDir  = "gtk-2.0/2.10.0/printbackends"
+		gdkSubDir    = "gdk-pixbuf-2.0/2.10.0/loaders"
 	)
 
 	gtkLibs := []string{}
 	gtkLibPath := ""
+	setGtkPath := false
 
 	// Figure out where the system keeps the Gtk+-2.0 theme libraries,
 	// and bind mount in Adwaita and Pixmap.
-	adwaitaPath := findDistributionDependentLibs(gtkSubDir, libAdwaita)
+	adwaitaPath := findDistributionDependentLibs(engineSubDir, libAdwaita)
 	if adwaitaPath != "" {
 		gtkEngineDir, _ := filepath.Split(adwaitaPath)
 		normGtkEngineDir := filepath.Join(restrictedLibDir, "gtk-2.0", "2.10.0", "engines")
 		h.roBind(adwaitaPath, filepath.Join(normGtkEngineDir, libAdwaita), false)
 		h.roBind(filepath.Join(gtkEngineDir, libPixmap), filepath.Join(normGtkEngineDir, libPixmap), true)
-		h.setenv("GTK_PATH", filepath.Join(restrictedLibDir, "gtk-2.0"))
 
+		setGtkPath = true
 		gtkLibs = append(gtkLibs, libAdwaita)
 		gtkLibPath = gtkLibPath + ":" + gtkEngineDir
 	} else {
 		log.Printf("sandbox: Failed to find gtk-2.0 libadwaita.so.")
+	}
+
+	// Figure out where the system keeps the Gtk+-2.0 print backends,
+	// and bind mount in the file one.
+	printFilePath := findDistributionDependentLibs(printSubDir, libPrintFile)
+	if printFilePath != "" {
+		gtkPrintDir, _ := filepath.Split(printFilePath)
+		normGtkPrintDir := filepath.Join(restrictedLibDir, "gtk-2.0", "2.10.0", "printbackends")
+		h.roBind(printFilePath, filepath.Join(normGtkPrintDir, libPrintFile), false)
+
+		setGtkPath = true
+		gtkLibs = append(gtkLibs, libPrintFile)
+		gtkLibPath = gtkLibPath + ":" + gtkPrintDir
+	} else {
+		log.Printf("sandbox: Failed to find gtk-2.0 libprintbackend-file.so.")
+	}
+
+	if setGtkPath {
+		h.setenv("GTK_PATH", filepath.Join(restrictedLibDir, "gtk-2.0"))
 	}
 
 	// Figure out if the system gdk-pixbuf-2.0 needs loaders for common
