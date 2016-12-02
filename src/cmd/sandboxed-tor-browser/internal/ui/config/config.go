@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	gonet "net"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -414,6 +415,13 @@ func New() (*Config, error) {
 		if net, addr, err := butils.ParseControlPortString(env); err != nil {
 			return nil, fmt.Errorf("invalid control port: %v", err)
 		} else {
+			// Refuse to use TCP control ports not on the loopback interface.
+			if net == "tcp" {
+				host, _, _ := gonet.SplitHostPort(addr)
+				if !gonet.ParseIP(host).IsLoopback() {
+					return nil, fmt.Errorf("non-loopback control port: %v", host)
+				}
+			}
 			cfg.UseSystemTor = true
 			cfg.SystemTorControlNet = net
 			cfg.SystemTorControlAddr = addr
