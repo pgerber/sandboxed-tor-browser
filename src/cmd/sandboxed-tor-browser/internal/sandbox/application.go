@@ -172,6 +172,9 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (cm
 	h.bind(tor.SocksSurrogatePath(), socksPath, false)
 	h.assetFile(stubPath, "tbb_stub.so")
 
+	// Hardware accelerated OpenGL will not work, and never will.
+	h.setenv("LIBGL_ALWAYS_SOFTWARE", "1")
+
 	// Tor Browser currently is incompatible with PaX MPROTECT, apply the
 	// override if needed.
 	realFirefoxPath := filepath.Join(realBrowserHome, "firefox")
@@ -210,10 +213,15 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (cm
 			// "libc.so", - Uhhhhh.... wtf?
 			// "libcanberra.so.0", - Not ubiquitous.
 		}
+
+		glExtraLibs, glLibPaths := h.appendRestrictedOpenGL()
+		extraLibs = append(extraLibs, glExtraLibs...)
+		ldLibraryPath = ldLibraryPath + glLibPaths
+
 		if cfg.Sandbox.EnablePulseAudio && pulseAudioWorks {
 			const libPulse = "libpulse.so.0"
 
-			paLibsPath := findDistributionDependentLibs("", "pulseaudio")
+			paLibsPath := findDistributionDependentLibs(nil, "", "pulseaudio")
 			if paLibsPath != "" && cache.GetLibraryPath(libPulse) != "" {
 				const restrictedPulseDir = "/usr/lib/pulseaudio"
 
@@ -539,14 +547,40 @@ func newConsoleLogger(prefix string) *consoleLogger {
 	return l
 }
 
-func findDistributionDependentLibs(subDir, fn string) string {
-	for _, base := range distributionDependentLibSearchPath {
+func findDistributionDependentLibs(extraSearch []string, subDir, fn string) string {
+	var searchPaths []string
+	searchPaths = append(searchPaths, extraSearch...)
+	searchPaths = append(searchPaths, distributionDependentLibSearchPath...)
+
+	for _, base := range searchPaths {
 		candidate := filepath.Join(base, subDir, fn)
 		if FileExists(candidate) {
 			return candidate
 		}
 	}
 	return ""
+}
+
+func (h *hugbox) appendRestrictedOpenGL() ([]string, string) {
+	const (
+		archXorgDir = "/usr/lib/xorg/modules"
+		swrastDri   = "swrast_dri.so"
+	)
+
+	swrastPath := findDistributionDependentLibs([]string{archXorgDir}, "dri", swrastDri)
+	if swrastPath != "" {
+		// Debian needs libGL.so.1 explicitly specified.
+		retLibs := []string{swrastDri, "libGL.so.1"}
+
+		driDir, _ := filepath.Split(swrastPath)
+		restrictedDriDir := filepath.Join(restrictedLibDir, "dri")
+		h.roBind(swrastPath, filepath.Join(restrictedDriDir, swrastDri), false)
+		h.setenv("LIBGL_DRIVERS_PATH", restrictedDriDir)
+
+		return retLibs, ":" + driDir
+	}
+
+	return nil, ""
 }
 
 func (h *hugbox) appendRestrictedGtk2() ([]string, string, error) {
@@ -567,7 +601,7 @@ func (h *hugbox) appendRestrictedGtk2() ([]string, string, error) {
 
 	// Figure out where the system keeps the Gtk+-2.0 theme libraries,
 	// and bind mount in Adwaita and Pixmap.
-	adwaitaPath := findDistributionDependentLibs(engineSubDir, libAdwaita)
+	adwaitaPath := findDistributionDependentLibs(nil, engineSubDir, libAdwaita)
 	if adwaitaPath != "" {
 		gtkEngineDir, _ := filepath.Split(adwaitaPath)
 		normGtkEngineDir := filepath.Join(restrictedLibDir, "gtk-2.0", "2.10.0", "engines")
@@ -583,7 +617,7 @@ func (h *hugbox) appendRestrictedGtk2() ([]string, string, error) {
 
 	// Figure out where the system keeps the Gtk+-2.0 print backends,
 	// and bind mount in the file one.
-	printFilePath := findDistributionDependentLibs(printSubDir, libPrintFile)
+	printFilePath := findDistributionDependentLibs(nil, printSubDir, libPrintFile)
 	if printFilePath != "" {
 		gtkPrintDir, _ := filepath.Split(printFilePath)
 		normGtkPrintDir := filepath.Join(restrictedLibDir, "gtk-2.0", "2.10.0", "printbackends")
@@ -603,7 +637,7 @@ func (h *hugbox) appendRestrictedGtk2() ([]string, string, error) {
 	// Figure out if the system gdk-pixbuf-2.0 needs loaders for common
 	// file formats.  Arch and Fedora 25 do not.  Debian does.  As far as
 	// I can tell, the only file format we actually care about is PNG.
-	pngLoaderPath := findDistributionDependentLibs(gdkSubDir, libPngLoader)
+	pngLoaderPath := findDistributionDependentLibs(nil, gdkSubDir, libPngLoader)
 	if pngLoaderPath != "" {
 		loaderDir, _ := filepath.Split(pngLoaderPath)
 		normGdkPath := filepath.Join(restrictedLibDir, "gdk-pixbuf-2.0", "2.10.0")
