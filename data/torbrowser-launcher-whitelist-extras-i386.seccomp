@@ -15,3 +15,5 @@ set_thread_area: 1
 recv: 1
 send: 1
 socketcall: 1
+
+waitpid: 1
