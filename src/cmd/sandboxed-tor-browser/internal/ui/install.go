@@ -272,6 +272,13 @@ func (c *Common) doUpdate(async *Async, dialFn dialFunc) {
 		return
 	}
 
+	// Shutdown the old tor now.
+	if c.tor != nil {
+		log.Printf("update: Shutting down old tor.")
+		c.tor.Shutdown()
+		c.tor = nil
+	}
+
 	// Apply the update.
 	log.Printf("update: Updating Tor Browser.")
 	async.UpdateProgress("Updating Tor Browser.")
