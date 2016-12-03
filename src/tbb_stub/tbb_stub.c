@@ -48,10 +48,7 @@
 #include <stdlib.h>
 #include <X11/Xlib.h>
 
-#ifdef __i386__
-#include <sys/time.h>
-#include <sys/resource.h>
-#else
+#ifndef __i386__
 #include <glob.h>
 #include <stdbool.h>
 #endif
@@ -179,28 +176,7 @@ XQueryExtension(Display *display, _Xconst char *name, int *major, int *event, in
   return real_XQueryExtension(display, name, major, event, error);
 }
 
-#ifdef __i386__
-
-static int (*real_getrlimit)(__rlimit_resource_t, struct rlimit *);
-
-int
-getrlimit(__rlimit_resource_t resource, struct rlimit *rlim)
-{
-  /* I have no fucking idea why, on i386 systems rlimit starts failing
-   * randomly deep inside firefox, even with the appropriate system calls
-   * whitelisted.  Hooking it, makes the problem go away for extra fun.
-   */
-  if (real_getrlimit == NULL) {
-    if ((real_getrlimit = dlsym(RTLD_NEXT, "getrlimit")) == NULL) {
-      fprintf(stderr, "ERROR: Failed to find `getrlimit() symbol: %s\n", dlerror());
-      abort();
-    }
-  }
-
-  return real_getrlimit(resource, rlim);
-}
-
-#else
+#ifndef __i386__
 
 typedef struct pa_mutex pm;
 static pm* (*real_pa_mutex_new)(bool, bool);

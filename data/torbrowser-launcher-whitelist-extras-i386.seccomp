@@ -19,6 +19,7 @@ getresgid32: 1
 time: 1
 getuid32: 1
 getgid32: 1
+ugetrlimit: 1
 
 recv: 1
 send: 1
