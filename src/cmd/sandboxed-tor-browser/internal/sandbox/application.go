@@ -232,6 +232,15 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (cm
 				ldLibraryPath = ldLibraryPath + ":" + paLibsPath
 				h.roBind(paLibsPath, restrictedPulseDir, false)
 				extraLdLibraryPath = extraLdLibraryPath + ":" + restrictedPulseDir
+
+				matches, err := filepath.Glob(paLibsPath + "/*.so")
+				if err != nil {
+					return nil, err
+				}
+				for _, v := range matches {
+					_, f := filepath.Split(v)
+					extraLibs = append(extraLibs, f)
+				}
 			} else {
 				log.Printf("sandbox: Failed to find pulse audio libraries.")
 			}

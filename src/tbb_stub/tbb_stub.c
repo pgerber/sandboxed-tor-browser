@@ -51,6 +51,9 @@
 #ifdef __i386__
 #include <sys/time.h>
 #include <sys/resource.h>
+#else
+#include <glob.h>
+#include <stdbool.h>
 #endif
 
 static pthread_once_t stub_init_once = PTHREAD_ONCE_INIT;
@@ -177,6 +180,7 @@ XQueryExtension(Display *display, _Xconst char *name, int *major, int *event, in
 }
 
 #ifdef __i386__
+
 static int (*real_getrlimit)(__rlimit_resource_t, struct rlimit *);
 
 int
@@ -195,6 +199,83 @@ getrlimit(__rlimit_resource_t resource, struct rlimit *rlim)
 
   return real_getrlimit(resource, rlim);
 }
+
+#else
+
+typedef struct pa_mutex pm;
+static pm* (*real_pa_mutex_new)(bool, bool);
+
+static char *
+glob_library(const char *lib_glob) {
+  glob_t gb;
+  char *lib = NULL;
+  size_t i;
+
+  if (glob(lib_glob, GLOB_MARK, NULL, &gb) != 0) {
+    return NULL;
+  }
+
+  for (i = 0; i < gb.gl_pathc; i++) {
+    const char *path = gb.gl_pathv[i];
+    size_t plen = strlen(path);
+
+    if (plen > 0 && path[plen] != '/') {
+      lib = strndup(path, plen);
+      break;
+    }
+  }
+
+  globfree(&gb);
+
+  return lib;
+}
+
+/* There are rumors that PI futexes have scary race conditions, that enable
+ * an exploit that is being sold by the forces of darkness.  On systems where
+ * we can filter futex kernel args, we reject such calls.
+ *
+ * However this breaks PulseAudio, because PI futex usage is determined at
+ * compile time.  This fixes up the mutex creation call, to never request PI
+ * mutexes.
+ *
+ * Thanks to the unnamed reporter who filed the issues on the tails, bug
+ * tracker and chatted with me on IRC about it.
+ * See: https://labs.riseup.net/code/issues/11524
+ *
+ * Note: This could be enabled unconditionally (ie: also on x86), but since
+ * that platform doesn't filter syscalls by argument due to seccomp-bpf
+ * limitations, it seems somewhat pointless.
+ */
+pm *
+pa_mutex_new(bool recursive, bool inherit_priority) {
+  (void) inherit_priority;
+
+  pthread_once(&stub_init_once, stub_init);
+
+  if (real_pa_mutex_new == NULL) {
+    void *handle;
+    char *lib;
+
+    if ((lib = glob_library("/usr/lib/pulseaudio/libpulsecore-*.so")) == NULL) {
+      fprintf(stderr, "ERROR: Failed to find `libpulsecore-*.so`");
+      abort();
+    }
+
+    if ((handle = real_dlopen(lib, RTLD_LAZY|RTLD_LOCAL)) == NULL) {
+      fprintf(stderr, "ERROR: Failed to dlopen() libpulsecore.so: %s\n", dlerror());
+      abort();
+    }
+    free(lib);
+
+    if ((real_pa_mutex_new = dlsym(handle, "pa_mutex_new")) == NULL) {
+      fprintf(stderr, "ERROR: Failed to find `pa_mutex_new()` symbol: %s\n", dlerror());
+      abort();
+    }
+    dlclose(handle);
+  }
+  return real_pa_mutex_new(recursive, false);
+}
+
 #endif
 
 /*  Initialize the stub. */
