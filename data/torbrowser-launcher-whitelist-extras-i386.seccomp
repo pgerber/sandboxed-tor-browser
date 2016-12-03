@@ -17,6 +17,8 @@ set_thread_area: 1
 getresuid32: 1
 getresgid32: 1
 time: 1
+getuid32: 1
+getgid32: 1
 
 recv: 1
 send: 1
