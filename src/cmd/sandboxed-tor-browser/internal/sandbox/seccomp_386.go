@@ -95,12 +95,17 @@ func installSeccomp(fd *os.File, assets []string, isBlacklist bool) error {
 			scallName := string(bytes.TrimSpace(sp[0]))
 			scall, err := seccomp.GetSyscallFromName(scallName)
 			if err != nil {
-				// Continue instead of failing on ENOSYS.  gosecco will fail
-				// here, but this allows whitelists to be more futureproof,
-				// and handles thing like Debian prehistoric^wstable missing
-				// system calls that we would like to allow like `getrandom`.
-				log.Printf("seccomp: unknown system call: %v", scallName)
-				continue
+				if scallName == "newselect" {
+					// The library doesn't have "NR_newselect" yet.
+					scall = seccomp.ScmpSyscall(142)
+				} else {
+					// Continue instead of failing on ENOSYS.  gosecco will fail
+					// here, but this allows whitelists to be more futureproof,
+					// and handles thing like Debian prehistoric^wstable missing
+					// system calls that we would like to allow like `getrandom`.
+					log.Printf("seccomp: unknown system call: %v", scallName)
+					continue
+				}
 			}
 
 			// If the system call is present, just add it.  This is x86,

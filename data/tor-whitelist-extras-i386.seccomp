@@ -14,6 +14,7 @@ fcntl64: 1
 stat64: 1
 
 ugetrlimit: 1
+newselect: 1
 
 # tor's sandbox code claims that these calls are required on x86 but not on
 # x86_64.  tor's sandbox attempts to filter socketcall's arguments as well
