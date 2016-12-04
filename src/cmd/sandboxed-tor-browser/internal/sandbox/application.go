@@ -28,6 +28,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strings"
 	"syscall"
 
 	"cmd/sandboxed-tor-browser/internal/dynlib"
@@ -230,16 +231,40 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (cm
 				// you.
 				extraLibs = append(extraLibs, libPulse)
 				ldLibraryPath = ldLibraryPath + ":" + paLibsPath
-				h.roBind(paLibsPath, restrictedPulseDir, false)
+				h.dir(restrictedPulseDir)
 				extraLdLibraryPath = extraLdLibraryPath + ":" + restrictedPulseDir
 
+				boundPulseCore := false
 				matches, err := filepath.Glob(paLibsPath + "/*.so")
 				if err != nil {
 					return nil, err
 				}
 				for _, v := range matches {
 					_, f := filepath.Split(v)
+					if strings.HasPrefix(f, "libpulsecore") {
+						boundPulseCore = true
+					}
+					h.roBind(v, filepath.Join(restrictedPulseDir, f), false)
 					extraLibs = append(extraLibs, f)
+				}
+
+				if !boundPulseCore {
+					// Debian sticks libpulsecore-blah.so in /usr/lib, unlike
+					// everyone else who sticks it in /usr/lib/pulseaudo,
+					// because fuck you.
+					matches, err = filepath.Glob("/usr/lib/libpulsecore-*.so")
+					if err != nil {
+						return nil, err
+					}
+					if len(matches) == 0 {
+						log.Printf("sandbox: Failed to find `libpulsecore-<version>.so`, audio will crash the browser.")
+					} else {
+						for _, v := range matches {
+							_, f := filepath.Split(v)
+							h.roBind(v, filepath.Join(restrictedPulseDir, f), false)
+							extraLibs = append(extraLibs, f)
+						}
+					}
 				}
 			} else {
 				log.Printf("sandbox: Failed to find pulse audio libraries.")

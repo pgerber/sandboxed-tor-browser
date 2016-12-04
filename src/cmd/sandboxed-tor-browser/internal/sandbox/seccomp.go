@@ -16,7 +16,13 @@
 
 package sandbox
 
-import "os"
+import (
+	"log"
+	"os"
+	"runtime"
+
+	seccomp "github.com/seccomp/libseccomp-golang"
+)
 
 const (
 	torBrowserWhitelist = "torbrowser-launcher-whitelist.seccomp"
@@ -25,19 +31,115 @@ const (
 	basicBlacklist      = "blacklist.seccomp"
 )
 
-func installTorBrowserSeccompProfile(fd *os.File) error {
-	return installSeccomp(fd, torBrowserSeccompAssets, false)
-}
+const (
+	madvNormal    = 0 // MADV_NORMAL
+	madvDontneed  = 4 // MADV_DONTNEED
+	madvFree      = 8 // MADV_FREE
+	mremapMaymove = 1
 
-func installTorSeccompProfile(fd *os.File, useBridges bool) error {
-	assets := torSeccompAssets
-	if useBridges {
-		assets = torObfs4SeccompAssets
-	}
+	sigBlock   = 1 // SIG_BLOCK
+	sigSetmask = 2 // SIG_SETMASK
 
-	return installSeccomp(fd, assets, false)
-}
+	futexWait          = 0
+	futexWake          = 1
+	futexFd            = 2
+	futexRequeue       = 3
+	futexCmpRequeue    = 4
+	futexWakeOp        = 5
+	futexLockPi        = 6
+	futexUnlockPi      = 7
+	futexTrylockPi     = 8
+	futexWaitBitset    = 9
+	futexWakeBitset    = 10
+	futexWaitRequeuePi = 11
+	futexCmpRequeuePi  = 12
+
+	futexPrivateFlag   = 128
+	futexClockRealtime = 256
+
+	futexWaitPrivate          = futexWait | futexPrivateFlag
+	futexWakePrivate          = futexWake | futexPrivateFlag
+	futexRequeuePrivate       = futexRequeue | futexPrivateFlag
+	futexCmpRequeuePrivate    = futexCmpRequeue | futexPrivateFlag
+	futexWakeOpPrivate        = futexWakeOp | futexPrivateFlag
+	futexLockPiPrivate        = futexLockPi | futexPrivateFlag
+	futexUnlockPiPrivate      = futexUnlockPi | futexPrivateFlag
+	futexTrylockPiPrivate     = futexTrylockPi | futexPrivateFlag
+	futexWaitBitsetPrivate    = futexWaitBitset | futexPrivateFlag
+	futexWakeBitsetPrivate    = futexWakeBitset | futexPrivateFlag
+	futexWaitRequeuePiPrivate = futexWaitRequeuePi | futexPrivateFlag
+	futexCmpRequeuePiPrivate  = futexCmpRequeuePi | futexPrivateFlag
+
+	pollIn = 1
+
+	fionread  = 0x541b
+	tcgets    = 0x5401
+	tiocgpgrp = 0x540f
+)
 
 func installBasicSeccompBlacklist(fd *os.File) error {
 	return installSeccomp(fd, blacklistSeccompAssets, true)
+}
+
+func newWhitelist() (*seccomp.ScmpFilter, error) {
+	arch, err := seccomp.GetNativeArch()
+	if err != nil {
+		return nil, err
+	}
+
+	actENOSYS := seccomp.ActErrno.SetReturnCode(38)
+	f, err := seccomp.NewFilter(actENOSYS)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = f.AddArch(arch); err != nil {
+		f.Release()
+		return nil, err
+	}
+
+	return f, nil
+}
+
+func allowSyscalls(f *seccomp.ScmpFilter, calls []string) error {
+	for _, scallName := range calls {
+		scall, err := seccomp.GetSyscallFromName(scallName)
+		if err != nil {
+			if is386() && scallName == "newselect" {
+				scall = seccomp.ScmpSyscall(142)
+			} else {
+				log.Printf("seccomp: unknown system call: %v", scallName)
+				continue
+			}
+		}
+		if err = f.AddRule(scall, seccomp.ActAllow); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func allowCmpEq(f *seccomp.ScmpFilter, scallName string, arg uint, values ...uint64) error {
+	scall, err := seccomp.GetSyscallFromName(scallName)
+	if err != nil {
+		log.Printf("seccomp: unknown system call: %v", scallName)
+		return nil
+	}
+
+	// Allow if the arg matches any of the values.  Implemented as multiple
+	// rules.
+	for _, v := range values {
+		argIsEqual, err := seccomp.MakeCondition(arg, seccomp.CompareEqual, v)
+		if err != nil {
+			return err
+		}
+		if err = f.AddRuleConditional(scall, seccomp.ActAllow, []seccomp.ScmpCondition{argIsEqual}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func is386() bool {
+	return runtime.GOARCH == "386"
 }

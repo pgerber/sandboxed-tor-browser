@@ -48,10 +48,8 @@
 #include <stdlib.h>
 #include <X11/Xlib.h>
 
-#ifndef __i386__
 #include <glob.h>
 #include <stdbool.h>
-#endif
 
 static pthread_once_t stub_init_once = PTHREAD_ONCE_INIT;
 static int (*real_connect)(int, const struct sockaddr *, socklen_t) = NULL;
@@ -176,8 +174,6 @@ XQueryExtension(Display *display, _Xconst char *name, int *major, int *event, in
   return real_XQueryExtension(display, name, major, event, error);
 }
 
-#ifndef __i386__
-
 typedef struct pa_mutex pm;
 static pm* (*real_pa_mutex_new)(bool, bool);
 
@@ -251,8 +247,6 @@ pa_mutex_new(bool recursive, bool inherit_priority) {
   }
   return real_pa_mutex_new(recursive, false);
 }
-
-#endif
 
 /*  Initialize the stub. */
 static void
