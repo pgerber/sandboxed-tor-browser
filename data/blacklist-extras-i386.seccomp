@@ -1,5 +1,0 @@
-# Seccomp blacklist i386 specific rules  that will be installed in adition to
-# blacklist.seccomp.
-
-vm86: 1 
-vm86old: 1

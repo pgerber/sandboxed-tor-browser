@@ -18,17 +18,9 @@ package sandbox
 
 import (
 	"log"
-	"os"
 	"runtime"
 
 	seccomp "github.com/seccomp/libseccomp-golang"
-)
-
-const (
-	torBrowserWhitelist = "torbrowser-launcher-whitelist.seccomp"
-	torWhitelist        = "tor-whitelist.seccomp"
-	torObfs4Whitelist   = "tor-obfs4-whitelist.seccomp"
-	basicBlacklist      = "blacklist.seccomp"
 )
 
 const (
@@ -76,10 +68,6 @@ const (
 	tcgets    = 0x5401
 	tiocgpgrp = 0x540f
 )
-
-func installBasicSeccompBlacklist(fd *os.File) error {
-	return installSeccomp(fd, blacklistSeccompAssets, true)
-}
 
 func newWhitelist() (*seccomp.ScmpFilter, error) {
 	arch, err := seccomp.GetNativeArch()
