@@ -1,7 +1,0 @@
-
-# a comment
-
-something(a) = 1 + a
-
-read: something(b)
-
