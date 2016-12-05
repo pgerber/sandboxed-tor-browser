@@ -14,18 +14,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-package sandbox
+package main
 
 import (
 	"os"
 	"syscall"
-	//	seccomp "github.com/seccomp/libseccomp-golang"
 )
 
-func installTorBrowserSeccompProfile(fd *os.File) error {
+func compileTorBrowserSeccompProfile(fd *os.File, is386 bool) error {
 	defer fd.Close()
 
-	f, err := newWhitelist()
+	f, err := newWhitelist(is386)
 	if err != nil {
 		return err
 	}
@@ -184,7 +183,7 @@ func installTorBrowserSeccompProfile(fd *os.File) error {
 		// "memfd_create", (PulseAudio?  Won't work in our container.)
 		// "personality",
 	}
-	if is386() {
+	if is386 {
 		allowedNoArgs386 := []string{
 			"fadvise64_64",
 			"fcntl64",
@@ -216,7 +215,7 @@ func installTorBrowserSeccompProfile(fd *os.File) error {
 		}
 		allowedNoArgs = append(allowedNoArgs, allowedNoArgs386...)
 	}
-	if err = allowSyscalls(f, allowedNoArgs); err != nil {
+	if err = allowSyscalls(f, allowedNoArgs, is386); err != nil {
 		return err
 	}
 
@@ -236,7 +235,7 @@ func installTorBrowserSeccompProfile(fd *os.File) error {
 		return err
 	}
 
-	if is386() {
+	if is386 {
 		if err = allowCmpEq(f, "time", 0, 0); err != nil {
 			return err
 		}

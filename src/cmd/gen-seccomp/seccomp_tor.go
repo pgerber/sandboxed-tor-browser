@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-package sandbox
+package main
 
 import (
 	"os"
@@ -23,10 +23,10 @@ import (
 	seccomp "github.com/seccomp/libseccomp-golang"
 )
 
-func installTorSeccompProfile(fd *os.File, useBridges bool) error {
+func compileTorSeccompProfile(fd *os.File, useBridges bool, is386 bool) error {
 	defer fd.Close()
 
-	f, err := newWhitelist()
+	f, err := newWhitelist(is386)
 	if err != nil {
 		return err
 	}
@@ -106,7 +106,7 @@ func installTorSeccompProfile(fd *os.File, useBridges bool) error {
 		"set_tid_address",
 		"unshare",
 	}
-	if is386() {
+	if is386 {
 		allowedNoArgs386 := []string{
 			"fstat64",
 			"getegid32",
@@ -121,14 +121,13 @@ func installTorSeccompProfile(fd *os.File, useBridges bool) error {
 			"send",
 			"stat64",
 			"socketcall", // Sigh... (see accept4 in the tor code)
-			"prlimit",
 
 			"ugetrlimit",
 			"set_thread_area",
 		}
 		allowedNoArgs = append(allowedNoArgs, allowedNoArgs386...)
 	}
-	if err = allowSyscalls(f, allowedNoArgs); err != nil {
+	if err = allowSyscalls(f, allowedNoArgs, is386); err != nil {
 		return err
 	}
 
@@ -165,19 +164,19 @@ func installTorSeccompProfile(fd *os.File, useBridges bool) error {
 	if err = torFilterPoll(f); err != nil {
 		return err
 	}
-	if err = torFilterSocket(f); err != nil {
+	if err = torFilterSocket(f, is386); err != nil {
 		return err
 	}
-	if err = torFilterSetsockopt(f); err != nil {
+	if err = torFilterSetsockopt(f, is386); err != nil {
 		return err
 	}
-	if err = torFilterGetsockopt(f); err != nil {
+	if err = torFilterGetsockopt(f, is386); err != nil {
 		return err
 	}
-	if err = torFilterSocketpair(f); err != nil {
+	if err = torFilterSocketpair(f, is386); err != nil {
 		return err
 	}
-	if err = torFilterMmap(f); err != nil {
+	if err = torFilterMmap(f, is386); err != nil {
 		return err
 	}
 
@@ -194,10 +193,10 @@ func installTorSeccompProfile(fd *os.File, useBridges bool) error {
 			"getpeername",
 			"getppid",
 		}
-		if is386() {
+		if is386 {
 			obfsCalls = append(obfsCalls, "newselect")
 		}
-		if err = allowSyscalls(f, obfsCalls); err != nil {
+		if err = allowSyscalls(f, obfsCalls, is386); err != nil {
 			return err
 		}
 
@@ -211,10 +210,10 @@ func installTorSeccompProfile(fd *os.File, useBridges bool) error {
 		if err = allowCmpEq(f, "futex", 1, futexWake, futexWait); err != nil {
 			return err
 		}
-		if err = obfsFilterSetsockopt(f); err != nil {
+		if err = obfsFilterSetsockopt(f, is386); err != nil {
 			return err
 		}
-		if err = obfsFilterMmap(f); err != nil {
+		if err = obfsFilterMmap(f, is386); err != nil {
 			return err
 		}
 	}
@@ -264,12 +263,12 @@ func torFilterPoll(f *seccomp.ScmpFilter) error {
 	return f.AddRuleConditional(scall, seccomp.ActAllow, []seccomp.ScmpCondition{isPollIn, timeoutIsTen})
 }
 
-func torFilterSocket(f *seccomp.ScmpFilter) error {
+func torFilterSocket(f *seccomp.ScmpFilter, is386 bool) error {
 	scall, err := seccomp.GetSyscallFromName("socket")
 	if err != nil {
 		return err
 	}
-	if is386() {
+	if is386 {
 		return f.AddRule(scall, seccomp.ActAllow)
 	}
 
@@ -277,12 +276,12 @@ func torFilterSocket(f *seccomp.ScmpFilter) error {
 	return allowCmpEq(f, "socket", 0, syscall.AF_UNIX, syscall.AF_INET, syscall.AF_INET6, syscall.AF_NETLINK)
 }
 
-func torFilterSetsockopt(f *seccomp.ScmpFilter) error {
+func torFilterSetsockopt(f *seccomp.ScmpFilter, is386 bool) error {
 	scall, err := seccomp.GetSyscallFromName("setsockopt")
 	if err != nil {
 		return err
 	}
-	if is386() {
+	if is386 {
 		return f.AddRule(scall, seccomp.ActAllow)
 	}
 
@@ -310,12 +309,12 @@ func torFilterSetsockopt(f *seccomp.ScmpFilter) error {
 	return nil
 }
 
-func torFilterGetsockopt(f *seccomp.ScmpFilter) error {
+func torFilterGetsockopt(f *seccomp.ScmpFilter, is386 bool) error {
 	scall, err := seccomp.GetSyscallFromName("getsockopt")
 	if err != nil {
 		return err
 	}
-	if is386() {
+	if is386 {
 		return f.AddRule(scall, seccomp.ActAllow)
 	}
 
@@ -330,12 +329,12 @@ func torFilterGetsockopt(f *seccomp.ScmpFilter) error {
 	return f.AddRuleConditional(scall, seccomp.ActAllow, []seccomp.ScmpCondition{isSolSocket, optIsError})
 }
 
-func torFilterSocketpair(f *seccomp.ScmpFilter) error {
+func torFilterSocketpair(f *seccomp.ScmpFilter, is386 bool) error {
 	scall, err := seccomp.GetSyscallFromName("socketpair")
 	if err != nil {
 		return err
 	}
-	if is386() {
+	if is386 {
 		return f.AddRule(scall, seccomp.ActAllow)
 	}
 
@@ -362,13 +361,13 @@ func torFilterSocketpair(f *seccomp.ScmpFilter) error {
 	return nil
 }
 
-func torFilterMmap(f *seccomp.ScmpFilter) error {
+func torFilterMmap(f *seccomp.ScmpFilter, is386 bool) error {
 	scallMmap, err := seccomp.GetSyscallFromName("mmap")
 	if err != nil {
 		return err
 	}
 	scalls := []seccomp.ScmpSyscall{scallMmap}
-	if is386() {
+	if is386 {
 		scallMmap2, err := seccomp.GetSyscallFromName("mmap2")
 		if err != nil {
 			return err
@@ -448,9 +447,9 @@ func torFilterMmap(f *seccomp.ScmpFilter) error {
 	return nil
 }
 
-func obfsFilterSetsockopt(f *seccomp.ScmpFilter) error {
+func obfsFilterSetsockopt(f *seccomp.ScmpFilter, is386 bool) error {
 	// 386 already blindly allows all setsockopt() calls.
-	if is386() {
+	if is386 {
 		return nil
 	}
 
@@ -499,13 +498,13 @@ func obfsFilterSetsockopt(f *seccomp.ScmpFilter) error {
 }
 
 // `mmap` -> `arg2 == PROT_NONE && (arg3 == MAP_PRIVATE|MAP_ANONYMOUS || arg3 == MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS)`
-func obfsFilterMmap(f *seccomp.ScmpFilter) error {
+func obfsFilterMmap(f *seccomp.ScmpFilter, is386 bool) error {
 	scallMmap, err := seccomp.GetSyscallFromName("mmap")
 	if err != nil {
 		return err
 	}
 	scalls := []seccomp.ScmpSyscall{scallMmap}
-	if is386() {
+	if is386 {
 		scallMmap2, err := seccomp.GetSyscallFromName("mmap2")
 		if err != nil {
 			return err
