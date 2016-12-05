@@ -17,7 +17,7 @@
 package main
 
 import (
-	"log"
+	"fmt"
 
 	seccomp "github.com/seccomp/libseccomp-golang"
 )
@@ -98,8 +98,7 @@ func allowSyscalls(f *seccomp.ScmpFilter, calls []string, is386 bool) error {
 			if is386 && scallName == "newselect" {
 				scall = seccomp.ScmpSyscall(142)
 			} else {
-				log.Printf("seccomp: unknown system call: %v", scallName)
-				continue
+				return fmt.Errorf("seccomp: unknown system call: %v", scallName)
 			}
 		}
 		if err = f.AddRule(scall, seccomp.ActAllow); err != nil {
@@ -112,8 +111,7 @@ func allowSyscalls(f *seccomp.ScmpFilter, calls []string, is386 bool) error {
 func allowCmpEq(f *seccomp.ScmpFilter, scallName string, arg uint, values ...uint64) error {
 	scall, err := seccomp.GetSyscallFromName(scallName)
 	if err != nil {
-		log.Printf("seccomp: unknown system call: %v", scallName)
-		return nil
+		return fmt.Errorf("seccomp: unknown system call: %v", scallName)
 	}
 
 	// Allow if the arg matches any of the values.  Implemented as multiple

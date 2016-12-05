@@ -115,7 +115,6 @@ func compileTorSeccompProfile(fd *os.File, useBridges bool, is386 bool) error {
 			"recv",
 			"send",
 			"stat64",
-			"socketcall", // Sigh...
 
 			"ugetrlimit",
 			"set_thread_area",
@@ -254,7 +253,8 @@ func torFilterAccept4(f *seccomp.ScmpFilter, is386 bool) error {
 	}
 	if is386 {
 		// XXX: The tor common/sandbox.c file, explcitly allows socketcall()
-		// by arg for this call, and only this call. ??????
+		// by arg for this call, and only this call, when libseccomp should
+		// do the right thing.
 		return f.AddRule(scall, seccomp.ActAllow)
 	}
 

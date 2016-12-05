@@ -209,7 +209,6 @@ func compileTorBrowserSeccompProfile(fd *os.File, is386 bool) error {
 			"recv",
 			"send",
 			"newselect",
-			"socketcall",
 
 			"socket", // Filtered on amd64.
 		}
