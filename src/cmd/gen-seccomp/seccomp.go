@@ -84,6 +84,9 @@ func newWhitelist(is386 bool) (*seccomp.ScmpFilter, error) {
 		f.Release()
 		return nil, err
 	}
+	if err = f.SetBadArchAction(seccomp.ActKill); err != nil {
+		return nil, err
+	}
 
 	return f, nil
 }

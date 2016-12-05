@@ -43,7 +43,6 @@ func compileTorSeccompProfile(fd *os.File, useBridges bool, is386 bool) error {
 		"eventfd2",
 		"pipe2",
 		"pipe",
-		"fcntl",
 		"fstat",
 		"getdents",
 		"getdents64",
@@ -84,10 +83,6 @@ func compileTorSeccompProfile(fd *os.File, useBridges bool, is386 bool) error {
 		"sendto",
 		"unlink",
 
-		// XXX: Calls that should be filtered by arg, but aren't yet.
-		"rt_sigaction",
-		"accept4",
-
 		// Calls that tor can filter, but I can't due to not being in
 		// the tor daemon's process space.
 		"chown",
@@ -105,6 +100,7 @@ func compileTorSeccompProfile(fd *os.File, useBridges bool, is386 bool) error {
 		"restart_syscall",
 		"set_tid_address",
 		"unshare",
+		"rt_sigaction", // Tor filters this but libc does more.
 	}
 	if is386 {
 		allowedNoArgs386 := []string{
@@ -115,12 +111,11 @@ func compileTorSeccompProfile(fd *os.File, useBridges bool, is386 bool) error {
 			"getuid32",
 			"_llseek",
 			"sigreturn",
-			"fcntl64", // XXX: Filter by arg.
 
 			"recv",
 			"send",
 			"stat64",
-			"socketcall", // Sigh... (see accept4 in the tor code)
+			"socketcall", // Sigh...
 
 			"ugetrlimit",
 			"set_thread_area",
@@ -161,6 +156,9 @@ func compileTorSeccompProfile(fd *os.File, useBridges bool, is386 bool) error {
 	if err = allowCmpEq(f, "mremap", 3, mremapMaymove); err != nil {
 		return err
 	}
+	if err = torFilterAccept4(f, is386); err != nil {
+		return err
+	}
 	if err = torFilterPoll(f); err != nil {
 		return err
 	}
@@ -177,6 +175,9 @@ func compileTorSeccompProfile(fd *os.File, useBridges bool, is386 bool) error {
 		return err
 	}
 	if err = torFilterMmap(f, is386); err != nil {
+		return err
+	}
+	if err = torFilterFcntl(f, is386); err != nil {
 		return err
 	}
 
@@ -246,6 +247,25 @@ func torFilterPrctl(f *seccomp.ScmpFilter) error {
 	return f.AddRuleConditional(scall, seccomp.ActAllow, []seccomp.ScmpCondition{isPrSetDeathsig})
 }
 
+func torFilterAccept4(f *seccomp.ScmpFilter, is386 bool) error {
+	scall, err := seccomp.GetSyscallFromName("accept4")
+	if err != nil {
+		return err
+	}
+	if is386 {
+		// XXX: The tor common/sandbox.c file, explcitly allows socketcall()
+		// by arg for this call, and only this call. ??????
+		return f.AddRule(scall, seccomp.ActAllow)
+	}
+
+	cond, err := seccomp.MakeCondition(3, seccomp.CompareMaskedEqual, 0, syscall.SOCK_CLOEXEC|syscall.SOCK_NONBLOCK)
+	if err != nil {
+		return nil
+	}
+
+	return f.AddRuleConditional(scall, seccomp.ActAllow, []seccomp.ScmpCondition{cond})
+}
+
 func torFilterPoll(f *seccomp.ScmpFilter) error {
 	scall, err := seccomp.GetSyscallFromName("poll")
 	if err != nil {
@@ -273,7 +293,7 @@ func torFilterSocket(f *seccomp.ScmpFilter, is386 bool) error {
 	}
 
 	// XXX: Tighten this some more.
-	return allowCmpEq(f, "socket", 0, syscall.AF_UNIX, syscall.AF_INET, syscall.AF_INET6, syscall.AF_NETLINK)
+	return allowCmpEq(f, "socket", 0, syscall.AF_UNIX, syscall.AF_INET, syscall.AF_INET6 /*, syscall.AF_NETLINK */)
 }
 
 func torFilterSetsockopt(f *seccomp.ScmpFilter, is386 bool) error {
@@ -440,6 +460,67 @@ func torFilterMmap(f *seccomp.ScmpFilter, is386 bool) error {
 	}
 	for _, scall := range scalls {
 		if err = f.AddRuleConditional(scall, seccomp.ActAllow, []seccomp.ScmpCondition{isProtReadExec, isProtReadExecFlags}); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func torFilterFcntl(f *seccomp.ScmpFilter, is386 bool) error {
+	scallFcntl, err := seccomp.GetSyscallFromName("fcntl")
+	if err != nil {
+		return err
+	}
+	scalls := []seccomp.ScmpSyscall{scallFcntl}
+	if is386 {
+		scallFcntl64, err := seccomp.GetSyscallFromName("fcntl64")
+		if err != nil {
+			return err
+		}
+		scalls = append(scalls, scallFcntl64)
+	}
+
+	isFGetfl, err := seccomp.MakeCondition(1, seccomp.CompareEqual, syscall.F_GETFL)
+	if err != nil {
+		return err
+	}
+	isFGetfd, err := seccomp.MakeCondition(1, seccomp.CompareEqual, syscall.F_GETFD)
+	if err != nil {
+		return err
+	}
+
+	isFSetfl, err := seccomp.MakeCondition(1, seccomp.CompareEqual, syscall.F_SETFL)
+	if err != nil {
+		return err
+	}
+	isFSetflFlags, err := seccomp.MakeCondition(2, seccomp.CompareEqual, syscall.O_RDWR|syscall.O_NONBLOCK)
+	if err != nil {
+		return err
+	}
+
+	isFSetfd, err := seccomp.MakeCondition(1, seccomp.CompareEqual, syscall.F_SETFD)
+	if err != nil {
+		return err
+	}
+	isFdCloexec, err := seccomp.MakeCondition(2, seccomp.CompareEqual, syscall.FD_CLOEXEC)
+	if err != nil {
+		return err
+	}
+
+	for _, scall := range scalls {
+		if err = f.AddRuleConditional(scall, seccomp.ActAllow, []seccomp.ScmpCondition{isFGetfl}); err != nil {
+			return err
+		}
+		if err = f.AddRuleConditional(scall, seccomp.ActAllow, []seccomp.ScmpCondition{isFGetfd}); err != nil {
+			return err
+		}
+
+		if err = f.AddRuleConditional(scall, seccomp.ActAllow, []seccomp.ScmpCondition{isFSetfl, isFSetflFlags}); err != nil {
+			return err
+		}
+
+		if err = f.AddRuleConditional(scall, seccomp.ActAllow, []seccomp.ScmpCondition{isFSetfd, isFdCloexec}); err != nil {
 			return err
 		}
 	}
