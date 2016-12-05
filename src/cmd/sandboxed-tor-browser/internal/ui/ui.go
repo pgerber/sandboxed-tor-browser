@@ -206,6 +206,11 @@ func (c *Common) Run() error {
 		log.SetOutput(w)
 	}
 
+	// Set sensible rlimits.
+	if err = sandbox.SetSensibleRlimits(); err != nil {
+		return err
+	}
+
 	// Acquire the lock file.
 	if c.lock, err = newLockFile(c); err != nil {
 		return err

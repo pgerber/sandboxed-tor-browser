@@ -117,7 +117,6 @@ func compileTorBrowserSeccompProfile(fd *os.File, is386 bool) error {
 		"brk",
 		"mincore",
 		"mmap",
-		"mlock",
 		"mprotect",
 		"mremap",
 		"munmap",
@@ -182,6 +181,7 @@ func compileTorBrowserSeccompProfile(fd *os.File, is386 bool) error {
 		// "vfork",
 		// "memfd_create", (PulseAudio?  Won't work in our container.)
 		// "personality",
+		// "mlock",
 	}
 	if is386 {
 		allowedNoArgs386 := []string{
