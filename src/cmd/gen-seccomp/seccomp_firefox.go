@@ -121,11 +121,14 @@ func compileTorBrowserSeccompProfile(fd *os.File, is386 bool) error {
 		"mremap",
 		"munmap",
 
-		// XXX: Remove these?
-		"shmdt",
-		"shmat",
-		"shmctl",
-		"shmget",
+		// `MIT-SHM` doesn't work, and there's workarounds to try
+		// to prevent firefox from making such calls.  It doesn't appear
+		// to always ask (noticed on Ubuntu), so fail the calls entirely.
+		//
+		// "shmdt",
+		// "shmat",
+		// "shmctl",
+		// "shmget",
 
 		"alarm",
 		"execve",
