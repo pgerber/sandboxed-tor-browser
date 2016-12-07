@@ -127,6 +127,10 @@ func (h *hugbox) appendRestrictedPulseAudio(cache *dynlib.Cache) ([]string, stri
 				continue
 			}
 			_, f := filepath.Split(v)
+			if strings.HasPrefix(f, "libpulsecore") {
+				Debugf("sandbox: Skipping libpulsecore: %v", v)
+				continue
+			}
 			h.roBind(v, filepath.Join(restrictedPulseDir, f), false)
 			extraLibs = append(extraLibs, f)
 		}
