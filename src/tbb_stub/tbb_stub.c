@@ -172,6 +172,11 @@ XQueryExtension(Display *display, _Xconst char *name, int *major, int *event, in
   return real_XQueryExtension(display, name, major, event, error);
 }
 
+Bool
+XShmQueryExtension(Display* display) {
+  (void)display;
+  return False;
+}
 
 /* There are rumors that PI futexes have scary race conditions, that enable
  * an exploit that is being sold by the forces of darkness.  On systems where
