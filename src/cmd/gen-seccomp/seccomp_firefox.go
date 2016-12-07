@@ -210,6 +210,8 @@ func compileTorBrowserSeccompProfile(fd *os.File, is386 bool) error {
 			"newselect",
 
 			"socket", // Filtered on amd64.
+
+			"socketcall", // Fuck Debian stable.... :(
 		}
 		allowedNoArgs = append(allowedNoArgs, allowedNoArgs386...)
 	}

@@ -118,6 +118,8 @@ func compileTorSeccompProfile(fd *os.File, useBridges bool, is386 bool) error {
 
 			"ugetrlimit",
 			"set_thread_area",
+
+			"socketcall", // I *SHOULDN"T* need this, but Debian stable freaks out.
 		}
 		allowedNoArgs = append(allowedNoArgs, allowedNoArgs386...)
 	}
