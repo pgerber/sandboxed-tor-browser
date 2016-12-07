@@ -24,6 +24,9 @@ import (
 	"strings"
 
 	xdg "github.com/cep21/xdgbasedir"
+
+	"cmd/sandboxed-tor-browser/internal/dynlib"
+	. "cmd/sandboxed-tor-browser/internal/utils"
 )
 
 func (h *hugbox) enablePulseAudio() error {
@@ -48,7 +51,7 @@ func (h *hugbox) enablePulseAudio() error {
 	}
 
 	if fi, err := os.Stat(sockPath); err != nil {
-		// No pulse Audio socket.
+		// No PulseAudio socket.
 		return fmt.Errorf("sandbox: no PulseAudio socket")
 	} else if fi.Mode()&os.ModeSocket == 0 {
 		// Not an AF_LOCAL socket.
@@ -92,4 +95,84 @@ func (h *hugbox) enablePulseAudio() error {
 	}
 
 	return nil
+}
+
+func (h *hugbox) appendRestrictedPulseAudio(cache *dynlib.Cache) ([]string, string, string, error) {
+	const libPulse = "libpulse.so.0"
+
+	type roBindEnt struct {
+		src, dst string
+	}
+	toRoBind := []roBindEnt{}
+
+	extraLibs := []string{}
+	ldLibraryPath := ""
+	extraLdLibraryPath := ""
+
+	paLibsPath := findDistributionDependentDir(nil, "", "pulseaudio")
+	if paLibsPath != "" && cache.GetLibraryPath(libPulse) != "" {
+		const restrictedPulseDir = "/usr/lib/pulseaudio"
+
+		// The library search path ("/usr/lib/pulseaudio"), is
+		// hardcoded into libpulse.so.0, because you suck, and we hate
+		// you.
+
+		extraLibs = append(extraLibs, libPulse)
+		ldLibraryPath = ldLibraryPath + ":" + paLibsPath
+		extraLdLibraryPath = extraLdLibraryPath + ":" + restrictedPulseDir
+
+		// The special handling for libpulsecore is because, we need to dlopen
+		// it in our stub.
+
+		boundPulseCore := false
+		matches, err := filepath.Glob(paLibsPath + "/*.so")
+		if err != nil {
+			return nil, "", "", err
+		}
+		for _, v := range matches {
+			if dynlib.ValidateLibraryClass(v) != nil {
+				Debugf("sandbox: Unsuitable PulseAudio so: %v", v)
+				continue
+			}
+			_, f := filepath.Split(v)
+			if strings.HasPrefix(f, "libpulsecore") {
+				boundPulseCore = true
+			}
+			toRoBind = append(toRoBind, roBindEnt{v, filepath.Join(restrictedPulseDir, f)})
+			extraLibs = append(extraLibs, f)
+		}
+
+		// Debian sticks libpulsecore-blah.so in /usr/lib, unlike
+		// everyone else who sticks it in /usr/lib/pulseaudo,
+		// because fuck you.
+		if !boundPulseCore {
+			matches, err = filepath.Glob("/usr/lib/libpulsecore-*.so")
+			if err != nil {
+				return nil, "", "", err
+			}
+			for _, v := range matches {
+				if dynlib.ValidateLibraryClass(v) != nil {
+					Debugf("sandbox: Unsuitable pulsecore: %v", v)
+					continue
+				}
+				_, f := filepath.Split(v)
+				toRoBind = append(toRoBind, roBindEnt{v, filepath.Join(restrictedPulseDir, f)})
+				extraLibs = append(extraLibs, f)
+				boundPulseCore = true
+				break
+			}
+		}
+
+		// Now that we're done trying to find all the PulseAudio bits,
+		// actually bindmount everything into the sandbox.
+		if boundPulseCore {
+			h.dir(restrictedPulseDir)
+			for _, ent := range toRoBind {
+				h.roBind(ent.src, ent.dst, false)
+			}
+			return extraLibs, ldLibraryPath, extraLdLibraryPath, nil
+		}
+	}
+
+	return nil, "", "", fmt.Errorf("failed to find PulseAudio libraries")
 }

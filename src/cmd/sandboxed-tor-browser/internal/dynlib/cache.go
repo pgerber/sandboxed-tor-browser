@@ -94,7 +94,7 @@ func (c *Cache) ResolveLibraries(binaries []string, extraLibs []string, ldLibrar
 			break
 		}
 		for _, fn := range toCheck {
-			impLibs, err := GetLibraries(fn)
+			impLibs, err := getLibraries(fn)
 			if err != nil {
 				return nil, err
 			}
@@ -373,6 +373,8 @@ func LoadCache() (*Cache, error) {
 		// osVersion, or hwcap.
 		if ourOsVersion < e.osVersion {
 			Debugf("dynlib: ignoring library: %v (osVersion: %x)", e.key, e.osVersion)
+		} else if err = ValidateLibraryClass(e.value); err != nil {
+			Debugf("dynlib: ignoring library %v (%v)", e.key, err)
 		} else if flagCheckFn(e.flags) && capCheckFn(e.hwcap) {
 			vec := c.store[e.key]
 			vec = append(vec, e)

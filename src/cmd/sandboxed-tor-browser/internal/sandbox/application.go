@@ -28,7 +28,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
-	"strings"
 	"syscall"
 
 	"cmd/sandboxed-tor-browser/internal/dynlib"
@@ -220,54 +219,13 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (cm
 		ldLibraryPath = ldLibraryPath + glLibPaths
 
 		if cfg.Sandbox.EnablePulseAudio && pulseAudioWorks {
-			const libPulse = "libpulse.so.0"
-
-			paLibsPath := findDistributionDependentLibs(nil, "", "pulseaudio")
-			if paLibsPath != "" && cache.GetLibraryPath(libPulse) != "" {
-				const restrictedPulseDir = "/usr/lib/pulseaudio"
-
-				// The library search path ("/usr/lib/pulseaudio"), is
-				// hardcoded into libpulse.so.0, because you suck, and we hate
-				// you.
-				extraLibs = append(extraLibs, libPulse)
-				ldLibraryPath = ldLibraryPath + ":" + paLibsPath
-				h.dir(restrictedPulseDir)
-				extraLdLibraryPath = extraLdLibraryPath + ":" + restrictedPulseDir
-
-				boundPulseCore := false
-				matches, err := filepath.Glob(paLibsPath + "/*.so")
-				if err != nil {
-					return nil, err
-				}
-				for _, v := range matches {
-					_, f := filepath.Split(v)
-					if strings.HasPrefix(f, "libpulsecore") {
-						boundPulseCore = true
-					}
-					h.roBind(v, filepath.Join(restrictedPulseDir, f), false)
-					extraLibs = append(extraLibs, f)
-				}
-
-				if !boundPulseCore {
-					// Debian sticks libpulsecore-blah.so in /usr/lib, unlike
-					// everyone else who sticks it in /usr/lib/pulseaudo,
-					// because fuck you.
-					matches, err = filepath.Glob("/usr/lib/libpulsecore-*.so")
-					if err != nil {
-						return nil, err
-					}
-					if len(matches) == 0 {
-						log.Printf("sandbox: Failed to find `libpulsecore-<version>.so`, audio will crash the browser.")
-					} else {
-						for _, v := range matches {
-							_, f := filepath.Split(v)
-							h.roBind(v, filepath.Join(restrictedPulseDir, f), false)
-							extraLibs = append(extraLibs, f)
-						}
-					}
-				}
+			paLibs, paPath, paExtraPath, err := h.appendRestrictedPulseAudio(cache)
+			if err != nil {
+				log.Printf("sandbox: Failed to find PulseAudio libraries: %v", err)
 			} else {
-				log.Printf("sandbox: Failed to find pulse audio libraries.")
+				extraLibs = append(extraLibs, paLibs...)
+				ldLibraryPath = ldLibraryPath + paPath
+				extraLdLibraryPath = extraLdLibraryPath + paExtraPath
 			}
 		}
 		if codec := findBestCodec(cache); codec != "" {
@@ -588,7 +546,21 @@ func findDistributionDependentLibs(extraSearch []string, subDir, fn string) stri
 
 	for _, base := range searchPaths {
 		candidate := filepath.Join(base, subDir, fn)
-		if FileExists(candidate) {
+		if FileExists(candidate) && dynlib.ValidateLibraryClass(candidate) == nil {
+			return candidate
+		}
+	}
+	return ""
+}
+
+func findDistributionDependentDir(extraSearch []string, subDir, fn string) string {
+	var searchPaths []string
+	searchPaths = append(searchPaths, extraSearch...)
+	searchPaths = append(searchPaths, distributionDependentLibSearchPath...)
+
+	for _, base := range searchPaths {
+		candidate := filepath.Join(base, subDir, fn)
+		if DirExists(candidate) {
 			return candidate
 		}
 	}

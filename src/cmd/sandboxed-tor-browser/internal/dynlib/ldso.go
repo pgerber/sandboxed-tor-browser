@@ -19,6 +19,7 @@ package dynlib
 import (
 	"debug/elf"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -26,9 +27,7 @@ import (
 
 var errUnsupported = errors.New("dynlib: unsupported os/architecture")
 
-// GetLibraries returns the dynamic libraries imported by the given file at
-// dynamic link time.
-func GetLibraries(fn string) ([]string, error) {
+func getLibraries(fn string) ([]string, error) {
 	f, err := elf.Open(fn)
 	if err != nil {
 		return nil, err
@@ -36,6 +35,31 @@ func GetLibraries(fn string) ([]string, error) {
 	defer f.Close()
 
 	return f.ImportedLibraries()
+}
+
+// ValidateLibraryClass ensures that the library matches the current
+// architecture.
+func ValidateLibraryClass(fn string) error {
+	f, err := elf.Open(fn)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	var expectedClass elf.Class
+	switch runtime.GOARCH {
+	case "amd64":
+		expectedClass = elf.ELFCLASS64
+	case "386":
+		expectedClass = elf.ELFCLASS32
+	default:
+		return errUnsupported
+	}
+
+	if f.Class != expectedClass {
+		return fmt.Errorf("unsupported class: %v", fn, f.Class)
+	}
+	return nil
 }
 
 // FindLdSo returns the path to the `ld.so` dynamic linker for the current
