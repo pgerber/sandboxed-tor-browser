@@ -44,12 +44,10 @@
 #include <dlfcn.h>
 #include <errno.h>
 #include <pthread.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <X11/Xlib.h>
-
-#include <glob.h>
-#include <stdbool.h>
 
 static pthread_once_t stub_init_once = PTHREAD_ONCE_INIT;
 static int (*real_connect)(int, const struct sockaddr *, socklen_t) = NULL;
@@ -174,78 +172,56 @@ XQueryExtension(Display *display, _Xconst char *name, int *major, int *event, in
   return real_XQueryExtension(display, name, major, event, error);
 }
 
-typedef struct pa_mutex pm;
-static pm* (*real_pa_mutex_new)(bool, bool);
-
-static char *
-glob_library(const char *lib_glob) {
-  glob_t gb;
-  char *lib = NULL;
-  size_t i;
-
-  if (glob(lib_glob, GLOB_MARK, NULL, &gb) != 0) {
-    return NULL;
-  }
-
-  for (i = 0; i < gb.gl_pathc; i++) {
-    const char *path = gb.gl_pathv[i];
-    size_t plen = strlen(path);
-
-    if (plen > 0 && path[plen] != '/') {
-      lib = strndup(path, plen);
-      break;
-    }
-  }
-
-  globfree(&gb);
-
-  return lib;
-}
 
 /* There are rumors that PI futexes have scary race conditions, that enable
  * an exploit that is being sold by the forces of darkness.  On systems where
  * we can filter futex kernel args, we reject such calls.
  *
- * However this breaks PulseAudio, because PI futex usage is determined at
- * compile time.  This fixes up the mutex creation call, to never request PI
- * mutexes.
+ * However this breaks certain versions of PulseAudio, because PI futex
+ * usage is determined at compile time.  This fixes up the mutex creation
+ * call to never request PI mutexes.
+ *
+ * The code in master may be better, since it looks like it shouldn't assert,
+ * but god only knows what glibc does, when I ENOSYS their futex calls.
  *
  * Thanks to the unnamed reporter who filed the issues on the tails, bug
  * tracker and chatted with me on IRC about it.
  * See: https://labs.riseup.net/code/issues/11524
- *
- * Note: This could be enabled unconditionally (ie: also on x86), but since
- * that platform doesn't filter syscalls by argument due to seccomp-bpf
- * limitations, it seems somewhat pointless.
  */
+typedef struct pa_mutex {
+  pthread_mutex_t mutex;
+} pm;
+
 pm *
 pa_mutex_new(bool recursive, bool inherit_priority) {
+  int i;
+  pthread_mutexattr_t attr;
+  pm *m;
   (void) inherit_priority;
 
-  pthread_once(&stub_init_once, stub_init);
-
-  if (real_pa_mutex_new == NULL) {
-    void *handle;
-    char *lib;
-
-    if ((lib = glob_library("/usr/lib/pulseaudio/libpulsecore-*.so")) == NULL) {
-      fprintf(stderr, "ERROR: Failed to find `libpulsecore-*.so`");
-      abort();
-    }
-
-    if ((handle = real_dlopen(lib, RTLD_LAZY|RTLD_LOCAL)) == NULL) {
-      fprintf(stderr, "ERROR: Failed to dlopen() libpulsecore.so: %s\n", dlerror());
-      abort();
-    }
-    free(lib);
-
-    if ((real_pa_mutex_new = dlsym(handle, "pa_mutex_new")) == NULL) {
-      fprintf(stderr, "ERROR: Failed to find `pa_mutex_new()` symbol: %s\n", dlerror());
-      abort();
-    }
-    dlclose(handle);
+  if ((i = pthread_mutexattr_init(&attr)) != 0) {
+    fprintf(stderr, "ERROR: pthread_mutexattr_init(): %d\n", i);
+    abort();
   }
-  return real_pa_mutex_new(recursive, false);
+  if (recursive) {
+    if ((i = pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE)) != 0) {
+      fprintf(stderr, "ERROR: pthread_mutexattr_settype(PTHREAD_MUTEX_RECURSIVE): %d\n", i);
+      abort();
+    }
+  }
+
+  m = malloc(sizeof(*m));
+  if (m == NULL) {
+    fprintf(stderr, "ERROR: Failed to allocate PulseAudio mutex\n");
+    abort();
+  }
+
+  if ((i = pthread_mutex_init(&m->mutex, &attr)) != 0) {
+    fprintf(stderr, "ERROR: pthread_mutex_init(): %d\n", i);
+    abort();
+  }
+
+  return m;
 }
 
 /*  Initialize the stub. */

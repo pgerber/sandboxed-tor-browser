@@ -100,11 +100,6 @@ func (h *hugbox) enablePulseAudio() error {
 func (h *hugbox) appendRestrictedPulseAudio(cache *dynlib.Cache) ([]string, string, string, error) {
 	const libPulse = "libpulse.so.0"
 
-	type roBindEnt struct {
-		src, dst string
-	}
-	toRoBind := []roBindEnt{}
-
 	extraLibs := []string{}
 	ldLibraryPath := ""
 	extraLdLibraryPath := ""
@@ -118,13 +113,10 @@ func (h *hugbox) appendRestrictedPulseAudio(cache *dynlib.Cache) ([]string, stri
 		// you.
 
 		extraLibs = append(extraLibs, libPulse)
+		h.dir(restrictedPulseDir)
 		ldLibraryPath = ldLibraryPath + ":" + paLibsPath
 		extraLdLibraryPath = extraLdLibraryPath + ":" + restrictedPulseDir
 
-		// The special handling for libpulsecore is because, we need to dlopen
-		// it in our stub.
-
-		boundPulseCore := false
 		matches, err := filepath.Glob(paLibsPath + "/*.so")
 		if err != nil {
 			return nil, "", "", err
@@ -135,43 +127,11 @@ func (h *hugbox) appendRestrictedPulseAudio(cache *dynlib.Cache) ([]string, stri
 				continue
 			}
 			_, f := filepath.Split(v)
-			if strings.HasPrefix(f, "libpulsecore") {
-				boundPulseCore = true
-			}
-			toRoBind = append(toRoBind, roBindEnt{v, filepath.Join(restrictedPulseDir, f)})
+			h.roBind(v, filepath.Join(restrictedPulseDir, f), false)
 			extraLibs = append(extraLibs, f)
 		}
 
-		// Debian sticks libpulsecore-blah.so in /usr/lib, unlike
-		// everyone else who sticks it in /usr/lib/pulseaudo,
-		// because fuck you.
-		if !boundPulseCore {
-			matches, err = filepath.Glob("/usr/lib/libpulsecore-*.so")
-			if err != nil {
-				return nil, "", "", err
-			}
-			for _, v := range matches {
-				if dynlib.ValidateLibraryClass(v) != nil {
-					Debugf("sandbox: Unsuitable pulsecore: %v", v)
-					continue
-				}
-				_, f := filepath.Split(v)
-				toRoBind = append(toRoBind, roBindEnt{v, filepath.Join(restrictedPulseDir, f)})
-				extraLibs = append(extraLibs, f)
-				boundPulseCore = true
-				break
-			}
-		}
-
-		// Now that we're done trying to find all the PulseAudio bits,
-		// actually bindmount everything into the sandbox.
-		if boundPulseCore {
-			h.dir(restrictedPulseDir)
-			for _, ent := range toRoBind {
-				h.roBind(ent.src, ent.dst, false)
-			}
-			return extraLibs, ldLibraryPath, extraLdLibraryPath, nil
-		}
+		return extraLibs, ldLibraryPath, extraLdLibraryPath, nil
 	}
 
 	return nil, "", "", fmt.Errorf("failed to find PulseAudio libraries")
