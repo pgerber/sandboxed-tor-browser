@@ -19,6 +19,8 @@ package main
 import (
 	"os"
 	"syscall"
+
+	seccomp "github.com/seccomp/libseccomp-golang"
 )
 
 func compileTorBrowserSeccompProfile(fd *os.File, is386 bool) error {
@@ -30,6 +32,7 @@ func compileTorBrowserSeccompProfile(fd *os.File, is386 bool) error {
 	}
 	defer f.Release()
 
+	// TODO; Filter the arguments on more of these calls.
 	allowedNoArgs := []string{
 		"clock_gettime",
 		"clock_getres",
@@ -207,16 +210,25 @@ func compileTorBrowserSeccompProfile(fd *os.File, is386 bool) error {
 
 			"recv",
 			"send",
-			"newselect",
-
-			"socket", // Filtered on amd64.
-
-			"socketcall", // Fuck Debian stable.... :(
+			"_newselect",
 		}
 		allowedNoArgs = append(allowedNoArgs, allowedNoArgs386...)
 	}
 	if err = allowSyscalls(f, allowedNoArgs, is386); err != nil {
 		return err
+	}
+
+	// Like with how I do the tor rules, handle socketcall() before everything
+	// else.
+	if is386 {
+		if err = ffFilterSocketcall(f); err != nil {
+			return err
+		}
+
+		// Unrelated to sockets, only i386 needs this, and it can be filtered.
+		if err = allowCmpEq(f, "time", 0, 0); err != nil {
+			return err
+		}
 	}
 
 	// Because we patch PulseAudio's mutex creation, we can omit all PI futex
@@ -234,16 +246,33 @@ func compileTorBrowserSeccompProfile(fd *os.File, is386 bool) error {
 	if err = allowCmpEq(f, "prctl", 0, syscall.PR_SET_NAME, syscall.PR_GET_NAME, syscall.PR_GET_TIMERSLACK, syscall.PR_SET_SECCOMP); err != nil {
 		return err
 	}
-
-	if is386 {
-		if err = allowCmpEq(f, "time", 0, 0); err != nil {
-			return err
-		}
-	} else {
-		if err = allowCmpEq(f, "socket", 0, syscall.AF_UNIX); err != nil {
-			return err
-		}
+	if err = allowCmpEq(f, "socket", 0, syscall.AF_UNIX); err != nil {
+		return err
 	}
 
 	return f.ExportBPF(fd)
+}
+
+func ffFilterSocketcall(f *seccomp.ScmpFilter) error {
+	// This is kind of pointless because it allows basically all the things.
+	allowedCalls := []uint64{
+		sysSocket,
+		sysBind,
+		sysConnect,
+		sysListen,
+		sysGetsockname,
+		sysGetpeername,
+		sysSocketpair,
+		sysSend,
+		sysRecv,
+		sysSendto,
+		sysRecvfrom,
+		sysShutdown,
+		sysSetsockopt,
+		sysGetsockopt,
+		sysSendmsg,
+		sysRecvmsg,
+		sysAccept4,
+	}
+	return allowCmpEq(f, "socketcall", 0, allowedCalls...)
 }

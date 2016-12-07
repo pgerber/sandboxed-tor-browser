@@ -66,6 +66,28 @@ const (
 	fionread  = 0x541b
 	tcgets    = 0x5401
 	tiocgpgrp = 0x540f
+
+	// socketcall() call numbers (linux/net.h)
+	sysSocket      = 1  // sys_socket()
+	sysBind        = 2  // sys_bind()
+	sysConnect     = 3  // sys_connect()
+	sysListen      = 4  // sys_listen()
+	sysAccept      = 5  // sys_accept()
+	sysGetsockname = 6  // sys_getsockname()
+	sysGetpeername = 7  // sys_getpeername()
+	sysSocketpair  = 8  // sys_socketpair()
+	sysSend        = 9  // sys_send()
+	sysRecv        = 10 // sys_recv()
+	sysSendto      = 11 // sys_sendto()
+	sysRecvfrom    = 12 // sys_recvfrom()
+	sysShutdown    = 13 // sys_shutdown()
+	sysSetsockopt  = 14 // sys_setsockopt()
+	sysGetsockopt  = 15 // sys_getsockopt()
+	sysSendmsg     = 16 // sys_sendmsg()
+	sysRecvmsg     = 17 // sys_recvmsg()
+	sysAccept4     = 18 // sys_accept4()
+	sysRecvmmsg    = 19 // sys_recvmmsg
+	sysSendmmsg    = 20 // sys_sendmmsg
 )
 
 func newWhitelist(is386 bool) (*seccomp.ScmpFilter, error) {
@@ -95,11 +117,7 @@ func allowSyscalls(f *seccomp.ScmpFilter, calls []string, is386 bool) error {
 	for _, scallName := range calls {
 		scall, err := seccomp.GetSyscallFromName(scallName)
 		if err != nil {
-			if is386 && scallName == "newselect" {
-				scall = seccomp.ScmpSyscall(142)
-			} else {
-				return fmt.Errorf("seccomp: unknown system call: %v", scallName)
-			}
+			return fmt.Errorf("seccomp: unknown system call: %v", scallName)
 		}
 		if err = f.AddRule(scall, seccomp.ActAllow); err != nil {
 			return err

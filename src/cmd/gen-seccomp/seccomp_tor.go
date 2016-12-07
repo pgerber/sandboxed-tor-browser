@@ -118,13 +118,17 @@ func compileTorSeccompProfile(fd *os.File, useBridges bool, is386 bool) error {
 
 			"ugetrlimit",
 			"set_thread_area",
-
-			"socketcall", // I *SHOULDN"T* need this, but Debian stable freaks out.
 		}
 		allowedNoArgs = append(allowedNoArgs, allowedNoArgs386...)
 	}
 	if err = allowSyscalls(f, allowedNoArgs, is386); err != nil {
 		return err
+	}
+	if is386 {
+		// Handle socketcall() before filtering other things.
+		if err = torFilterSocketcall(f, useBridges); err != nil {
+			return err
+		}
 	}
 
 	if err = allowCmpEq(f, "time", 0, 0); err != nil {
@@ -157,22 +161,22 @@ func compileTorSeccompProfile(fd *os.File, useBridges bool, is386 bool) error {
 	if err = allowCmpEq(f, "mremap", 3, mremapMaymove); err != nil {
 		return err
 	}
-	if err = torFilterAccept4(f, is386); err != nil {
+	if err = torFilterAccept4(f); err != nil {
 		return err
 	}
 	if err = torFilterPoll(f); err != nil {
 		return err
 	}
-	if err = torFilterSocket(f, is386); err != nil {
+	if err = torFilterSocket(f); err != nil {
 		return err
 	}
-	if err = torFilterSetsockopt(f, is386); err != nil {
+	if err = torFilterSetsockopt(f); err != nil {
 		return err
 	}
-	if err = torFilterGetsockopt(f, is386); err != nil {
+	if err = torFilterGetsockopt(f); err != nil {
 		return err
 	}
-	if err = torFilterSocketpair(f, is386); err != nil {
+	if err = torFilterSocketpair(f); err != nil {
 		return err
 	}
 	if err = torFilterMmap(f, is386); err != nil {
@@ -196,7 +200,7 @@ func compileTorSeccompProfile(fd *os.File, useBridges bool, is386 bool) error {
 			"getppid",
 		}
 		if is386 {
-			obfsCalls = append(obfsCalls, "newselect")
+			obfsCalls = append(obfsCalls, "_newselect")
 		}
 		if err = allowSyscalls(f, obfsCalls, is386); err != nil {
 			return err
@@ -212,7 +216,7 @@ func compileTorSeccompProfile(fd *os.File, useBridges bool, is386 bool) error {
 		if err = allowCmpEq(f, "futex", 1, futexWake, futexWait); err != nil {
 			return err
 		}
-		if err = obfsFilterSetsockopt(f, is386); err != nil {
+		if err = obfsFilterSetsockopt(f); err != nil {
 			return err
 		}
 		if err = obfsFilterMmap(f, is386); err != nil {
@@ -221,6 +225,40 @@ func compileTorSeccompProfile(fd *os.File, useBridges bool, is386 bool) error {
 	}
 
 	return f.ExportBPF(fd)
+}
+
+func torFilterSocketcall(f *seccomp.ScmpFilter, useBridges bool) error {
+	// This interface needs to die in a fire, because it's leaving
+	// gaping attack surface.  It kind of will assuming that things
+	// move on to 4.3 or later.
+	//
+	// Emperically on Fedora 25 getsockopt and setsockopt still are
+	// multiplexed, though that may just be my rules or libseccomp2.
+	//
+	// Re-test after Debian stable moves to a modern kernel.
+
+	allowedCalls := []uint64{
+		sysSocket,
+		sysBind,
+		sysConnect,
+		sysListen,
+		sysGetsockname,
+		sysSocketpair,
+		sysSend,
+		sysRecv,
+		sysSendto,
+		sysRecvfrom,
+		sysSetsockopt,
+		sysGetsockopt,
+		sysSendmsg,
+		sysRecvmsg,
+		sysAccept4,
+	}
+	if useBridges {
+		allowedCalls = append(allowedCalls, sysGetpeername)
+	}
+
+	return allowCmpEq(f, "socketcall", 0, allowedCalls...)
 }
 
 func torFilterPrctl(f *seccomp.ScmpFilter) error {
@@ -248,16 +286,10 @@ func torFilterPrctl(f *seccomp.ScmpFilter) error {
 	return f.AddRuleConditional(scall, seccomp.ActAllow, []seccomp.ScmpCondition{isPrSetDeathsig})
 }
 
-func torFilterAccept4(f *seccomp.ScmpFilter, is386 bool) error {
+func torFilterAccept4(f *seccomp.ScmpFilter) error {
 	scall, err := seccomp.GetSyscallFromName("accept4")
 	if err != nil {
 		return err
-	}
-	if is386 {
-		// XXX: The tor common/sandbox.c file, explcitly allows socketcall()
-		// by arg for this call, and only this call, when libseccomp should
-		// do the right thing.
-		return f.AddRule(scall, seccomp.ActAllow)
 	}
 
 	cond, err := seccomp.MakeCondition(3, seccomp.CompareMaskedEqual, 0, syscall.SOCK_CLOEXEC|syscall.SOCK_NONBLOCK)
@@ -285,26 +317,15 @@ func torFilterPoll(f *seccomp.ScmpFilter) error {
 	return f.AddRuleConditional(scall, seccomp.ActAllow, []seccomp.ScmpCondition{isPollIn, timeoutIsTen})
 }
 
-func torFilterSocket(f *seccomp.ScmpFilter, is386 bool) error {
-	scall, err := seccomp.GetSyscallFromName("socket")
-	if err != nil {
-		return err
-	}
-	if is386 {
-		return f.AddRule(scall, seccomp.ActAllow)
-	}
-
+func torFilterSocket(f *seccomp.ScmpFilter) error {
 	// XXX: Tighten this some more.
 	return allowCmpEq(f, "socket", 0, syscall.AF_UNIX, syscall.AF_INET, syscall.AF_INET6 /*, syscall.AF_NETLINK */)
 }
 
-func torFilterSetsockopt(f *seccomp.ScmpFilter, is386 bool) error {
+func torFilterSetsockopt(f *seccomp.ScmpFilter) error {
 	scall, err := seccomp.GetSyscallFromName("setsockopt")
 	if err != nil {
 		return err
-	}
-	if is386 {
-		return f.AddRule(scall, seccomp.ActAllow)
 	}
 
 	isSolSocket, err := seccomp.MakeCondition(1, seccomp.CompareEqual, syscall.SOL_SOCKET)
@@ -331,13 +352,10 @@ func torFilterSetsockopt(f *seccomp.ScmpFilter, is386 bool) error {
 	return nil
 }
 
-func torFilterGetsockopt(f *seccomp.ScmpFilter, is386 bool) error {
+func torFilterGetsockopt(f *seccomp.ScmpFilter) error {
 	scall, err := seccomp.GetSyscallFromName("getsockopt")
 	if err != nil {
 		return err
-	}
-	if is386 {
-		return f.AddRule(scall, seccomp.ActAllow)
 	}
 
 	isSolSocket, err := seccomp.MakeCondition(1, seccomp.CompareEqual, syscall.SOL_SOCKET)
@@ -351,13 +369,10 @@ func torFilterGetsockopt(f *seccomp.ScmpFilter, is386 bool) error {
 	return f.AddRuleConditional(scall, seccomp.ActAllow, []seccomp.ScmpCondition{isSolSocket, optIsError})
 }
 
-func torFilterSocketpair(f *seccomp.ScmpFilter, is386 bool) error {
+func torFilterSocketpair(f *seccomp.ScmpFilter) error {
 	scall, err := seccomp.GetSyscallFromName("socketpair")
 	if err != nil {
 		return err
-	}
-	if is386 {
-		return f.AddRule(scall, seccomp.ActAllow)
 	}
 
 	isPfLocal, err := seccomp.MakeCondition(0, seccomp.CompareEqual, syscall.AF_LOCAL)
@@ -530,12 +545,7 @@ func torFilterFcntl(f *seccomp.ScmpFilter, is386 bool) error {
 	return nil
 }
 
-func obfsFilterSetsockopt(f *seccomp.ScmpFilter, is386 bool) error {
-	// 386 already blindly allows all setsockopt() calls.
-	if is386 {
-		return nil
-	}
-
+func obfsFilterSetsockopt(f *seccomp.ScmpFilter) error {
 	scall, err := seccomp.GetSyscallFromName("setsockopt")
 	if err != nil {
 		return err

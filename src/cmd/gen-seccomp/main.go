@@ -32,8 +32,6 @@ func main() {
 		log.Fatalf("failed to get absolute path: %v", err)
 	}
 
-	log.Printf("outDir: %v", outDir)
-
 	// Tor Browser (amd64)
 	f, err := os.Create(filepath.Join(outDir, "tor-amd64.bpf"))
 	if err != nil {
