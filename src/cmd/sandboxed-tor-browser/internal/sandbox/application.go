@@ -45,7 +45,7 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (cm
 	const (
 		profileSubDir = "TorBrowser/Data/Browser/profile.default"
 		cachesSubDir  = "TorBrowser/Data/Browser/Caches"
-		stubPath      = "/tmp/tbb_stub.so"
+		stubPath      = "/home/amnesia/.tbb_stub.so"
 		controlSocket = "control"
 		socksSocket   = "socks"
 	)
@@ -165,12 +165,27 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (cm
 	// supply the relevant args required for functionality.
 	ctrlPath := filepath.Join(h.runtimeDir, controlSocket)
 	socksPath := filepath.Join(h.runtimeDir, socksSocket)
-	h.setenv("LD_PRELOAD", stubPath)
 	h.setenv("TOR_STUB_CONTROL_SOCKET", ctrlPath)
 	h.setenv("TOR_STUB_SOCKS_SOCKET", socksPath)
 	h.bind(tor.CtrlSurrogatePath(), ctrlPath, false)
 	h.bind(tor.SocksSurrogatePath(), socksPath, false)
 	h.assetFile(stubPath, "tbb_stub.so")
+
+	ldPreload := stubPath
+	if manif.Channel == "hardened" {
+		// ASAN wants to be the first entry on LD_PRELOAD, so placate it.
+		matches, err := filepath.Glob(filepath.Join(realBrowserHome, "TorBrowser", "Tor") + "/libasan.so*")
+		if err != nil {
+			return nil, err
+		}
+		if len(matches) < 1 {
+			log.Printf("sandbox: Failed to find 'libasan.so.*'")
+		} else {
+			_, f := filepath.Split(matches[0])
+			ldPreload = f + ":" + ldPreload
+		}
+	}
+	h.setenv("LD_PRELOAD", ldPreload)
 
 	// Hardware accelerated OpenGL will not work, and never will.
 	h.setenv("LIBGL_ALWAYS_SOFTWARE", "1")
