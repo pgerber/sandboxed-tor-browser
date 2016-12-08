@@ -103,6 +103,8 @@ func compileTorSeccompProfile(fd *os.File, useBridges bool, is386 bool) error {
 		"set_tid_address",
 		"unshare",
 		"rt_sigaction", // Tor filters this but libc does more.
+
+		"readlink", // ASAN needs this.
 	}
 	if is386 {
 		allowedNoArgs386 := []string{
