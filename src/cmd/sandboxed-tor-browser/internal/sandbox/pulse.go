@@ -43,7 +43,12 @@ func (h *hugbox) enablePulseAudio() error {
 	// along with the modern default locations.
 	sockPath := os.Getenv(pulseServer)
 	if sockPath == "" {
-		sockPath = filepath.Join(h.runtimeDir, "pulse", "native")
+		hostRuntimeDir := os.Getenv("XDG_RUNTIME_DIR")
+		if hostRuntimeDir == "" {
+			// Should never happen, the app requires/uses XDG_RUNTIME_DIR.
+			return fmt.Errorf("hugbox: BUG: Couldn't determine XDG_RUNTIME_DIR")
+		}
+		sockPath = filepath.Join(hostRuntimeDir, "pulse", "native")
 	} else if strings.HasPrefix(sockPath, unixPrefix) {
 		sockPath = strings.TrimPrefix(sockPath, unixPrefix)
 	} else {
