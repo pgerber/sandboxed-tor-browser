@@ -33,6 +33,9 @@ func compileTorBrowserSeccompProfile(fd *os.File, is386 bool) error {
 	defer f.Release()
 
 	// TODO; Filter the arguments on more of these calls.
+	//
+	// Maybe draaw inspiration from:
+	// https://github.com/mozilla/gecko-dev/blob/master/security/sandbox/linux/SandboxFilter.cpp
 	allowedNoArgs := []string{
 		"clock_gettime",
 		"clock_getres",
@@ -149,7 +152,6 @@ func compileTorBrowserSeccompProfile(fd *os.File, is386 bool) error {
 		"rt_sigprocmask",
 		"rt_sigreturn",
 		"sigaltstack",
-		"setrlimit",
 
 		"arch_prctl",
 		"capset",
@@ -175,6 +177,9 @@ func compileTorBrowserSeccompProfile(fd *os.File, is386 bool) error {
 		"unshare",
 		"wait4",
 
+		// ASAN explodes if this doesn't work.  Sigh.
+		"setrlimit",
+
 		// Firefox uses this, but will take no for an answer.
 		// "quotactl",
 
@@ -198,7 +203,6 @@ func compileTorBrowserSeccompProfile(fd *os.File, is386 bool) error {
 			"_llseek",
 
 			"mmap2",
-			"prlimit64",
 			"ugetrlimit",
 			"set_thread_area",
 			"waitpid",
@@ -225,8 +229,11 @@ func compileTorBrowserSeccompProfile(fd *os.File, is386 bool) error {
 			return err
 		}
 
-		// Unrelated to sockets, only i386 needs this, and it can be filtered.
+		// Unrelated to sockets, only i386 needs these, and it can be filtered.
 		if err = allowCmpEq(f, "time", 0, 0); err != nil {
+			return err
+		}
+		if err = ffFilterPrlimit64(f); err != nil {
 			return err
 		}
 	}
@@ -275,4 +282,25 @@ func ffFilterSocketcall(f *seccomp.ScmpFilter) error {
 		sysAccept4,
 	}
 	return allowCmpEq(f, "socketcall", 0, allowedCalls...)
+}
+
+func ffFilterPrlimit64(f *seccomp.ScmpFilter) error {
+	scall, err := seccomp.GetSyscallFromName("prlimit64")
+	if err != nil {
+		return err
+	}
+
+	// Per Mozilla's sandbox: only prlimit64(0, resource,  NULL, old_limit)
+	// which is functionally equivalent to getrlimit().  0 instead of the
+	// pid() is a glibc-ism.
+
+	isPid0, err := seccomp.MakeCondition(0, seccomp.CompareEqual, 0)
+	if err != nil {
+		return err
+	}
+	isNoNewLimit, err := seccomp.MakeCondition(2, seccomp.CompareEqual, 9)
+	if err != nil {
+		return err
+	}
+	return f.AddRuleConditional(scall, seccomp.ActAllow, []seccomp.ScmpCondition{isPid0, isNoNewLimit})
 }

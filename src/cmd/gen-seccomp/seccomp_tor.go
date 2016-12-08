@@ -23,6 +23,8 @@ import (
 	seccomp "github.com/seccomp/libseccomp-golang"
 )
 
+var maskedCloexecNonblock = ^(uint64(syscall.SOCK_CLOEXEC | syscall.SOCK_NONBLOCK))
+
 func compileTorSeccompProfile(fd *os.File, useBridges bool, is386 bool) error {
 	defer fd.Close()
 
@@ -292,7 +294,7 @@ func torFilterAccept4(f *seccomp.ScmpFilter) error {
 		return err
 	}
 
-	cond, err := seccomp.MakeCondition(3, seccomp.CompareMaskedEqual, 0, syscall.SOCK_CLOEXEC|syscall.SOCK_NONBLOCK)
+	cond, err := seccomp.MakeCondition(3, seccomp.CompareMaskedEqual, maskedCloexecNonblock, 0)
 	if err != nil {
 		return nil
 	}
@@ -318,8 +320,69 @@ func torFilterPoll(f *seccomp.ScmpFilter) error {
 }
 
 func torFilterSocket(f *seccomp.ScmpFilter) error {
-	// XXX: Tighten this some more.
-	return allowCmpEq(f, "socket", 0, syscall.AF_UNIX, syscall.AF_INET, syscall.AF_INET6 /*, syscall.AF_NETLINK */)
+	scall, err := seccomp.GetSyscallFromName("socket")
+	if err != nil {
+		return err
+	}
+
+	makeCondType := func(t uint64) (seccomp.ScmpCondition, error) {
+		return seccomp.MakeCondition(1, seccomp.CompareMaskedEqual, maskedCloexecNonblock, t)
+	}
+
+	// tor allows PF_FILE, which is PF_LOCAL on Linux, not sure why.
+
+	for _, d := range []uint64{syscall.AF_INET, syscall.AF_INET6} {
+		isDomain, err := seccomp.MakeCondition(0, seccomp.CompareEqual, d)
+		if err != nil {
+			return err
+		}
+
+		for _, t := range []uint64{syscall.SOCK_STREAM, syscall.SOCK_DGRAM} {
+			protocols := []uint64{syscall.IPPROTO_IP, syscall.IPPROTO_UDP}
+			if t == syscall.SOCK_STREAM {
+				protocols = append(protocols, syscall.IPPROTO_TCP)
+			}
+
+			isType, err := makeCondType(t)
+			if err != nil {
+				return err
+			}
+
+			for _, p := range protocols {
+				isProtocol, err := seccomp.MakeCondition(2, seccomp.CompareEqual, p)
+				if err != nil {
+					return err
+				}
+
+				if err = f.AddRuleConditional(scall, seccomp.ActAllow, []seccomp.ScmpCondition{isDomain, isType, isProtocol}); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	isAfLocal, err := seccomp.MakeCondition(0, seccomp.CompareEqual, syscall.AF_LOCAL)
+	if err != nil {
+		return err
+	}
+	for _, t := range []uint64{syscall.SOCK_STREAM, syscall.SOCK_DGRAM} {
+		isType, err := makeCondType(t)
+		if err != nil {
+			return err
+		}
+		isProtocol, err := seccomp.MakeCondition(2, seccomp.CompareEqual, 0)
+		if err != nil {
+			return err
+		}
+		if err = f.AddRuleConditional(scall, seccomp.ActAllow, []seccomp.ScmpCondition{isAfLocal, isType, isProtocol}); err != nil {
+			return err
+		}
+	}
+
+	// tor allows socket(AF_NETLINK, SOCK_RAW, 0), which is used to check it's
+	// IP address, but will take "no".
+
+	return nil
 }
 
 func torFilterSetsockopt(f *seccomp.ScmpFilter) error {
