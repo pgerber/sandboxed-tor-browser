@@ -35,7 +35,7 @@ import (
 )
 
 type unshareOpts struct {
-	// user   bool
+	user   bool
 	ipc    bool
 	pid    bool
 	net    bool
@@ -46,10 +46,9 @@ type unshareOpts struct {
 func (u *unshareOpts) toArgs() []string {
 	var args []string
 
-	// A new user namespace is created unconditionally, so that gid/uids
-	// can be normalized.
-	args = append(args, "--unshare-user")
-
+	if u.user {
+		args = append(args, "--unshare-user")
+	}
 	if u.ipc {
 		args = append(args, "--unshare-ipc")
 	}
@@ -225,11 +224,10 @@ func (h *hugbox) run() (*exec.Cmd, error) {
 	if h.chdir != "" {
 		fdArgs = append(fdArgs, "--chdir", h.chdir)
 	}
-
-	fdArgs = append(fdArgs, "--uid", "1000")
-	fdArgs = append(fdArgs, "--gid", "1000")
-	h.assetFile("/etc/passwd", "passwd")
-	h.assetFile("/etc/group", "group")
+	passwdBody := fmt.Sprintf("amnesia:x:%d:%d:Debian Live User,,,:/home/amnesia:/bin/bash\n", os.Getuid(), os.Getgid())
+	groupBody := fmt.Sprintf("amnesia:x:%d:\n", os.Getgid())
+	h.file("/etc/passwd", []byte(passwdBody))
+	h.file("/etc/group", []byte(groupBody))
 
 	if h.fakeDbus {
 		h.setupDbus()
@@ -373,7 +371,7 @@ type bwrapInfo struct {
 func newHugbox() (*hugbox, error) {
 	h := &hugbox{
 		unshare: unshareOpts{
-			// user:   true,
+			user:   false, // No point, not enough USER_NS support.
 			ipc:    true,
 			pid:    true,
 			net:    true,
@@ -382,7 +380,7 @@ func newHugbox() (*hugbox, error) {
 		},
 		hostname:     "amnesia",
 		mountProc:    true,
-		runtimeDir:   filepath.Join("/run", "user", "1000"),
+		runtimeDir:   filepath.Join("/run", "user", fmt.Sprintf("%d", os.Getuid())),
 		homeDir:      "/home/amnesia",
 		pdeathSig:    syscall.SIGTERM,
 		standardLibs: true,
