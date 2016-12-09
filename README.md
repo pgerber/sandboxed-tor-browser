@@ -48,6 +48,8 @@ Upstream Bugs:
    (https://bugs.torproject.org/20083)
  * Tor Browser should run without a `/proc` filesystem.
    (https://bugs.torproject.org/20283)
+ * OpenGL software rendering is  broken on certain Linux systems.
+   (https://bugs.torproject.org/20866)
 
 Notes:
 
