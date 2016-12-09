@@ -71,26 +71,27 @@ type hugbox struct {
 	cmd     string
 	cmdArgs []string
 
-	hostname   string
-	runtimeDir string
-	homeDir    string
-	chdir      string
-	mountProc  bool
-	unshare    unshareOpts
-	stdin      io.Reader
-	stdout     io.Writer
-	stderr     io.Writer
-	seccompFn  func(*os.File) error
-	pdeathSig  syscall.Signal
+	hostname  string
+	homeDir   string
+	chdir     string
+	mountProc bool
+	unshare   unshareOpts
+	stdin     io.Reader
+	stdout    io.Writer
+	stderr    io.Writer
+	seccompFn func(*os.File) error
+	pdeathSig syscall.Signal
 
 	fakeDbus     bool
 	standardLibs bool
 
-	// Internal options, not to be modified except via helpers, unless you
+	// Internal options, not to be *modified* except via helpers, unless you
 	// know what you are doing.
 	bwrapPath string
 	args      []string
 	fileData  [][]byte
+
+	runtimeDir string // Set at creation time.
 }
 
 func (h *hugbox) setenv(k, v string) {
@@ -224,8 +225,17 @@ func (h *hugbox) run() (*exec.Cmd, error) {
 	if h.chdir != "" {
 		fdArgs = append(fdArgs, "--chdir", h.chdir)
 	}
-	passwdBody := fmt.Sprintf("amnesia:x:%d:%d:Debian Live User,,,:/home/amnesia:/bin/bash\n", os.Getuid(), os.Getgid())
-	groupBody := fmt.Sprintf("amnesia:x:%d:\n", os.Getgid())
+
+	uid, gid := os.Getuid(), os.Getgid()
+	if h.unshare.user {
+		uid, gid = 1000, 1000
+		fdArgs = append(fdArgs, []string{
+			"--uid", "1000",
+			"--gid", "1000",
+		}...)
+	}
+	passwdBody := fmt.Sprintf("amnesia:x:%d:%d:Debian Live User,,,:/home/amnesia:/bin/bash\n", uid, gid)
+	groupBody := fmt.Sprintf("amnesia:x:%d:\n", gid)
 	h.file("/etc/passwd", []byte(passwdBody))
 	h.file("/etc/group", []byte(groupBody))
 
@@ -371,7 +381,7 @@ type bwrapInfo struct {
 func newHugbox() (*hugbox, error) {
 	h := &hugbox{
 		unshare: unshareOpts{
-			user:   false, // No point, not enough USER_NS support.
+			user:   false,
 			ipc:    true,
 			pid:    true,
 			net:    true,
@@ -384,6 +394,15 @@ func newHugbox() (*hugbox, error) {
 		homeDir:      "/home/amnesia",
 		pdeathSig:    syscall.SIGTERM,
 		standardLibs: true,
+	}
+
+	// This option is considered dangerous and leads to things like
+	// CVE-2016-8655.  But if the user is running with this enabled,
+	// then might as well take advantage of it.
+	if FileExists("/proc/self/ns/user") {
+		Debugf("sandbox: User namespace support detected.")
+		h.unshare.user = true
+		h.runtimeDir = "/run/user/1000"
 	}
 
 	// Look for the bwrap binary in sensible locations.
