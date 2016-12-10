@@ -326,7 +326,7 @@ func LoadCache() (*Cache, error) {
 	case "amd64":
 		flagCheckFn = func(flags uint32) bool {
 			const wantFlags = flagX8664Lib64 | flagElfLibc6
-			return flags&wantFlags == flags
+			return flags&wantFlags == wantFlags
 		}
 		capCheckFn = func(hwcap uint64) bool {
 			// Not used on this arch AFAIK.
