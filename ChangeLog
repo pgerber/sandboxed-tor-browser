@@ -1,4 +1,6 @@
-Changes in version 0.0.2 - UNRELEASED:
+Changes in version 0.0.3 - UNRELEASED:
+
+Changes in version 0.0.2 - 2016-12-10:
  * Bug #20780: Shuffle and persist the ordering of internal bridges.
  * Bug #20806: Add an option to disable including `libavcodec.so` in the
    firefox container.
