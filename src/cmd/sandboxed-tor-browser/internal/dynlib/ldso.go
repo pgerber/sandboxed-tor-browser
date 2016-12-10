@@ -57,7 +57,7 @@ func ValidateLibraryClass(fn string) error {
 	}
 
 	if f.Class != expectedClass {
-		return fmt.Errorf("unsupported class: %v", fn, f.Class)
+		return fmt.Errorf("unsupported class: %v: %v", fn, f.Class)
 	}
 	return nil
 }
