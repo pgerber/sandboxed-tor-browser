@@ -28,8 +28,10 @@ import (
 )
 
 type installURLs struct {
-	DownloadsURLs map[string]string
-	UpdateURLs    map[string]string
+	DownloadsURLs   map[string]string
+	DownloadsOnions map[string]string
+	UpdateURLs      map[string]string
+	UpdateOnions    map[string]string
 }
 
 var urls *installURLs
@@ -51,7 +53,10 @@ type DownloadsEntry struct {
 }
 
 // DownloadsURL returns the `downloads.json` URL for the configured channel.
-func DownloadsURL(cfg *config.Config) string {
+func DownloadsURL(cfg *config.Config, useOnion bool) string {
+	if useOnion {
+		return urls.DownloadsOnions[cfg.Channel]
+	}
 	return urls.DownloadsURLs[cfg.Channel]
 }
 
@@ -99,7 +104,12 @@ type Patch struct {
 }
 
 // UpdateURL returns the update check URL for the installed bundle.
-func UpdateURL(manif *config.Manifest) (string, error) {
+func UpdateURL(manif *config.Manifest, useOnion bool) (string, error) {
+	base := urls.UpdateURLs[manif.Channel]
+	if useOnion {
+		base = urls.UpdateOnions[manif.Channel]
+	}
+
 	arch := ""
 	switch manif.Architecture {
 	case "linux64":
@@ -109,7 +119,7 @@ func UpdateURL(manif *config.Manifest) (string, error) {
 	default:
 		return "", fmt.Errorf("unsupported architecture for update: %v", manif.Architecture)
 	}
-	return fmt.Sprintf("%s/%s/%s/%s", urls.UpdateURLs[manif.Channel], arch, manif.Version, manif.Locale), nil
+	return fmt.Sprintf("%s/%s/%s/%s", base, arch, manif.Version, manif.Locale), nil
 }
 
 // GetUpdateEntry parses the xml file and returns the UpdateEntry if any.

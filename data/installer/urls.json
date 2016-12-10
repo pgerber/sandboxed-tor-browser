@@ -4,9 +4,19 @@
     "alpha": "https://aus1.torproject.org/torbrowser/update_2/alpha/downloads.json" ,
     "hardened": "https://aus1.torproject.org/torbrowser/update_2/hardened/downloads.json"
   },
+  "downloadsOnions": {
+    "release": "http://rqef5a5mebgq46y5.onion/torbrowser/update_2/release/downloads.json",
+    "alpha": "http://x3nelbld33llasqv.onion/torbrowser/update_2/alpha/downloads.json",
+    "hardened": "http://x3nelbld33llasqv.onion/torbrowser/update_2/hardened/downloads.json"
+  },
   "updateURLs": {
     "release": "https://dist.torproject.org/torbrowser/update_2/release",
     "alpha": "https://aus1.torproject.org/torbrowser/update_2/alpha",
     "hardened": "https://aus1.torproject.org/torbrowser/update_2/hardened"
+  },
+  "updateOnions": {
+    "release": "http://rqef5a5mebgq46y5.onion/torbrowser/update_2/release",
+    "alpha": "http://x3nelbld33llasqv.onion/torbrowser/update_2/alpha",
+    "hardened": "http://x3nelbld33llasqv.onion/torbrowser/update_2/hardened"
   }
 }

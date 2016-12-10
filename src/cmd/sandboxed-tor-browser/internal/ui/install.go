@@ -79,13 +79,16 @@ func (c *Common) DoInstall(async *Async) {
 
 	var version string
 	var downloads *installer.DownloadsEntry
-	if url := installer.DownloadsURL(c.Cfg); url == "" {
+	if url := installer.DownloadsURL(c.Cfg, (c.tor != nil)); url == "" {
 		async.Err = fmt.Errorf("unable to find downloads URL")
 		return
-	} else if b := async.Grab(client, url, nil); async.Err != nil {
-		return
-	} else if version, downloads, async.Err = installer.GetDownloadsEntry(c.Cfg, b); async.Err != nil {
-		return
+	} else {
+		log.Printf("install: Metadata URL: %v", url)
+		if b := async.Grab(client, url, nil); async.Err != nil {
+			return
+		} else if version, downloads, async.Err = installer.GetDownloadsEntry(c.Cfg, b); async.Err != nil {
+			return
+		}
 	}
 	checkAt := time.Now().Unix()
 
@@ -183,8 +186,9 @@ func (c *Common) doUpdate(async *Async, dialFn dialFunc) {
 	client := newHPKPGrabClient(dialFn)
 
 	// Check the version, by downloading the XML file.
+	// XXX: Fall back to https over clearnet if the onion fails.
 	var update *installer.UpdateEntry
-	if url, err := installer.UpdateURL(c.Manif); err != nil {
+	if url, err := installer.UpdateURL(c.Manif, true); err != nil {
 		async.Err = err
 		return
 	} else {
