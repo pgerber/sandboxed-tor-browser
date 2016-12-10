@@ -3,6 +3,7 @@ Changes in version 0.0.2 - UNRELEASED:
  * Bug #20806: Add an option to disable including `libavcodec.so` in the
    firefox container.
  * Bug #20899: Incorrect x86_64 ld.so flag check in dynlib.
+ * Allow MADV_FREE in the firefox seccomp profile.
 
 Changes in version 0.0.1 - 2016-12-09:
  * Initial release.
