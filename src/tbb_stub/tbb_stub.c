@@ -154,8 +154,7 @@ dlopen(const char *filename, int flags)
   ret = real_dlopen(filename, flags);
 #if 0
   /* This is useful for debugging the internal/dynlib package. */
-  if (ret == NULL)
-    fprintf(stderr, "tbb_stub: dlopen('%s', %d) returned NULL\n", filename, flags);
+  fprintf(stderr, "tbb_stub: dlopen('%s', %d) returned %p\n", filename, flags, ret);
 #endif
   return ret;
 }

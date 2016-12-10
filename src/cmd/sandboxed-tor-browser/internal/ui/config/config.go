@@ -209,6 +209,10 @@ type Sandbox struct {
 	// sandbox.
 	EnablePulseAudio bool `json:"enablePulseAudio"`
 
+	// EnableAVCodec enables extra codecs via ffmpeg's libavcodec.so inside
+	// the sandbox.
+	EnableAVCodec bool `json:"enableAVCodec"`
+
 	// EnableCircuitDisplay enables the Tor Browser circuit display.
 	EnableCircuitDisplay bool `json:"enableCircuitDisplay"`
 
@@ -234,6 +238,15 @@ func (sb *Sandbox) SetDisplay(s string) {
 func (sb *Sandbox) SetEnablePulseAudio(b bool) {
 	if sb.EnablePulseAudio != b {
 		sb.EnablePulseAudio = b
+		sb.cfg.isDirty = true
+	}
+}
+
+// SetEnableAVCodec sets the sandbox libavcodec enable and marks the config
+// dirty.
+func (sb *Sandbox) SetEnableAVCodec(b bool) {
+	if sb.EnableAVCodec != b {
+		sb.EnableAVCodec = b
 		sb.cfg.isDirty = true
 	}
 }

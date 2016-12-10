@@ -62,6 +62,7 @@ type configDialog struct {
 	// Sandbox config elements.
 	pulseAudioBox            *gtk3.Box
 	pulseAudioSwitch         *gtk3.Switch
+	avCodecSwitch            *gtk3.Switch
 	circuitDisplaySwitch     *gtk3.Switch
 	volatileExtensionsSwitch *gtk3.Switch
 	displayBox               *gtk3.Box
@@ -111,6 +112,7 @@ func (d *configDialog) loadFromConfig() {
 	// XXX: Hide PulseAudio option if not available.
 	forceAdv := false
 	d.pulseAudioSwitch.SetActive(d.ui.Cfg.Sandbox.EnablePulseAudio)
+	d.avCodecSwitch.SetActive(d.ui.Cfg.Sandbox.EnableAVCodec)
 	d.circuitDisplaySwitch.SetActive(d.ui.Cfg.Sandbox.EnableCircuitDisplay)
 	d.volatileExtensionsSwitch.SetActive(d.ui.Cfg.Sandbox.VolatileExtensionsDir)
 	if d.ui.Cfg.Sandbox.Display != "" {
@@ -192,6 +194,7 @@ func (d *configDialog) onOk() error {
 	}
 
 	d.ui.Cfg.Sandbox.SetEnablePulseAudio(d.pulseAudioSwitch.GetActive())
+	d.ui.Cfg.Sandbox.SetEnableAVCodec(d.avCodecSwitch.GetActive())
 	d.ui.Cfg.Sandbox.SetEnableCircuitDisplay(d.circuitDisplaySwitch.GetActive())
 	d.ui.Cfg.Sandbox.SetVolatileExtensionsDir(d.volatileExtensionsSwitch.GetActive())
 	if s, err := d.displayEntry.GetText(); err != nil {
@@ -376,6 +379,9 @@ func (ui *gtkUI) initConfigDialog(b *gtk3.Builder) error {
 		return err
 	}
 	if d.pulseAudioSwitch, err = getSwitch(b, "pulseAudioSwitch"); err != nil {
+		return err
+	}
+	if d.avCodecSwitch, err = getSwitch(b, "avCodecSwitch"); err != nil {
 		return err
 	}
 	if d.circuitDisplaySwitch, err = getSwitch(b, "circuitDisplaySwitch"); err != nil {

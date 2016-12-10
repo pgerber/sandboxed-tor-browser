@@ -38,6 +38,10 @@ const (
 	flagElfLibc6   = 3
 )
 
+// FilterFunc is a function that implements a filter to allow rejecting
+// dependencies when resolving libraries.
+type FilterFunc func(string) error
+
 // Quoting from sysdeps/generic/dl-cache.h:
 //
 // libc5 and glibc 2.0/2.1 use the same format.  For glibc 2.2 another
@@ -80,7 +84,7 @@ func (c *Cache) GetLibraryPath(name string) string {
 // ResolveLibraries returns a map of library paths and their aliases for a
 // given set of binaries, based off the ld.so.cache, libraries known to be
 // internal, and a search path.
-func (c *Cache) ResolveLibraries(binaries []string, extraLibs []string, ldLibraryPath string) (map[string][]string, error) {
+func (c *Cache) ResolveLibraries(binaries []string, extraLibs []string, ldLibraryPath string, filterFn FilterFunc) (map[string][]string, error) {
 	searchPaths := filepath.SplitList(ldLibraryPath)
 	libraries := make(map[string]string)
 
@@ -94,6 +98,12 @@ func (c *Cache) ResolveLibraries(binaries []string, extraLibs []string, ldLibrar
 			break
 		}
 		for _, fn := range toCheck {
+			if filterFn != nil {
+				if err := filterFn(fn); err != nil {
+					return nil, err
+				}
+			}
+
 			impLibs, err := getLibraries(fn)
 			if err != nil {
 				return nil, err

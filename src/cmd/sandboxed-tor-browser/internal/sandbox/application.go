@@ -28,6 +28,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strings"
 	"syscall"
 
 	"cmd/sandboxed-tor-browser/internal/dynlib"
@@ -243,8 +244,16 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (cm
 				extraLdLibraryPath = extraLdLibraryPath + paExtraPath
 			}
 		}
-		if codec := findBestCodec(cache); codec != "" {
-			extraLibs = append(extraLibs, codec)
+
+		allowFfmpeg := false
+		if cfg.Sandbox.EnableAVCodec {
+			if codec := findBestCodec(cache); codec != "" {
+				extraLibs = append(extraLibs, codec)
+				allowFfmpeg = true
+			}
+		}
+		filterFn := func(fn string) error {
+			return filterCodecs(fn, allowFfmpeg)
 		}
 
 		// Gtk uses plugin libraries and shit for theming, and expecting
@@ -256,7 +265,7 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (cm
 		extraLibs = append(extraLibs, gtkExtraLibs...)
 		ldLibraryPath = ldLibraryPath + gtkLibPaths
 
-		if err := h.appendLibraries(cache, binaries, extraLibs, ldLibraryPath); err != nil {
+		if err := h.appendLibraries(cache, binaries, extraLibs, ldLibraryPath, filterFn); err != nil {
 			return nil, err
 		}
 	}
@@ -266,6 +275,29 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (cm
 	h.cmdArgs = []string{"--class", "Tor Browser", "-profile", profileDir}
 
 	return h.run()
+}
+
+func filterCodecs(fn string, allowFfmpeg bool) error {
+	_, fn = filepath.Split(fn)
+	lfn := strings.ToLower(fn)
+
+	codecPrefixes := []string{
+		// gstreamer is always disallowed, see `findBestCodec()`.
+		"libstreamer",
+		"libgstapp",
+		"libgstvideo",
+	}
+	if !allowFfmpeg {
+		codecPrefixes = append(codecPrefixes, "libavcodec")
+	}
+
+	for _, prefix := range codecPrefixes {
+		if strings.HasPrefix(lfn, prefix) {
+			return fmt.Errorf("sandbox: Attempted to load AV codec when disabled: %v", fn)
+		}
+	}
+
+	return nil
 }
 
 func findBestCodec(cache *dynlib.Cache) string {
@@ -370,7 +402,7 @@ func RunUpdate(cfg *config.Config, mar []byte) (err error) {
 			return err
 		}
 
-		if err := h.appendLibraries(cache, []string{realUpdateBin}, nil, filepath.Join(realInstallDir, "Browser")); err != nil {
+		if err := h.appendLibraries(cache, []string{realUpdateBin}, nil, filepath.Join(realInstallDir, "Browser"), nil); err != nil {
 			return err
 		}
 		extraLdLibraryPath = extraLdLibraryPath + ":" + restrictedLibDir
@@ -522,7 +554,7 @@ func RunTor(cfg *config.Config, manif *config.Manifest, torrc []byte) (cmd *exec
 
 		// XXX: For now assume that PTs will always use a subset of the tor
 		// binaries libraries.
-		if err := h.appendLibraries(cache, []string{realTorBin}, nil, realTorHome); err != nil {
+		if err := h.appendLibraries(cache, []string{realTorBin}, nil, realTorHome, nil); err != nil {
 			return nil, err
 		}
 		extraLdLibraryPath = extraLdLibraryPath + ":" + restrictedLibDir
@@ -678,7 +710,7 @@ func (h *hugbox) appendRestrictedGtk2() ([]string, string, error) {
 	return gtkLibs, gtkLibPath, nil
 }
 
-func (h *hugbox) appendLibraries(cache *dynlib.Cache, binaries []string, extraLibs []string, ldLibraryPath string) error {
+func (h *hugbox) appendLibraries(cache *dynlib.Cache, binaries []string, extraLibs []string, ldLibraryPath string, filterFn dynlib.FilterFunc) error {
 	defer runtime.GC()
 
 	// ld-linux(-x86-64).so needs special handling since it needs to be in
@@ -694,7 +726,7 @@ func (h *hugbox) appendLibraries(cache *dynlib.Cache, binaries []string, extraLi
 		ldSoAlias = filepath.Join("/lib", ldSoAliasFn)
 	}
 
-	toBindMount, err := cache.ResolveLibraries(binaries, extraLibs, ldLibraryPath)
+	toBindMount, err := cache.ResolveLibraries(binaries, extraLibs, ldLibraryPath, filterFn)
 	if err != nil {
 		return err
 	}
