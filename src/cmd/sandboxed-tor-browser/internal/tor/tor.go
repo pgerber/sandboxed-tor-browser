@@ -25,7 +25,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	//	mrand "math/rand"
+	mrand "math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -444,17 +444,26 @@ func CfgToSandboxTorrc(cfg *config.Config, bridges map[string][]string) ([]byte,
 		}
 		bridgeArgs := []string{string(torrcBridges)}
 		if !cfg.Tor.UseCustomBridges {
-			// XXX: Actually shuffle this once there's a mechanism for
-			// persisting ordering. (#43)
-			for _, v := range bridges[cfg.Tor.InternalBridgeType] {
-				bridgeArgs = append(bridgeArgs, v)
-			}
-			/*
-				shuf := mrand.Perm(len(bridges[cfg.Tor.InternalBridgeType]))
-				for _, i := range shuf {
-					bridgeArgs = append(bridgeArgs, bridges[cfg.Tor.InternalBridgeType][i])
+			// No seed was set. Generate one with math.Rand, since this is
+			// purely for load balancing and doesn't require high grade
+			// entropy.
+			if cfg.Tor.InternalBridgeSeed == 0 {
+				seed := mrand.Int63()
+				cfg.Tor.SetInternalBridgeSeed(seed)
+				if err = cfg.Sync(); err != nil {
+					return nil, err
 				}
-			*/
+			}
+
+			// Initialize the deterministic random bit generator, using
+			// the persisted seed.
+			drbgSrc := mrand.NewSource(cfg.Tor.InternalBridgeSeed)
+			drbg := mrand.New(drbgSrc)
+
+			shuf := drbg.Perm(len(bridges[cfg.Tor.InternalBridgeType]))
+			for _, i := range shuf {
+				bridgeArgs = append(bridgeArgs, bridges[cfg.Tor.InternalBridgeType][i])
+			}
 		} else {
 			// The caller is responsible for making sure that this is indeed
 			// bridge lines, and not random other bullshit.

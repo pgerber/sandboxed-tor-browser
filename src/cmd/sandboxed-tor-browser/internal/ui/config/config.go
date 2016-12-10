@@ -82,6 +82,10 @@ type Tor struct {
 	// bridges.
 	InternalBridgeType string `json:"internalBridgeType"`
 
+	// InternalBridgeSeed is the seed to use when permuting the internal
+	// bridges for load balancing purposes.
+	InternalBridgeSeed int64 `json:"internalBridgeSeed"`
+
 	// UseCustomBridges is if the user provided bridges should be used.
 	UseCustomBridges bool `json:"useCustomBridges"`
 
@@ -157,6 +161,15 @@ func (t *Tor) SetUseBridges(b bool) {
 func (t *Tor) SetInternalBridgeType(s string) {
 	if t.InternalBridgeType != s {
 		t.InternalBridgeType = s
+		t.cfg.isDirty = true
+	}
+}
+
+// SetInternalBridgeSeed sets the seed to use when permuting the internal
+// bridges for load balancing purposes and marks the config dirty.
+func (t *Tor) SetInternalBridgeSeed(i int64) {
+	if t.InternalBridgeSeed != i {
+		t.InternalBridgeSeed = i
 		t.cfg.isDirty = true
 	}
 }
