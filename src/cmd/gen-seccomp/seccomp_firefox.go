@@ -244,7 +244,7 @@ func compileTorBrowserSeccompProfile(fd *os.File, is386 bool) error {
 		return err
 	}
 
-	if err = allowCmpEq(f, "madvise", 2, madvNormal, madvDontneed); err != nil {
+	if err = allowCmpEq(f, "madvise", 2, madvNormal, madvDontneed, madvFree); err != nil {
 		return err
 	}
 	if err = allowCmpEq(f, "ioctl", 1, fionread, tcgets, tiocgpgrp); err != nil {
