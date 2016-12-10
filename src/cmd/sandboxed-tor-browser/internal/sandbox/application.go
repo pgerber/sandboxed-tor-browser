@@ -285,14 +285,14 @@ func filterCodecs(fn string, allowFfmpeg bool) error {
 	_, fn = filepath.Split(fn)
 	lfn := strings.ToLower(fn)
 
-	codecPrefixes := []string{}
-	if !allowGstreamer && !allowFfmpeg {
-		// Unless overridden, gstreamer is explicitly prohibited.
-		codecPrefixes = append(codecPrefixes, []string{
-			"libstreamer",
-			"libgstapp",
-			"libgstvideo",
-		}...)
+	// Unless overridden, gstreamer is explicitly prohibited.
+	codecPrefixes := []string{
+		"libstreamer",
+		"libgstapp",
+		"libgstvideo",
+	}
+	if allowGstreamer && allowFfmpeg {
+		codecPrefixes = []string{}
 	}
 	if !allowFfmpeg {
 		codecPrefixes = append(codecPrefixes, "libavcodec")
