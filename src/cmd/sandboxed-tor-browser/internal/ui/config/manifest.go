@@ -89,21 +89,24 @@ func (m *Manifest) BundleUpdateVersionValid(vStr string) bool {
 	return cmp < 0
 }
 
-func bundleVersionParse(vStr string) (*[4]int, error) {
+func bundleVersionParse(vStr string) (*[4]int, bool, error) {
 	vStr = strings.TrimSuffix(vStr, "-hardened")
 	vStr = strings.Replace(vStr, "a", ".0.", 1)
 
 	var out [4]int
+	vSplit := strings.Split(vStr, ".")
+	isAlpha := len(vSplit) == 4
+
 	for idx, s := range strings.Split(vStr, ".") {
 		i, err := strconv.Atoi(s)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		out[idx] = i
 	}
-	out[3] = -out[3] // XXX: I hope there never is "7.0a" or "7.0a0"
+	out[3] = -out[3]
 
-	return &out, nil
+	return &out, isAlpha, nil
 }
 
 func bundleVersionCompare(a, b string) (int, error) {
@@ -114,11 +117,11 @@ func bundleVersionCompare(a, b string) (int, error) {
 		return 0, nil // Equal.
 	}
 
-	aVer, err := bundleVersionParse(a)
+	aVer, aAlpha, err := bundleVersionParse(a)
 	if err != nil {
 		return 0, err
 	}
-	bVer, err := bundleVersionParse(b)
+	bVer, bAlpha, err := bundleVersionParse(b)
 	if err != nil {
 		return 0, err
 	}
@@ -132,10 +135,10 @@ func bundleVersionCompare(a, b string) (int, error) {
 		}
 	}
 
-	if aVer[3] < 0 && bVer[3] >= 0 { // Alpha vs Release.
+	if aAlpha && !bAlpha { // Alpha vs Release.
 		return -1, nil
 	}
-	if aVer[3] >= 0 && bVer[3] < 0 { // Release vs Alpha.
+	if !aAlpha && bAlpha { // Release vs Alpha.
 		return 1, nil
 	}
 
