@@ -1,4 +1,5 @@
 Changes in version 0.0.3 - UNRELEASED:
+ * Bug 20973: Silence Gdk warnings on systems with integrated png loader.
  * Bug 20806: Try even harder to exclude gstreamer.
  * Per the browser developers, the initial 7.0 alpha builds will not be ESR52
    based, with a switch mid-alpha series, so keep the Grsec PaX override

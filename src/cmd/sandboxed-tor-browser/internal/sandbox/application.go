@@ -138,7 +138,6 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (cm
 
 	// Env vars taken from start-tor-browser.
 	// h.setenv("LD_LIBRARY_PATH", filepath.Join(browserHome, "TorBrowser", "Tor"))
-	h.setenv("LD_LIBRARY_PATH", filepath.Join(browserHome, "TorBrowser", "Tor"))
 	h.setenv("FONTCONFIG_PATH", filepath.Join(browserHome, "TorBrowser", "Data", "fontconfig"))
 	h.setenv("FONTCONFIG_FILE", "fonts.conf")
 	if manif.Channel == "hardened" {
@@ -661,10 +660,11 @@ func (h *hugbox) appendRestrictedGtk2() ([]string, string, error) {
 
 	// Figure out where the system keeps the Gtk+-2.0 theme libraries,
 	// and bind mount in Adwaita and Pixmap.
+	normGtkDir := filepath.Join(restrictedLibDir, "gtk-2.0", "2.10.0")
 	adwaitaPath := findDistributionDependentLibs(nil, engineSubDir, libAdwaita)
 	if adwaitaPath != "" {
 		gtkEngineDir, _ := filepath.Split(adwaitaPath)
-		normGtkEngineDir := filepath.Join(restrictedLibDir, "gtk-2.0", "2.10.0", "engines")
+		normGtkEngineDir := filepath.Join(normGtkDir, "engines")
 		h.roBind(adwaitaPath, filepath.Join(normGtkEngineDir, libAdwaita), false)
 		h.roBind(filepath.Join(gtkEngineDir, libPixmap), filepath.Join(normGtkEngineDir, libPixmap), true)
 
@@ -680,7 +680,7 @@ func (h *hugbox) appendRestrictedGtk2() ([]string, string, error) {
 	printFilePath := findDistributionDependentLibs(nil, printSubDir, libPrintFile)
 	if printFilePath != "" {
 		gtkPrintDir, _ := filepath.Split(printFilePath)
-		normGtkPrintDir := filepath.Join(restrictedLibDir, "gtk-2.0", "2.10.0", "printbackends")
+		normGtkPrintDir := filepath.Join(normGtkDir, "printbackends")
 		h.roBind(printFilePath, filepath.Join(normGtkPrintDir, libPrintFile), false)
 
 		setGtkPath = true
@@ -697,21 +697,23 @@ func (h *hugbox) appendRestrictedGtk2() ([]string, string, error) {
 	// Figure out if the system gdk-pixbuf-2.0 needs loaders for common
 	// file formats.  Arch and Fedora 25 do not.  Debian does.  As far as
 	// I can tell, the only file format we actually care about is PNG.
+	normGdkDir := filepath.Join(restrictedLibDir, "gdk-pixbuf-2.0", "2.10.0")
 	pngLoaderPath := findDistributionDependentLibs(nil, gdkSubDir, libPngLoader)
 	if pngLoaderPath != "" {
 		loaderDir, _ := filepath.Split(pngLoaderPath)
-		normGdkPath := filepath.Join(restrictedLibDir, "gdk-pixbuf-2.0", "2.10.0")
-		normPngLoaderPath := filepath.Join(normGdkPath, "loaders", libPngLoader)
+		normPngLoaderPath := filepath.Join(normGdkDir, "loaders", libPngLoader)
 		h.roBind(pngLoaderPath, normPngLoaderPath, false)
 
-		// GDK doesn't have a nice equivalent to `GTK_PATH`, and instead has
-		// an env var pointing to a `loaders.cache` file.
-		loaderCachePath := filepath.Join(normGdkPath, "loaders.cache")
+		loaderCachePath := filepath.Join(normGdkDir, "loaders.cache")
 		h.assetFile(loaderCachePath, "loaders.cache")
 		h.setenv("GDK_PIXBUF_MODULE_FILE", loaderCachePath)
 
 		gtkLibs = append(gtkLibs, libPngLoader)
 		gtkLibPath = gtkLibPath + ":" + loaderDir
+	} else {
+		// gdk-pixbuf can display an annoying warning if, it thinks it should
+		// have a `loaders.cache` but doesnot.  Shut it up.
+		h.setenv("GDK_PIXBUF_MODULE_FILE", "/dev/null")
 	}
 
 	return gtkLibs, gtkLibPath, nil
