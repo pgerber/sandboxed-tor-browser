@@ -31,6 +31,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"git.schwanenlied.me/yawning/grab.git"
 	"git.schwanenlied.me/yawning/hpkp.git"
@@ -328,7 +329,6 @@ type lockFile struct {
 
 func (l *lockFile) unlock() {
 	defer l.f.Close()
-	os.Remove(l.f.Name())
 }
 
 func newLockFile(c *Common) (*lockFile, error) {
@@ -338,9 +338,18 @@ func newLockFile(c *Common) (*lockFile, error) {
 	p := filepath.Join(c.Cfg.RuntimeDir, lockFileName)
 
 	var err error
-	if l.f, err = os.OpenFile(p, os.O_CREATE|os.O_EXCL, utils.FileMode); err != nil {
+	if l.f, err = os.OpenFile(p, os.O_CREATE, utils.FileMode); err != nil {
 		return nil, err
 	}
+
+	fd := int(l.f.Fd())
+	if err = syscall.Flock(fd, syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		if err == syscall.EWOULDBLOCK {
+			return nil, fmt.Errorf("`sandboxed-tor-browser` is already running")
+		}
+		return nil, err
+	}
+
 	return l, nil
 }
 

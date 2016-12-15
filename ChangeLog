@@ -1,4 +1,5 @@
 Changes in version 0.0.3 - UNRELEASED:
+ * Bug 20993: Handle the lock file better.
  * Bug 20970: Firefox crashes if the security slider is left at the default
    on certain pages.
  * Bug 20973: Silence Gdk warnings on systems with integrated png loader.
