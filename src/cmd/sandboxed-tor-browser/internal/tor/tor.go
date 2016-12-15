@@ -371,6 +371,9 @@ func (t *Tor) DoBootstrap(cfg *config.Config, async *Async) (err error) {
 		select {
 		case ev := <-t.ctrlEvents:
 			const evPrefix = "STATUS_CLIENT "
+			if ev == nil {
+				return ErrCanceled
+			}
 			if !strings.HasPrefix(ev.Reply, evPrefix) {
 				continue
 			}
