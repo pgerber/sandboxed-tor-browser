@@ -1,4 +1,6 @@
 Changes in version 0.0.3 - UNRELEASED:
+ * Bug 20979: runtime/cgo: pthread_create failed: Resource temporarily
+   unavailable.
  * Bug 20993: Handle the lock file better.
  * Bug 20970: Firefox crashes if the security slider is left at the default
    on certain pages.

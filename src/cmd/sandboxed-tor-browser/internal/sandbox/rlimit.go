@@ -48,9 +48,9 @@ func lowerRlimit(resource int, newHard uint64) error {
 // because it should be tied into the UI.
 func SetSensibleRlimits() error {
 	const (
-		limStack      = 8 * 1024 * 1024 // 8 MiB Firefox uses a lot with js...
-		limRSS        = 0          // No effect as of 2.6.x...
-		limNproc      = 512
+		limStack = 8 * 1024 * 1024 // 8 MiB Firefox uses a lot with js...
+		limRSS   = 0               // No effect as of 2.6.x...
+		// limNproc      = 512
 		limNofile     = 1024 // Could maybe go as low as 512...
 		limMlock      = 0    // This might need to be increased later.
 		limLocks      = 32
@@ -61,8 +61,8 @@ func SetSensibleRlimits() error {
 		limRttime     = 0
 
 		// The syscall package doesn't expose these.
-		RLIMIT_RSS        = 5
-		RLIMIT_NPROC      = 6
+		RLIMIT_RSS = 5
+		// RLIMIT_NPROC      = 6
 		RLIMIT_MLOCK      = 8
 		RLIMIT_LOCKS      = 10
 		RLIMIT_SIGPENDING = 11
@@ -78,9 +78,9 @@ func SetSensibleRlimits() error {
 	if err := lowerRlimit(RLIMIT_RSS, limRSS); err != nil {
 		return err
 	}
-	if err := lowerRlimit(RLIMIT_NPROC, limNproc); err != nil {
-		return err
-	}
+	// if err := lowerRlimit(RLIMIT_NPROC, limNproc); err != nil {
+	//	return err
+	// }
 	if err := lowerRlimit(syscall.RLIMIT_NOFILE, limNofile); err != nil {
 		return err
 	}
