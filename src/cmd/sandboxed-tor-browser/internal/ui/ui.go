@@ -57,6 +57,9 @@ var (
 
 	// Version is the version of `sandboxed-tor-browser`.
 	Version string
+
+	// Revision is the git commit of `sandboxed-tor-browser`.
+	Revision string
 )
 
 const (
@@ -165,7 +168,7 @@ func (c *Common) Run() error {
 		}
 	}
 	if c.PrintVersion {
-		fmt.Printf("sandboxed-tor-browser %s\n", Version)
+		fmt.Printf("sandboxed-tor-browser %s (%s)\n", Version, Revision)
 		return nil // Skip the lock, because we will exit.
 	}
 
@@ -455,6 +458,12 @@ func init() {
 		panic(err)
 	} else {
 		Version = strings.TrimSpace(string(d))
+	}
+
+	if d, err := data.Asset("revision"); err != nil {
+		panic(err)
+	} else {
+		Revision = strings.TrimSpace(string(d))
 	}
 
 	// Fixup all the bridge lines to be well formed.
