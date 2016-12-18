@@ -313,6 +313,10 @@ type Config struct {
 	// FirstLuach is set for the first launch post install.
 	FirstLaunch bool `json:"firstLaunch"`
 
+	// LastVersion is the last `sandboxed-tor`browser` version that wrote
+	// the config file.
+	LastVersion string `json:"lastVersion"`
+
 	// UseSystemTor indicates if a system tor daemon should be used.
 	UseSystemTor bool `json:"-"`
 
@@ -336,6 +340,10 @@ type Config struct {
 
 	// ConfigDir is `XDG_CONFIG_HOME/appDir`.
 	ConfigDir string `json:"-"`
+
+	// ConfigVersionChanged indicates that the config file was from an old
+	// version.
+	ConfigVersionChanged bool `json:"-"`
 
 	isDirty      bool
 	path         string
@@ -417,7 +425,7 @@ func (cfg *Config) ResetDirty() {
 
 // New creates a new config object and populates it with the configuration
 // from disk if available, default values otherwise.
-func New() (*Config, error) {
+func New(version string) (*Config, error) {
 	const (
 		envControlPort = "TOR_CONTROL_PORT"
 		envRuntimeDir  = "XDG_RUNTIME_DIR"
@@ -483,16 +491,19 @@ func New() (*Config, error) {
 	}
 
 	// Load the config file.
+	cfg.isDirty = true
 	if b, err := ioutil.ReadFile(cfg.path); err != nil {
 		// File not found, or failed to read.
 		if !os.IsNotExist(err) {
 			return nil, err
 		}
-		cfg.isDirty = true
 	} else if err = json.Unmarshal(b, &cfg); err != nil {
 		return nil, err
+	} else if cfg.LastVersion != version {
+		// The version changed, we want to re-Sync().
+		cfg.LastVersion = version
+		cfg.ConfigVersionChanged = true
 	} else {
-		// File exists and was successfully deserialized.
 		cfg.isDirty = false
 	}
 

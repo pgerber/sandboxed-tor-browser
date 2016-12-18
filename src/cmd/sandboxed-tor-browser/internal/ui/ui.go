@@ -122,7 +122,7 @@ func (c *Common) Init() error {
 	flag.StringVar(&c.logPath, "l", "", "Specify a log file.")
 
 	// Initialize/load the config file.
-	if c.Cfg, err = config.New(); err != nil {
+	if c.Cfg, err = config.New(Version + "-" + Revision); err != nil {
 		return err
 	}
 	if c.Manif, err = config.LoadManifest(c.Cfg); err != nil {
@@ -138,6 +138,14 @@ func (c *Common) Init() error {
 			}
 		}
 		BundleChannels[c.Cfg.Architecture] = channels
+	}
+
+	// If the config is clearly from an old version, re-assert our will over
+	// firefox, by re-writing the autoconfig files.
+	if c.Cfg.ConfigVersionChanged {
+		if err = writeAutoconfig(c.Cfg); err != nil {
+			return err
+		}
 	}
 
 	if c.Manif != nil {
