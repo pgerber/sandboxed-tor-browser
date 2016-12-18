@@ -310,7 +310,7 @@ type Config struct {
 	// Sandbox is the sandbox configuration.
 	Sandbox Sandbox `json:"sandbox,omitEmpty"`
 
-	// FirstLuach is set for the first launch post install.
+	// FirstLaunch is set for the first launch post install.
 	FirstLaunch bool `json:"firstLaunch"`
 
 	// LastVersion is the last `sandboxed-tor`browser` version that wrote
