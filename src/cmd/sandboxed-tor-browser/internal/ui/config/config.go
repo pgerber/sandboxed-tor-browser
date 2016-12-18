@@ -313,7 +313,7 @@ type Config struct {
 	// FirstLaunch is set for the first launch post install.
 	FirstLaunch bool `json:"firstLaunch"`
 
-	// LastVersion is the last `sandboxed-tor`browser` version that wrote
+	// LastVersion is the last `sandboxed-tor-browser` version that wrote
 	// the config file.
 	LastVersion string `json:"lastVersion"`
 
