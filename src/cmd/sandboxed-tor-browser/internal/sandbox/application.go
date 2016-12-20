@@ -337,10 +337,8 @@ func applyPaXAttributes(manif *config.Manifest, f string) error {
 
 	sz, _ := syscall.Getxattr(f, paxAttr, nil)
 
-	// Strip off the attribute if this is a non-grsec kernel, or the bundle is
-	// sufficiently recent to the point where the required W^X fixes are present
-	// in the JIT.
-	if !IsGrsecKernel() || manif.BundleVersionAtLeast("7.0.0") {
+	// Strip off the attribute if this is a non-grsec kernel.
+	if !IsGrsecKernel() {
 		if sz > 0 {
 			log.Printf("sandbox: Removing Tor Browser PaX attributes.")
 			syscall.Removexattr(f, paxAttr)

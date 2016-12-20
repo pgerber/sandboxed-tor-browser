@@ -13,9 +13,8 @@ Changes in version 0.0.3 - UNRELEASED:
  * Include the git revision as a static asset, and display it as part of
    the `--version` output.
  * Fix a nil pointer deref on SIGINT received durring bootstrap.
- * Per the browser developers, the initial 7.0 alpha builds will not be ESR52
-   based, with a switch mid-alpha series, so keep the Grsec PaX override
-   around till 7.0.0 release.
+ * Don't remove the PaX overrides ever, because until the JIT gets rewritten
+   Firefox won't play nice with MPROTECT.
 
 Changes in version 0.0.2 - 2016-12-10:
  * Bug #20780: Shuffle and persist the ordering of internal bridges.
