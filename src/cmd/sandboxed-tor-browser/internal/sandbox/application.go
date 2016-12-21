@@ -76,13 +76,9 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (cm
 	if err = h.enableX11(cfg.Sandbox.Display); err != nil {
 		return
 	}
-	h.roBind("/usr/share/themes/Adwaita/gtk-2.0", "/usr/share/themes/Adwaita/gtk-2.0", false)
-	h.roBind("/usr/share/icons/Adwaita", "/usr/share/icons/Adwaita", false)
+	hasAdwaita := h.appendGtk2Theme()
 	h.roBind("/usr/share/icons/hicolor", "/usr/share/icons/hicolor", true)
 	h.roBind("/usr/share/mime", "/usr/share/mime", false)
-	gtkRcPath := filepath.Join(h.homeDir, ".gtkrc-2.0")
-	h.setenv("GTK2_RC_FILES", gtkRcPath)
-	h.assetFile(gtkRcPath, "gtkrc-2.0")
 
 	pulseAudioWorks := false
 	if cfg.Sandbox.EnablePulseAudio {
@@ -261,7 +257,7 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (cm
 
 		// Gtk uses plugin libraries and shit for theming, and expecting
 		// them to be in consistent locations, is too much to ask for.
-		gtkExtraLibs, gtkLibPaths, err := h.appendRestrictedGtk2()
+		gtkExtraLibs, gtkLibPaths, err := h.appendRestrictedGtk2(hasAdwaita)
 		if err != nil {
 			return nil, err
 		}
@@ -640,7 +636,34 @@ func (h *hugbox) appendRestrictedOpenGL() ([]string, string) {
 	return nil, ""
 }
 
-func (h *hugbox) appendRestrictedGtk2() ([]string, string, error) {
+func (h *hugbox) appendGtk2Theme() bool {
+	const (
+		themeDir          = "/usr/share/themes/Adwaita/gtk-2.0"
+		iconDir           = "/usr/share/themes/Adwaita"
+		adwaitaGtkrcAsset = "gtkrc-2.0"
+
+		fallbackGtkrcAsset = "gtkrc-2.0-fallback"
+	)
+
+	gtkRc := fallbackGtkrcAsset
+
+	hasAdwaita := DirExists(themeDir) && DirExists(iconDir)
+	if hasAdwaita {
+		h.roBind("/usr/share/themes/Adwaita/gtk-2.0", "/usr/share/themes/Adwaita/gtk-2.0", false)
+		h.roBind("/usr/share/icons/Adwaita", "/usr/share/icons/Adwaita", false)
+		gtkRc = adwaitaGtkrcAsset
+	} else {
+		log.Printf("sandbox: Failed to find Adwaita gtk-2.0 theme.")
+	}
+
+	gtkRcPath := filepath.Join(h.homeDir, ".gtkrc-2.0")
+	h.setenv("GTK2_RC_FILES", gtkRcPath)
+	h.assetFile(gtkRcPath, gtkRc)
+
+	return hasAdwaita
+}
+
+func (h *hugbox) appendRestrictedGtk2(hasAdwaita bool) ([]string, string, error) {
 	const (
 		libAdwaita   = "libadwaita.so"
 		libPixmap    = "libpixmap.so"
@@ -656,21 +679,24 @@ func (h *hugbox) appendRestrictedGtk2() ([]string, string, error) {
 	gtkLibPath := ""
 	setGtkPath := false
 
+	normGtkDir := filepath.Join(restrictedLibDir, "gtk-2.0", "2.10.0")
+
 	// Figure out where the system keeps the Gtk+-2.0 theme libraries,
 	// and bind mount in Adwaita and Pixmap.
-	normGtkDir := filepath.Join(restrictedLibDir, "gtk-2.0", "2.10.0")
-	adwaitaPath := findDistributionDependentLibs(nil, engineSubDir, libAdwaita)
-	if adwaitaPath != "" {
-		gtkEngineDir, _ := filepath.Split(adwaitaPath)
-		normGtkEngineDir := filepath.Join(normGtkDir, "engines")
-		h.roBind(adwaitaPath, filepath.Join(normGtkEngineDir, libAdwaita), false)
-		h.roBind(filepath.Join(gtkEngineDir, libPixmap), filepath.Join(normGtkEngineDir, libPixmap), true)
+	if hasAdwaita {
+		adwaitaPath := findDistributionDependentLibs(nil, engineSubDir, libAdwaita)
+		if adwaitaPath != "" {
+			gtkEngineDir, _ := filepath.Split(adwaitaPath)
+			normGtkEngineDir := filepath.Join(normGtkDir, "engines")
+			h.roBind(adwaitaPath, filepath.Join(normGtkEngineDir, libAdwaita), false)
+			h.roBind(filepath.Join(gtkEngineDir, libPixmap), filepath.Join(normGtkEngineDir, libPixmap), true)
 
-		setGtkPath = true
-		gtkLibs = append(gtkLibs, libAdwaita)
-		gtkLibPath = gtkLibPath + ":" + gtkEngineDir
-	} else {
-		log.Printf("sandbox: Failed to find gtk-2.0 libadwaita.so.")
+			setGtkPath = true
+			gtkLibs = append(gtkLibs, libAdwaita)
+			gtkLibPath = gtkLibPath + ":" + gtkEngineDir
+		} else {
+			log.Printf("sandbox: Failed to find gtk-2.0 libadwaita.so.")
+		}
 	}
 
 	// Figure out where the system keeps the Gtk+-2.0 print backends,

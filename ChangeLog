@@ -1,4 +1,5 @@
 Changes in version 0.0.3 - UNRELEASED:
+ * Bug 21055: Fall back gracefully if the Adwaita theme is not present.
  * Bug 20791: Fetch install/update metadata using onions.
  * Bug 20979: runtime/cgo: pthread_create failed: Resource temporarily
    unavailable.

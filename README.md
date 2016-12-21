@@ -20,6 +20,7 @@ Runtime dependencies:
  * bubblewrap >= 0.1.3 (https://github.com/projectatomic/bubblewrap).
  * Gtk+ >= 3.14.0
  * (Optional) PulseAudio
+ * (Optional) Adwaita Gtk+-2.0 theme
 
 Build time dependencies:
 
