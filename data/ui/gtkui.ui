@@ -519,7 +519,7 @@
                 <property name="margin_bottom">6</property>
                 <property name="orientation">vertical</property>
                 <child>
-                  <object class="GtkBox" id="pulseAudioBox">
+                  <object class="GtkBox">
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
                     <property name="margin_bottom">6</property>

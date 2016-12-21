@@ -60,7 +60,6 @@ type configDialog struct {
 	torSystemIndicator *gtk3.Box
 
 	// Sandbox config elements.
-	pulseAudioBox            *gtk3.Box
 	pulseAudioSwitch         *gtk3.Switch
 	avCodecSwitch            *gtk3.Switch
 	circuitDisplaySwitch     *gtk3.Switch
@@ -109,7 +108,6 @@ func (d *configDialog) loadFromConfig() {
 	d.torConfigBox.SetSensitive(!d.ui.Cfg.UseSystemTor)
 	d.torSystemIndicator.SetVisible(d.ui.Cfg.UseSystemTor)
 
-	// XXX: Hide PulseAudio option if not available.
 	forceAdv := false
 	d.pulseAudioSwitch.SetActive(d.ui.Cfg.Sandbox.EnablePulseAudio)
 	d.avCodecSwitch.SetActive(d.ui.Cfg.Sandbox.EnableAVCodec)
@@ -375,9 +373,6 @@ func (ui *gtkUI) initConfigDialog(b *gtk3.Builder) error {
 	}
 
 	// Sandbox config elements.
-	if d.pulseAudioBox, err = getBox(b, "pulseAudioBox"); err != nil {
-		return err
-	}
 	if d.pulseAudioSwitch, err = getSwitch(b, "pulseAudioSwitch"); err != nil {
 		return err
 	}
