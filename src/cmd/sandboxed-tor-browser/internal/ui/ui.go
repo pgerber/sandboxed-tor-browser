@@ -164,7 +164,11 @@ func (c *Common) Run() error {
 	)
 
 	// Parse the command line flags.
+	halp := flag.Bool("h", false, "Print usage and esit.")
 	flag.Parse()
+	if *halp {
+		flag.Usage()
+	}
 	for _, v := range flag.Args() {
 		switch strings.ToLower(v) {
 		case cmdInstall:
