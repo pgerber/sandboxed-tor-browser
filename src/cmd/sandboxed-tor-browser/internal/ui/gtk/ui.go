@@ -159,7 +159,7 @@ func (ui *gtkUI) onDestroy() {
 
 func (ui *gtkUI) launch() error {
 	// If we don't need to update, and would just launch, quash the UI.
-	checkUpdate := ui.Cfg.NeedsUpdateCheck()
+	checkUpdate := ui.Cfg.ForceUpdate
 	squelchUI := !checkUpdate && ui.Cfg.UseSystemTor
 
 	async := async.NewAsync()

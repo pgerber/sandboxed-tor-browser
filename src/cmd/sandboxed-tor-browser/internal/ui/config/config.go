@@ -25,7 +25,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"time"
 
 	butils "git.schwanenlied.me/yawning/bulb.git/utils"
 	xdg "github.com/cep21/xdgbasedir"
@@ -300,9 +299,8 @@ type Config struct {
 	// Locale is the Tor Browser locale to install ("en-US", "ja").
 	Locale string `json:"locale,omitempty"`
 
-	// LastUpdateCheck is the UNIX time when the last update check was
-	// sucessfully completed.
-	LastUpdateCheck int64 `json:"lastUpdateCheck,omitEmpty"`
+	// ForceUpdate is set if the installed bundle is known to be obsolete.
+	ForceUpdate bool `json:"forceUpdate"`
 
 	// Tor is the Tor network configuration.
 	Tor Tor `json:"tor,omitEmpty"`
@@ -374,19 +372,11 @@ func (cfg *Config) SetFirstLaunch(b bool) {
 	}
 }
 
-// NeedsUpdateCheck returns true if the bundle needs to be checked for updates,
-// and possibly updated.
-func (cfg *Config) NeedsUpdateCheck() bool {
-	const updateInterval = 60 * 60 * 12 // 12 hours.
-	now := time.Now().Unix()
-	return (now > cfg.LastUpdateCheck+updateInterval) || cfg.LastUpdateCheck > now
-}
-
-// SetLastUpdateCheck sets the last update check time and marks the config
+// SetForceUpdate sets the bundle as needed an update and marks the config
 // dirty.
-func (cfg *Config) SetLastUpdateCheck(t int64) {
-	if cfg.LastUpdateCheck != t {
-		cfg.LastUpdateCheck = t
+func (cfg *Config) SetForceUpdate(b bool) {
+	if cfg.ForceUpdate != b {
+		cfg.ForceUpdate = b
 		cfg.isDirty = true
 	}
 }
