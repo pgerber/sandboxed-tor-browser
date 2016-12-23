@@ -302,6 +302,9 @@ type Config struct {
 	// ForceUpdate is set if the installed bundle is known to be obsolete.
 	ForceUpdate bool `json:"forceUpdate"`
 
+	// SkipPartialUpdate is set if the partial update has failed to apply.
+	SkipPartialUpdate bool `json:"skipPartialUpdate"`
+
 	// Tor is the Tor network configuration.
 	Tor Tor `json:"tor,omitEmpty"`
 
@@ -377,6 +380,15 @@ func (cfg *Config) SetFirstLaunch(b bool) {
 func (cfg *Config) SetForceUpdate(b bool) {
 	if cfg.ForceUpdate != b {
 		cfg.ForceUpdate = b
+		cfg.isDirty = true
+	}
+}
+
+// SetSkipPartailUpdate sets the bundle as needing a complete update as opposed
+// to a partial one, and marks the config dirty.
+func (cfg *Config) SetSkipPartialUpdate(b bool) {
+	if cfg.SkipPartialUpdate != b {
+		cfg.SkipPartialUpdate = b
 		cfg.isDirty = true
 	}
 }

@@ -63,15 +63,13 @@ func (c *Common) DoLaunch(async *Async, checkUpdates bool) {
 	// Start tor if required.
 	log.Printf("launch: Connecting to the Tor network.")
 	async.UpdateProgress("Connecting to the Tor network.")
-	dialFn, err := c.launchTor(async, false)
-	if err != nil {
-		async.Err = err
+	if _, async.Err = c.launchTor(async, false); async.Err != nil {
 		return
 	}
 
 	// If an update check is needed, check for updates.
 	if checkUpdates {
-		c.doUpdate(async, dialFn)
+		c.doUpdate(async)
 		if async.Err != nil {
 			return
 		}

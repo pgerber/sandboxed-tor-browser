@@ -25,16 +25,29 @@ import (
 
 	"cmd/sandboxed-tor-browser/internal/installer"
 	"cmd/sandboxed-tor-browser/internal/sandbox"
+	"cmd/sandboxed-tor-browser/internal/tor"
 	. "cmd/sandboxed-tor-browser/internal/ui/async"
 )
 
-func (c *Common) CheckUpdate(async *Async, dialFn dialFunc) *installer.UpdateEntry {
+// CheckUpdate queries the update server to see if an update for the current
+// bundle is available.
+func (c *Common) CheckUpdate(async *Async) *installer.UpdateEntry {
 	// Check for updates.
 	log.Printf("update: Checking for updates.")
 	async.UpdateProgress("Checking for updates.")
 
 	// Create the async HTTP client.
-	client := newHPKPGrabClient(dialFn)
+	if c.tor == nil {
+		async.Err = tor.ErrTorNotRunning
+		return nil
+	}
+	dialer, err := c.tor.Dialer()
+	if err != nil {
+		async.Err = err
+		return nil
+	}
+
+	client := newHPKPGrabClient(dialer.Dial)
 
 	// Determine where the update metadata should be fetched from.
 	updateURLs := []string{}
@@ -57,7 +70,9 @@ func (c *Common) CheckUpdate(async *Async, dialFn dialFunc) *installer.UpdateEnt
 	for _, url := range updateURLs {
 		log.Printf("update: Metadata URL: %v", url)
 		async.Err = nil // Clear errors per fetch.
-		if b := async.Grab(client, url, nil); async.Err != nil {
+		if b := async.Grab(client, url, nil); async.Err == ErrCanceled {
+			return nil
+		} else if async.Err != nil {
 			log.Printf("update: Metadata download failed: %v", async.Err)
 			continue
 		} else if update, async.Err = installer.GetUpdateEntry(b); async.Err != nil {
@@ -69,13 +84,14 @@ func (c *Common) CheckUpdate(async *Async, dialFn dialFunc) *installer.UpdateEnt
 	}
 
 	if !fetchOk {
-		// This should be set from the last update attempt...
-		if async.Err == nil {
-			async.Err = fmt.Errorf("failed to download update metadata")
-		}
+		// The last update attempt likely isn't the only relevant error,
+		// just set this to something that won't terrify users, more detailed
+		// diagnostics are avaialble in the log.
+		async.Err = fmt.Errorf("failed to download update metadata")
 		return nil
 	}
 
+	// If there is an update, tag the installed bundle as stale...
 	if update == nil {
 		log.Printf("update: Installed bundle is current.")
 		c.Cfg.SetForceUpdate(false)
@@ -84,6 +100,7 @@ func (c *Common) CheckUpdate(async *Async, dialFn dialFunc) *installer.UpdateEnt
 		c.Cfg.SetForceUpdate(true)
 	}
 
+	// ... and flush the config.
 	if async.Err = c.Cfg.Sync(); async.Err != nil {
 		return nil
 	}
@@ -91,13 +108,82 @@ func (c *Common) CheckUpdate(async *Async, dialFn dialFunc) *installer.UpdateEnt
 	return update
 }
 
-func (c *Common) doUpdate(async *Async, dialFn dialFunc) {
+// FetchUpdate downloads the update specified by the patch over tor, and
+// validates it with the hash in the patch datastructure, and the known MAR
+// signing keys.
+func (c *Common) FetchUpdate(async *Async, patch *installer.Patch) []byte {
+	var dialFn dialFunc
+
+	// Launch the tor daemon if needed.
+	if c.tor == nil {
+		dialFn, async.Err = c.launchTor(async, false)
+		if async.Err != nil {
+			return nil
+		}
+	} else {
+		// Otherwise, retreive the dialer.
+		dialer, err := c.tor.Dialer()
+		if err != nil {
+			async.Err = err
+			return nil
+		}
+		dialFn = dialer.Dial
+	}
+
+	// Download the MAR file.
+	log.Printf("update: Downloading %v", patch.Url)
+	async.UpdateProgress("Downloading Tor Browser Update.")
+
+	var mar []byte
+	client := newHPKPGrabClient(dialFn)
+	if mar = async.Grab(client, patch.Url, func(s string) { async.UpdateProgress(fmt.Sprintf("Downloading Tor Browser Update: %s", s)) }); async.Err != nil {
+		return nil
+	}
+
+	log.Printf("update: Validating Tor Browser Update.")
+	async.UpdateProgress("Validating Tor Browser Update.")
+
+	// Validate the hash against that listed in the XML file.
+	expectedHash, err := hex.DecodeString(patch.HashValue)
+	if err != nil {
+		async.Err = fmt.Errorf("failed to decode HashValue: %v", err)
+		return nil
+	}
+	switch patch.HashFunction {
+	case "SHA512":
+		derivedHash := sha512.Sum512(mar)
+		if !bytes.Equal(expectedHash, derivedHash[:]) {
+			async.Err = fmt.Errorf("downloaded hash does not match patch metadata")
+			return nil
+		}
+	default:
+		async.Err = fmt.Errorf("unsupported hash function: '%v'", patch.HashFunction)
+		return nil
+	}
+
+	// ... and verify the signature block in the MAR with our copy of the key.
+	if async.Err = installer.VerifyTorBrowserMAR(mar); async.Err != nil {
+		return nil
+	}
+
+	return mar
+}
+
+func (c *Common) doUpdate(async *Async) {
 	// This attempts to follow the process that Firefox uses to check for
 	// updates.  https://wiki.mozilla.org/Software_Update:Checking_For_Updates
 
+	const (
+		patchPartial  = "partial"
+		patchComplete = "complete"
+	)
+
 	// Check for updates.
-	update := c.CheckUpdate(async, dialFn)
+	update := c.CheckUpdate(async)
 	if async.Err != nil || update == nil {
+		// Something either broke, or the bundle is up to date.  The caller
+		// needs to check async.Err, and either way there's nothing more that
+		// can be done.
 		return
 	}
 
@@ -110,96 +196,102 @@ func (c *Common) doUpdate(async *Async, dialFn dialFunc) {
 
 	// Figure out the best MAR to download.
 	patches := make(map[string]*installer.Patch)
-	for _, v := range update.Patch {
+	for i := 0; i < len(update.Patch); i++ {
+		v := &update.Patch[i]
 		if patches[v.Type] != nil {
 			async.Err = fmt.Errorf("duplicate patch entry for kind: '%v'", v.Type)
 			return
 		}
-		patches[v.Type] = &v
+		patches[v.Type] = v
 	}
-	patch := patches["partial"] // Favor the delta update mechanism.
-	if patch == nil {
-		if patch = patches["complete"]; patch == nil {
-			async.Err = fmt.Errorf("no suitable MAR file found")
+
+	patchTypes := []string{}
+	if !c.Cfg.SkipPartialUpdate {
+		patchTypes = append(patchTypes, patchPartial)
+	}
+	patchTypes = append(patchTypes, patchComplete)
+
+	// Cycle through the patch types, and apply the "best" one.
+	nrAttempts := 0
+	for _, patchType := range patchTypes {
+		async.Err = nil
+
+		patch := patches[patchType]
+		if patch == nil {
+			continue
+		}
+
+		nrAttempts++
+		mar := c.FetchUpdate(async, patch)
+		if async.Err == ErrCanceled {
+			return
+		} else if async.Err != nil {
+			log.Printf("update: Failed to fetch update: %v", async.Err)
+			continue
+		}
+		if mar == nil {
+			panic("update: no MAR returned from successful fetch")
+		}
+
+		// Shutdown the old tor now.
+		if c.tor != nil {
+			log.Printf("update: Shutting down old tor.")
+			c.tor.Shutdown()
+			c.tor = nil
+		}
+
+		// Apply the update.
+		log.Printf("update: Updating Tor Browser.")
+		async.UpdateProgress("Updating Tor Browser.")
+
+		async.ToUI <- false //  Lock out canceling.
+
+		if async.Err = sandbox.RunUpdate(c.Cfg, mar); async.Err != nil {
+			log.Printf("update: Failed to apply update: %v", async.Err)
+			if patchType == patchPartial {
+				c.Cfg.SetSkipPartialUpdate(true)
+				if async.Err = c.Cfg.Sync(); async.Err != nil {
+					return
+				}
+			}
+			async.ToUI <- true // Unlock canceling.
+			continue
+		}
+
+		// Failues past this point are catastrophic in that, the on-disk
+		// bundle is up to date, but the post-update tasks have failed.
+
+		// Reinstall the autoconfig stuff.
+		if async.Err = writeAutoconfig(c.Cfg); async.Err != nil {
 			return
 		}
-	}
 
-	// Download the MAR file.
-	log.Printf("update: Downloading %v", patch.Url)
-	async.UpdateProgress("Downloading Tor Browser Update.")
-
-	var mar []byte
-	client := newHPKPGrabClient(dialFn)
-	if mar = async.Grab(client, patch.Url, func(s string) { async.UpdateProgress(fmt.Sprintf("Downloading Tor Browser Update: %s", s)) }); async.Err != nil {
-		return
-	}
-
-	log.Printf("update: Validating Tor Browser Update.")
-	async.UpdateProgress("Validating Tor Browser Update.")
-
-	// Validate the hash against that listed in the XML file.
-	expectedHash, err := hex.DecodeString(patch.HashValue)
-	if err != nil {
-		async.Err = fmt.Errorf("failed to decode HashValue: %v", err)
-		return
-	}
-	switch patch.HashFunction {
-	case "SHA512":
-		derivedHash := sha512.Sum512(mar)
-		if !bytes.Equal(expectedHash, derivedHash[:]) {
-			async.Err = fmt.Errorf("downloaded hash does not match patch metadata")
+		// Update the maniftest and config.
+		c.Manif.SetVersion(update.AppVersion)
+		if async.Err = c.Manif.Sync(); async.Err != nil {
 			return
 		}
-	default:
-		async.Err = fmt.Errorf("unsupported hash function: '%v'", patch.HashFunction)
+		c.Cfg.SetForceUpdate(false)
+		c.Cfg.SetSkipPartialUpdate(false)
+		if async.Err = c.Cfg.Sync(); async.Err != nil {
+			return
+		}
+
+		async.ToUI <- true // Unlock canceling.
+
+		// Restart tor if we launched it.
+		if !c.Cfg.UseSystemTor {
+			log.Printf("launch: Reconnecting to the Tor network.")
+			async.UpdateProgress("Reconnecting to the Tor network.")
+			_, async.Err = c.launchTor(async, false)
+		}
 		return
 	}
 
-	// ... and verify the signature block in the MAR with our copy of the key.
-	if async.Err = installer.VerifyTorBrowserMAR(mar); async.Err != nil {
-		return
-	}
-
-	// Shutdown the old tor now.
-	if c.tor != nil {
-		log.Printf("update: Shutting down old tor.")
-		c.tor.Shutdown()
-		c.tor = nil
-	}
-
-	// Apply the update.
-	log.Printf("update: Updating Tor Browser.")
-	async.UpdateProgress("Updating Tor Browser.")
-
-	async.ToUI <- false //  Lock out canceling.
-
-	if async.Err = sandbox.RunUpdate(c.Cfg, mar); async.Err != nil {
-		return
-	}
-
-	// Reinstall the autoconfig stuff.
-	if async.Err = writeAutoconfig(c.Cfg); async.Err != nil {
-		return
-	}
-
-	// Update the maniftest and config.
-	c.Manif.SetVersion(update.AppVersion)
-	if async.Err = c.Manif.Sync(); async.Err != nil {
-		return
-	}
-	c.Cfg.SetForceUpdate(false)
-	if async.Err = c.Cfg.Sync(); async.Err != nil {
-		return
-	}
-
-	async.ToUI <- true // Unlock canceling.
-
-	// Restart tor if we launched it.
-	if !c.Cfg.UseSystemTor {
-		log.Printf("launch: Reconnecting to the Tor network.")
-		async.UpdateProgress("Reconnecting to the Tor network.")
-		_, async.Err = c.launchTor(async, false)
+	if nrAttempts == 0 {
+		async.Err = fmt.Errorf("no suitable MAR file found")
+	} else if async.Err != ErrCanceled {
+		async.Err = fmt.Errorf("failed to apply all possible MAR files")
 	}
 	return
 }
