@@ -97,7 +97,10 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (cm
 	realDesktopDir := filepath.Join(realBrowserHome, "Desktop")
 	realDownloadsDir := filepath.Join(realBrowserHome, "Downloads")
 
-	// Ensure that the `Downloads` and `Desktop` mount points exist.
+	// Ensure that the `Caches`, `Downloads` and `Desktop` mount points exist.
+	if err = os.MkdirAll(realCachesDir, DirMode); err != nil {
+		return
+	}
 	if err = os.MkdirAll(realDesktopDir, DirMode); err != nil {
 		return
 	}
