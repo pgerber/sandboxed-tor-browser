@@ -10,7 +10,6 @@ Changes in version 0.0.3 - UNRELEASED:
  * Bug 20806: Try even harder to exclude gstreamer.
  * Add a `-h` command line flag that prints usage.
  * Remove the unused `pulseAudioBox` identifier.
- * Set the security slider to "High" by default on a fresh install.
  * Store the version of the sandbox in the config file, and re-Sync() the
    config, and reinstall the `mozilla.cfg` when things change.
  * Include the git revision as a static asset, and display it as part of
