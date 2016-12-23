@@ -20,12 +20,15 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net"
 	"os"
 	"path/filepath"
 	"runtime"
+	"time"
 
 	"cmd/sandboxed-tor-browser/internal/data"
 	"cmd/sandboxed-tor-browser/internal/installer"
+	"cmd/sandboxed-tor-browser/internal/tor"
 	. "cmd/sandboxed-tor-browser/internal/ui/async"
 	"cmd/sandboxed-tor-browser/internal/ui/config"
 	"cmd/sandboxed-tor-browser/internal/utils"
@@ -59,8 +62,14 @@ func (c *Common) DoInstall(async *Async) {
 	}
 
 	// Get the Dial() routine used to reach the external network.
-	dialFn, err := c.launchTor(async, true)
-	if err != nil {
+	var dialFn dialFunc
+	if err := c.launchTor(async, true); err != nil {
+		async.Err = err
+		return
+	}
+	if dialFn, err = c.getTorDialFunc(); err == tor.ErrTorNotRunning {
+		dialFn = net.Dial
+	} else if err != nil {
 		async.Err = err
 		return
 	}
@@ -85,6 +94,7 @@ func (c *Common) DoInstall(async *Async) {
 			return
 		}
 	}
+	checkAt := time.Now().Unix()
 
 	log.Printf("install: Version: %v Downloads: %v", version, downloads)
 
@@ -143,6 +153,7 @@ func (c *Common) DoInstall(async *Async) {
 	}
 
 	// Set the appropriate bits in the config.
+	c.Cfg.SetLastUpdateCheck(checkAt)
 	c.Cfg.SetForceUpdate(false)
 	c.Cfg.SetFirstLaunch(true)
 

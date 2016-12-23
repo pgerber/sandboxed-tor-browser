@@ -22,6 +22,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+	"time"
 
 	"cmd/sandboxed-tor-browser/internal/installer"
 	"cmd/sandboxed-tor-browser/internal/sandbox"
@@ -41,13 +42,13 @@ func (c *Common) CheckUpdate(async *Async) *installer.UpdateEntry {
 		async.Err = tor.ErrTorNotRunning
 		return nil
 	}
-	dialer, err := c.tor.Dialer()
+	dialFn, err := c.getTorDialFunc()
 	if err != nil {
 		async.Err = err
 		return nil
 	}
 
-	client := newHPKPGrabClient(dialer.Dial)
+	client := newHPKPGrabClient(dialFn)
 
 	// Determine where the update metadata should be fetched from.
 	updateURLs := []string{}
@@ -90,15 +91,21 @@ func (c *Common) CheckUpdate(async *Async) *installer.UpdateEntry {
 		async.Err = fmt.Errorf("failed to download update metadata")
 		return nil
 	}
+	checkAt := time.Now().Unix()
 
 	// If there is an update, tag the installed bundle as stale...
 	if update == nil {
 		log.Printf("update: Installed bundle is current.")
 		c.Cfg.SetForceUpdate(false)
+	} else if !c.Manif.BundleUpdateVersionValid(update.AppVersion) {
+		log.Printf("update: Update server provided a downgrade: '%v'", update.AppVersion)
+		async.Err = fmt.Errorf("update server provided a downgrade: '%v'", update.AppVersion)
+		return nil
 	} else {
 		log.Printf("update: Installed bundle needs updating.")
 		c.Cfg.SetForceUpdate(true)
 	}
+	c.Cfg.SetLastUpdateCheck(checkAt)
 
 	// ... and flush the config.
 	if async.Err = c.Cfg.Sync(); async.Err != nil {
@@ -112,22 +119,17 @@ func (c *Common) CheckUpdate(async *Async) *installer.UpdateEntry {
 // validates it with the hash in the patch datastructure, and the known MAR
 // signing keys.
 func (c *Common) FetchUpdate(async *Async, patch *installer.Patch) []byte {
-	var dialFn dialFunc
-
 	// Launch the tor daemon if needed.
 	if c.tor == nil {
-		dialFn, async.Err = c.launchTor(async, false)
+		async.Err = c.launchTor(async, false)
 		if async.Err != nil {
 			return nil
 		}
-	} else {
-		// Otherwise, retreive the dialer.
-		dialer, err := c.tor.Dialer()
-		if err != nil {
-			async.Err = err
-			return nil
-		}
-		dialFn = dialer.Dial
+	}
+	dialFn, err := c.getTorDialFunc()
+	if err != nil {
+		async.Err = err
+		return nil
 	}
 
 	// Download the MAR file.
@@ -178,20 +180,20 @@ func (c *Common) doUpdate(async *Async) {
 		patchComplete = "complete"
 	)
 
-	// Check for updates.
-	update := c.CheckUpdate(async)
-	if async.Err != nil || update == nil {
-		// Something either broke, or the bundle is up to date.  The caller
-		// needs to check async.Err, and either way there's nothing more that
-		// can be done.
-		return
-	}
-
-	// Ensure that the update entry version is actually neweer.
-	if !c.Manif.BundleUpdateVersionValid(update.AppVersion) {
-		log.Printf("update: Update server provided a downgrade: '%v'", update.AppVersion)
-		async.Err = fmt.Errorf("update server provided a downgrade: '%v'", update.AppVersion)
-		return
+	// Check for updates, unless we have sufficiently fresh metatdata already.
+	var update *installer.UpdateEntry
+	if c.PendingUpdate != nil && !c.Cfg.NeedsUpdateCheck() {
+		update = c.PendingUpdate
+		c.PendingUpdate = nil
+	} else {
+		update = c.CheckUpdate(async)
+		if async.Err != nil || update == nil {
+			// Something either broke, or the bundle is up to date.  The caller
+			// needs to check async.Err, and either way there's nothing more that
+			// can be done.
+			return
+		}
+		c.PendingUpdate = nil
 	}
 
 	// Figure out the best MAR to download.
@@ -258,7 +260,7 @@ func (c *Common) doUpdate(async *Async) {
 			continue
 		}
 
-		// Failues past this point are catastrophic in that, the on-disk
+		// Failures past this point are catastrophic in that, the on-disk
 		// bundle is up to date, but the post-update tasks have failed.
 
 		// Reinstall the autoconfig stuff.
@@ -283,8 +285,9 @@ func (c *Common) doUpdate(async *Async) {
 		if !c.Cfg.UseSystemTor {
 			log.Printf("launch: Reconnecting to the Tor network.")
 			async.UpdateProgress("Reconnecting to the Tor network.")
-			_, async.Err = c.launchTor(async, false)
+			async.Err = c.launchTor(async, false)
 		}
+
 		return
 	}
 

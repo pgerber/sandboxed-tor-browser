@@ -18,16 +18,23 @@
 package gtk
 
 import (
+	"log"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/gotk3/gotk3/gdk"
 	gtk3 "github.com/gotk3/gotk3/gtk"
 
 	"cmd/sandboxed-tor-browser/internal/data"
+	"cmd/sandboxed-tor-browser/internal/installer"
 	sbui "cmd/sandboxed-tor-browser/internal/ui"
 	"cmd/sandboxed-tor-browser/internal/ui/async"
+	"cmd/sandboxed-tor-browser/internal/ui/notify"
+	. "cmd/sandboxed-tor-browser/internal/utils"
 )
+
+const actionRestart = "restart"
 
 type gtkUI struct {
 	sbui.Common
@@ -39,15 +46,28 @@ type gtkUI struct {
 	installDialog  *installDialog
 	configDialog   *configDialog
 	progressDialog *progressDialog
+
+	updateNotification   *notify.Notification
+	updateNotificationCh chan string
 }
 
 func (ui *gtkUI) Run() error {
+	const (
+		updateMinInterval   = 30 * time.Second
+		updateCheckInterval = 2 * time.Hour
+		updateNagInterval   = 15 * time.Minute
+		gtkPumpInterval     = 1 * time.Second
+	)
+
 	if err := ui.Common.Run(); err != nil {
 		ui.bitch("Failed to run common UI: %v", err)
 		return err
 	}
 	if ui.PrintVersion {
 		return nil
+	}
+	if ui.updateNotification == nil {
+		log.Printf("ui: libnotify wasn't found, no desktop notifications possible")
 	}
 
 	if ui.NeedsInstall() || ui.ForceInstall {
@@ -80,7 +100,7 @@ func (ui *gtkUI) Run() error {
 				continue
 			}
 		}
-		ui.ForceConfig = true
+		ui.ForceConfig = true // Drop back to the config on failures.
 
 		// Launch
 		if err := ui.launch(); err != nil {
@@ -88,12 +108,121 @@ func (ui *gtkUI) Run() error {
 				ui.bitch("Failed to launch Tor Browser: %v", err)
 			}
 			continue
-		} else {
-			// Wait till the sandboxed process finishes.
-			ui.Cfg.SetFirstLaunch(false)
-			ui.Cfg.Sync()
-			return ui.Sandbox.Wait()
 		}
+
+		// Unset the first launch flag to skip the config on subsequent
+		// launches.
+		ui.Cfg.SetFirstLaunch(false)
+		ui.Cfg.Sync()
+
+		waitCh := make(chan error)
+		go func() {
+			waitCh <- ui.Sandbox.Wait()
+		}()
+
+		// Determine the time for the initial update check.
+		initialUpdateInterval := updateMinInterval
+		oldScheduledTime := time.Unix(ui.Cfg.LastUpdateCheck, 0).Add(updateCheckInterval)
+		Debugf("update: Previous scheduled update check: %v", oldScheduledTime)
+
+		if oldScheduledTime.After(time.Now()) {
+			deltaT := oldScheduledTime.Sub(time.Now())
+			if deltaT > updateMinInterval {
+				initialUpdateInterval = deltaT
+			}
+		}
+		Debugf("update: Initial scheduled update check: %v", initialUpdateInterval)
+
+		updateTimer := time.NewTimer(initialUpdateInterval)
+		defer updateTimer.Stop()
+
+		gtkPumpTicker := time.NewTicker(gtkPumpInterval)
+		defer gtkPumpTicker.Stop()
+
+		var update *installer.UpdateEntry
+	browserRunningLoop:
+		for {
+			select {
+			case err := <-waitCh:
+				return err
+			case <-gtkPumpTicker.C:
+				// This is so stupid, but is needed for notification actions
+				// to work.
+				gtk3.MainIteration()
+				continue
+			case action := <-ui.updateNotificationCh:
+				// Notification action was triggered, probably a restart.
+				log.Printf("update: Received notification action: %v", action)
+				if action == actionRestart {
+					break browserRunningLoop
+				}
+				continue
+			case <-updateTimer.C:
+			}
+
+			updateTimer.Stop()
+
+			// Only re-check for updates if we think we are up to date.
+			// Skipping re-fetching the metadata is fine, because we will
+			// do it as part of doUpdate() after the restart if it has
+			// aged too much.
+			if !ui.Cfg.ForceUpdate {
+				log.Printf("update: Starting scheduled update check.")
+
+				// Check for an update in the background.
+				async := async.NewAsync()
+				async.UpdateProgress = func(s string) {}
+
+				go func() {
+					update = ui.CheckUpdate(async)
+					async.Done <- true
+				}()
+
+				/// Wait for the check to complete.
+				select {
+				case err := <-waitCh: // User exited browser while checking.
+					return err
+				case <-async.Done:
+				}
+
+				if async.Err != nil {
+					log.Printf("update: Failed background update check: %v", async.Err)
+				}
+
+				if update != nil {
+					log.Printf("update: An update is available: %v", update.DisplayVersion)
+				} else {
+					log.Printf("update: The bundle is up to date")
+				}
+			}
+
+			if ui.Cfg.ForceUpdate {
+				log.Printf("update: Displaying notification.")
+				ui.notifyUpdate(update)
+				updateTimer.Reset(updateNagInterval)
+			} else {
+				updateTimer.Reset(updateCheckInterval)
+			}
+		}
+
+		// If we are here, the user wants to restart to apply an update.
+		gtkPumpTicker.Stop()
+
+		if ui.updateNotification != nil {
+			ui.updateNotification.Close()
+		}
+
+		// Kill the browser.  It's not as if firefox does the right thing on
+		// SIGTERM/SIGINT and we have the pid of the bubblewrap child instead
+		// of the firefox process anyway...
+		//
+		// https://bugzilla.mozilla.org/show_bug.cgi?id=336193
+		ui.Sandbox.Process.Kill()
+		<-waitCh
+
+		ui.PendingUpdate = update
+		ui.ForceConfig = false
+		ui.NoKillTor = true // Don't re-lauch tor on the first pass.
 	}
 }
 
@@ -101,6 +230,12 @@ func (ui *gtkUI) Term() {
 	// By the time this is run, we have exited the Gtk+ event loop, so we
 	// can assume we have exclusive ownership of the UI state.
 	ui.Common.Term()
+
+	if ui.updateNotification != nil {
+		ui.updateNotification.Close()
+		ui.updateNotification = nil
+		notify.Uninit()
+	}
 }
 
 func Init() (sbui.UI, error) {
@@ -150,6 +285,16 @@ func Init() (sbui.UI, error) {
 		}
 	}
 
+	// Initialize the Desktop Notification interface.
+	if err = notify.Init("Sandboxed Tor Browser"); err == nil {
+		ui.updateNotification = notify.New("", "", ui.iconPixbuf)
+		ui.updateNotification.SetTimeout(15 * 1000)
+		ui.updateNotification.AddAction(actionRestart, "Restart Now")
+		ui.updateNotificationCh = ui.updateNotification.ActionChan()
+	} else {
+		ui.updateNotificationCh = make(chan string)
+	}
+
 	return ui, nil
 }
 
@@ -159,7 +304,7 @@ func (ui *gtkUI) onDestroy() {
 
 func (ui *gtkUI) launch() error {
 	// If we don't need to update, and would just launch, quash the UI.
-	checkUpdate := ui.Cfg.ForceUpdate
+	checkUpdate := ui.Cfg.ForceUpdate || ui.Cfg.NeedsUpdateCheck()
 	squelchUI := !checkUpdate && ui.Cfg.UseSystemTor
 
 	async := async.NewAsync()
@@ -182,6 +327,17 @@ func (ui *gtkUI) bitch(format string, a ...interface{}) {
 	md.Run()
 	md.Hide()
 	ui.forceRedraw()
+}
+
+func (ui *gtkUI) notifyUpdate(update *installer.UpdateEntry) {
+	if update == nil {
+		panic("ui: notifyUpdate called with no update metadata")
+	}
+
+	if ui.updateNotification != nil {
+		ui.updateNotification.Update("A Tor Browser update is available.", "Please restart to update to version "+update.DisplayVersion+".", ui.iconPixbuf)
+		ui.updateNotification.Show()
+	}
 }
 
 func (ui *gtkUI) pixbufFromAsset(asset string) (*gdk.Pixbuf, error) {

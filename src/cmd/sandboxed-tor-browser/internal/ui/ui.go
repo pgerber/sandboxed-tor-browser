@@ -104,8 +104,11 @@ type Common struct {
 	logPath  string
 	logFile  *os.File
 
+	PendingUpdate *installer.UpdateEntry
+
 	ForceInstall   bool
 	ForceConfig    bool
+	NoKillTor      bool
 	AdvancedConfig bool
 	PrintVersion   bool
 }
@@ -272,7 +275,19 @@ func (c *Common) NeedsInstall() bool {
 
 type dialFunc func(string, string) (net.Conn, error)
 
-func (c *Common) launchTor(async *Async, onlySystem bool) (dialFunc, error) {
+func (c *Common) getTorDialFunc() (dialFunc, error) {
+	if c.tor == nil {
+		return nil, tor.ErrTorNotRunning
+	}
+
+	dialer, err := c.tor.Dialer()
+	if err != nil {
+		return nil, err
+	}
+	return dialer.Dial, nil
+}
+
+func (c *Common) launchTor(async *Async, onlySystem bool) error {
 	var err error
 	defer func() {
 		if async.Err != nil && c.tor != nil {
@@ -281,23 +296,27 @@ func (c *Common) launchTor(async *Async, onlySystem bool) (dialFunc, error) {
 		}
 	}()
 
-	if c.tor != nil {
+	if c.tor != nil && !c.NoKillTor {
 		log.Printf("launch: Shutting down old tor.")
 		c.tor.Shutdown()
 		c.tor = nil
 	}
 
-	if c.Cfg.UseSystemTor {
+	if c.tor != nil && c.NoKillTor {
+		// Only the first re-launch should be skipped.
+		log.Printf("launch: Reusing old tor.")
+		c.NoKillTor = false
+	} else if c.Cfg.UseSystemTor {
 		if c.tor, err = tor.NewSystemTor(c.Cfg); err != nil {
 			async.Err = err
-			return nil, err
+			return err
 		}
 	} else if !onlySystem {
 		// Build the torrc.
 		torrc, err := tor.CfgToSandboxTorrc(c.Cfg, Bridges)
 		if err != nil {
 			async.Err = err
-			return nil, err
+			return err
 		}
 
 		os.Remove(filepath.Join(c.Cfg.TorDataDir, "control_port"))
@@ -306,36 +325,28 @@ func (c *Common) launchTor(async *Async, onlySystem bool) (dialFunc, error) {
 		cmd, err := sandbox.RunTor(c.Cfg, c.Manif, torrc)
 		if err != nil {
 			async.Err = err
-			return nil, err
+			return err
 		}
 
 		async.UpdateProgress("Waiting on Tor bootstrap.")
 		c.tor = tor.NewSandboxedTor(c.Cfg, cmd)
 		if err = c.tor.DoBootstrap(c.Cfg, async); err != nil {
 			async.Err = err
-			return nil, err
+			return err
 		}
 	} else if !(c.NeedsInstall() || c.ForceInstall) {
 		// That's odd, we only asked for a system tor, but we should be capable
 		// of launching tor ourselves.  Don't use a direct connection.
 		err = fmt.Errorf("tor bootstrap would be skipped, when we could launch")
 		async.Err = err
-		return nil, err
+		return err
 	}
 
-	// If we managed to launch tor...
-	if c.tor != nil {
-		// Query the socks port, setup the dialer.
-		if dialer, err := c.tor.Dialer(); err != nil {
-			async.Err = err
-			return nil, err
-		} else {
-			return dialer.Dial, nil
-		}
+	if c.tor != nil || onlySystem {
+		return nil
 	}
 
-	// We must be installing, without a tor daemon already running.
-	return net.Dial, nil
+	return tor.ErrTorNotRunning
 }
 
 type lockFile struct {

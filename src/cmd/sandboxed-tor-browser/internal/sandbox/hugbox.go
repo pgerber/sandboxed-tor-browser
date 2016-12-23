@@ -341,8 +341,8 @@ func (h *hugbox) run() (*exec.Cmd, error) {
 		Debugf("sandbox: bwrap pid is: %v", cmd.Process.Pid)
 		Debugf("sandbox: child pid is: %v", info.Pid)
 
-		// This is more useful to us, since it's fork of bubblewrap that will
-		// execvp.
+		// This is more useful to us, since it's the bubblewrap child inside
+		// the container.
 		cmd.Process.Pid = info.Pid
 
 		doneCh <- nil
