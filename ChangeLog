@@ -8,6 +8,8 @@ Changes in version 0.0.3 - UNRELEASED:
    on certain pages.
  * Bug 20973: Silence Gdk warnings on systems with integrated png loader.
  * Bug 20806: Try even harder to exclude gstreamer.
+ * Disable the firefox safe mode prompt, because it is nonsensical when
+   applied to Tor Browser.
  * Add a `-h` command line flag that prints usage.
  * Remove the unused `pulseAudioBox` identifier.
  * Store the version of the sandbox in the config file, and re-Sync() the
