@@ -50,8 +50,6 @@ func ValidateLibraryClass(fn string) error {
 	switch runtime.GOARCH {
 	case "amd64":
 		expectedClass = elf.ELFCLASS64
-	case "386":
-		expectedClass = elf.ELFCLASS32
 	default:
 		return errUnsupported
 	}
@@ -75,9 +73,6 @@ func FindLdSo(cache *Cache) (string, string, error) {
 	case "amd64":
 		searchPaths = append(searchPaths, "/lib64")
 		name = "ld-linux-x86-64.so.2"
-	case "386":
-		searchPaths = append(searchPaths, "/lib32")
-		name = "ld-linux.so.2"
 	default:
 		panic("dynlib: unsupported architecture: " + runtime.GOARCH)
 	}
@@ -105,5 +100,5 @@ func FindLdSo(cache *Cache) (string, string, error) {
 // IsSupported returns true if the architecture/os combination has dynlib
 // sypport.
 func IsSupported() bool {
-	return runtime.GOOS == "linux" && (runtime.GOARCH == "amd64" || runtime.GOARCH == "386")
+	return runtime.GOOS == "linux" && runtime.GOARCH == "amd64"
 }

@@ -262,9 +262,6 @@ func LoadCache() (*Cache, error) {
 		return nil, errUnsupported
 	}
 
-	auxvHwcap := getHwcap()
-	Debugf("dynlib: ELF AUXV AT_HWCAP: %016x", auxvHwcap)
-
 	ourOsVersion := getOsVersion()
 	Debugf("dynlib: osVersion: %08x", ourOsVersion)
 
@@ -321,41 +318,13 @@ func LoadCache() (*Cache, error) {
 
 	// libs[]
 	var flagCheckFn func(uint32) bool
-	var capCheckFn func(uint64) bool
 	switch runtime.GOARCH {
 	case "amd64":
 		flagCheckFn = func(flags uint32) bool {
 			const wantFlags = flagX8664Lib64 | flagElfLibc6
 			return flags&wantFlags == wantFlags
 		}
-		capCheckFn = func(hwcap uint64) bool {
-			// Not used on this arch AFAIK.
-			return true
-		}
-	case "386":
-		flagCheckFn = func(flags uint32) bool {
-			// Reject 64 bit libraries.
-			if flags&flagX8664Lib64 == flagX8664Lib64 {
-				return false
-			}
-			return flags&flagElfLibc6 == flags
-		}
-		capCheckFn = func(hwcap uint64) bool {
-			// Filter out libraries we have no hope of using.
-			ourHwcap := auxvHwcap & hwcapMask
-			libHwcap := hwcap & hwcapMask
-			if libHwcap&ourHwcap != libHwcap {
-				return false
-			}
-
-			ourPlatform := auxvHwcap >> x86HwcapFirstPlatform
-			libPlatform := hwcap >> x86HwcapFirstPlatform
-			if ourPlatform < libPlatform {
-				return false
-			}
-
-			return true
-		}
+		// HWCAP is unused on amd64.
 	default:
 		panic(errUnsupported)
 	}
@@ -385,7 +354,7 @@ func LoadCache() (*Cache, error) {
 			Debugf("dynlib: ignoring library: %v (osVersion: %x)", e.key, e.osVersion)
 		} else if err = ValidateLibraryClass(e.value); err != nil {
 			Debugf("dynlib: ignoring library %v (%v)", e.key, err)
-		} else if flagCheckFn(e.flags) && capCheckFn(e.hwcap) {
+		} else if flagCheckFn(e.flags) {
 			vec := c.store[e.key]
 			vec = append(vec, e)
 			c.store[e.key] = vec

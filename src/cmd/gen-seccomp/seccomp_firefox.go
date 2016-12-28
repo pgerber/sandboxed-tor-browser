@@ -19,14 +19,12 @@ package main
 import (
 	"os"
 	"syscall"
-
-	seccomp "github.com/seccomp/libseccomp-golang"
 )
 
-func compileTorBrowserSeccompProfile(fd *os.File, is386 bool) error {
+func compileTorBrowserSeccompProfile(fd *os.File) error {
 	defer fd.Close()
 
-	f, err := newWhitelist(is386)
+	f, err := newWhitelist()
 	if err != nil {
 		return err
 	}
@@ -190,52 +188,8 @@ func compileTorBrowserSeccompProfile(fd *os.File, is386 bool) error {
 		// "personality",
 		// "mlock",
 	}
-	if is386 {
-		allowedNoArgs386 := []string{
-			"fadvise64_64",
-			"fcntl64",
-			"fstat64",
-			"fstatfs64",
-			"ftruncate64",
-			"lstat64",
-			"stat64",
-			"statfs64",
-			"_llseek",
-
-			"mmap2",
-			"ugetrlimit",
-			"set_thread_area",
-			"waitpid",
-
-			"getgid32",
-			"getuid32",
-			"getresgid32",
-			"getresuid32",
-
-			"recv",
-			"send",
-			"_newselect",
-		}
-		allowedNoArgs = append(allowedNoArgs, allowedNoArgs386...)
-	}
-	if err = allowSyscalls(f, allowedNoArgs, is386); err != nil {
+	if err = allowSyscalls(f, allowedNoArgs); err != nil {
 		return err
-	}
-
-	// Like with how I do the tor rules, handle socketcall() before everything
-	// else.
-	if is386 {
-		if err = ffFilterSocketcall(f); err != nil {
-			return err
-		}
-
-		// Unrelated to sockets, only i386 needs these, and it can be filtered.
-		if err = allowCmpEq(f, "time", 0, 0); err != nil {
-			return err
-		}
-		if err = ffFilterPrlimit64(f); err != nil {
-			return err
-		}
 	}
 
 	// Because we patch PulseAudio's mutex creation, we can omit all PI futex
@@ -258,49 +212,4 @@ func compileTorBrowserSeccompProfile(fd *os.File, is386 bool) error {
 	}
 
 	return f.ExportBPF(fd)
-}
-
-func ffFilterSocketcall(f *seccomp.ScmpFilter) error {
-	// This is kind of pointless because it allows basically all the things.
-	allowedCalls := []uint64{
-		sysSocket,
-		sysBind,
-		sysConnect,
-		sysListen,
-		sysGetsockname,
-		sysGetpeername,
-		sysSocketpair,
-		sysSend,
-		sysRecv,
-		sysSendto,
-		sysRecvfrom,
-		sysShutdown,
-		sysSetsockopt,
-		sysGetsockopt,
-		sysSendmsg,
-		sysRecvmsg,
-		sysAccept4,
-	}
-	return allowCmpEq(f, "socketcall", 0, allowedCalls...)
-}
-
-func ffFilterPrlimit64(f *seccomp.ScmpFilter) error {
-	scall, err := seccomp.GetSyscallFromName("prlimit64")
-	if err != nil {
-		return err
-	}
-
-	// Per Mozilla's sandbox: only prlimit64(0, resource,  NULL, old_limit)
-	// which is functionally equivalent to getrlimit().  0 instead of the
-	// pid() is a glibc-ism.
-
-	isPid0, err := seccomp.MakeCondition(0, seccomp.CompareEqual, 0)
-	if err != nil {
-		return err
-	}
-	isNoNewLimit, err := seccomp.MakeCondition(2, seccomp.CompareEqual, 9)
-	if err != nil {
-		return err
-	}
-	return f.AddRuleConditional(scall, seccomp.ActAllow, []seccomp.ScmpCondition{isPid0, isNoNewLimit})
 }

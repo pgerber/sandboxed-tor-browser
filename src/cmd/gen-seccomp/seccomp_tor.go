@@ -25,10 +25,10 @@ import (
 
 var maskedCloexecNonblock = ^(uint64(syscall.SOCK_CLOEXEC | syscall.SOCK_NONBLOCK))
 
-func compileTorSeccompProfile(fd *os.File, useBridges bool, is386 bool) error {
+func compileTorSeccompProfile(fd *os.File, useBridges bool) error {
 	defer fd.Close()
 
-	f, err := newWhitelist(is386)
+	f, err := newWhitelist()
 	if err != nil {
 		return err
 	}
@@ -106,33 +106,8 @@ func compileTorSeccompProfile(fd *os.File, useBridges bool, is386 bool) error {
 
 		"readlink", // ASAN needs this.
 	}
-	if is386 {
-		allowedNoArgs386 := []string{
-			"fstat64",
-			"getegid32",
-			"geteuid32",
-			"getgid32",
-			"getuid32",
-			"_llseek",
-			"sigreturn",
-
-			"recv",
-			"send",
-			"stat64",
-
-			"ugetrlimit",
-			"set_thread_area",
-		}
-		allowedNoArgs = append(allowedNoArgs, allowedNoArgs386...)
-	}
-	if err = allowSyscalls(f, allowedNoArgs, is386); err != nil {
+	if err = allowSyscalls(f, allowedNoArgs); err != nil {
 		return err
-	}
-	if is386 {
-		// Handle socketcall() before filtering other things.
-		if err = torFilterSocketcall(f, useBridges); err != nil {
-			return err
-		}
 	}
 
 	if err = allowCmpEq(f, "time", 0, 0); err != nil {
@@ -183,10 +158,10 @@ func compileTorSeccompProfile(fd *os.File, useBridges bool, is386 bool) error {
 	if err = torFilterSocketpair(f); err != nil {
 		return err
 	}
-	if err = torFilterMmap(f, is386); err != nil {
+	if err = torFilterMmap(f); err != nil {
 		return err
 	}
-	if err = torFilterFcntl(f, is386); err != nil {
+	if err = torFilterFcntl(f); err != nil {
 		return err
 	}
 
@@ -203,10 +178,7 @@ func compileTorSeccompProfile(fd *os.File, useBridges bool, is386 bool) error {
 			"getpeername",
 			"getppid",
 		}
-		if is386 {
-			obfsCalls = append(obfsCalls, "_newselect")
-		}
-		if err = allowSyscalls(f, obfsCalls, is386); err != nil {
+		if err = allowSyscalls(f, obfsCalls); err != nil {
 			return err
 		}
 
@@ -223,46 +195,12 @@ func compileTorSeccompProfile(fd *os.File, useBridges bool, is386 bool) error {
 		if err = obfsFilterSetsockopt(f); err != nil {
 			return err
 		}
-		if err = obfsFilterMmap(f, is386); err != nil {
+		if err = obfsFilterMmap(f); err != nil {
 			return err
 		}
 	}
 
 	return f.ExportBPF(fd)
-}
-
-func torFilterSocketcall(f *seccomp.ScmpFilter, useBridges bool) error {
-	// This interface needs to die in a fire, because it's leaving
-	// gaping attack surface.  It kind of will assuming that things
-	// move on to 4.3 or later.
-	//
-	// Emperically on Fedora 25 getsockopt and setsockopt still are
-	// multiplexed, though that may just be my rules or libseccomp2.
-	//
-	// Re-test after Debian stable moves to a modern kernel.
-
-	allowedCalls := []uint64{
-		sysSocket,
-		sysBind,
-		sysConnect,
-		sysListen,
-		sysGetsockname,
-		sysSocketpair,
-		sysSend,
-		sysRecv,
-		sysSendto,
-		sysRecvfrom,
-		sysSetsockopt,
-		sysGetsockopt,
-		sysSendmsg,
-		sysRecvmsg,
-		sysAccept4,
-	}
-	if useBridges {
-		allowedCalls = append(allowedCalls, sysGetpeername)
-	}
-
-	return allowCmpEq(f, "socketcall", 0, allowedCalls...)
 }
 
 func torFilterPrctl(f *seccomp.ScmpFilter) error {
@@ -463,18 +401,10 @@ func torFilterSocketpair(f *seccomp.ScmpFilter) error {
 	return nil
 }
 
-func torFilterMmap(f *seccomp.ScmpFilter, is386 bool) error {
-	scallMmap, err := seccomp.GetSyscallFromName("mmap")
+func torFilterMmap(f *seccomp.ScmpFilter) error {
+	scall, err := seccomp.GetSyscallFromName("mmap")
 	if err != nil {
 		return err
-	}
-	scalls := []seccomp.ScmpSyscall{scallMmap}
-	if is386 {
-		scallMmap2, err := seccomp.GetSyscallFromName("mmap2")
-		if err != nil {
-			return err
-		}
-		scalls = append(scalls, scallMmap2)
 	}
 
 	// (arg2 == PROT_READ && arg3 == MAP_PRIVATE)
@@ -486,10 +416,8 @@ func torFilterMmap(f *seccomp.ScmpFilter, is386 bool) error {
 	if err != nil {
 		return err
 	}
-	for _, scall := range scalls {
-		if err = f.AddRuleConditional(scall, seccomp.ActAllow, []seccomp.ScmpCondition{isProtRead, isPrivate}); err != nil {
-			return err
-		}
+	if err = f.AddRuleConditional(scall, seccomp.ActAllow, []seccomp.ScmpCondition{isProtRead, isPrivate}); err != nil {
+		return err
 	}
 
 	// (arg2 == PROT_NONE && arg3 == MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE)
@@ -501,10 +429,8 @@ func torFilterMmap(f *seccomp.ScmpFilter, is386 bool) error {
 	if err != nil {
 		return err
 	}
-	for _, scall := range scalls {
-		if err = f.AddRuleConditional(scall, seccomp.ActAllow, []seccomp.ScmpCondition{isProtNone, isProtNoneFlags}); err != nil {
-			return err
-		}
+	if err = f.AddRuleConditional(scall, seccomp.ActAllow, []seccomp.ScmpCondition{isProtNone, isProtNoneFlags}); err != nil {
+		return err
 	}
 
 	isProtReadWrite, err := seccomp.MakeCondition(2, seccomp.CompareEqual, syscall.PROT_READ|syscall.PROT_WRITE)
@@ -523,10 +449,8 @@ func torFilterMmap(f *seccomp.ScmpFilter, is386 bool) error {
 		if err != nil {
 			return err
 		}
-		for _, scall := range scalls {
-			if err = f.AddRuleConditional(scall, seccomp.ActAllow, []seccomp.ScmpCondition{isProtReadWrite, isFlag}); err != nil {
-				return err
-			}
+		if err = f.AddRuleConditional(scall, seccomp.ActAllow, []seccomp.ScmpCondition{isProtReadWrite, isFlag}); err != nil {
+			return err
 		}
 	}
 
@@ -540,27 +464,17 @@ func torFilterMmap(f *seccomp.ScmpFilter, is386 bool) error {
 	if err != nil {
 		return err
 	}
-	for _, scall := range scalls {
-		if err = f.AddRuleConditional(scall, seccomp.ActAllow, []seccomp.ScmpCondition{isProtReadExec, isProtReadExecFlags}); err != nil {
-			return err
-		}
+	if err = f.AddRuleConditional(scall, seccomp.ActAllow, []seccomp.ScmpCondition{isProtReadExec, isProtReadExecFlags}); err != nil {
+		return err
 	}
 
 	return nil
 }
 
-func torFilterFcntl(f *seccomp.ScmpFilter, is386 bool) error {
-	scallFcntl, err := seccomp.GetSyscallFromName("fcntl")
+func torFilterFcntl(f *seccomp.ScmpFilter) error {
+	scall, err := seccomp.GetSyscallFromName("fcntl")
 	if err != nil {
 		return err
-	}
-	scalls := []seccomp.ScmpSyscall{scallFcntl}
-	if is386 {
-		scallFcntl64, err := seccomp.GetSyscallFromName("fcntl64")
-		if err != nil {
-			return err
-		}
-		scalls = append(scalls, scallFcntl64)
 	}
 
 	isFGetfl, err := seccomp.MakeCondition(1, seccomp.CompareEqual, syscall.F_GETFL)
@@ -590,21 +504,19 @@ func torFilterFcntl(f *seccomp.ScmpFilter, is386 bool) error {
 		return err
 	}
 
-	for _, scall := range scalls {
-		if err = f.AddRuleConditional(scall, seccomp.ActAllow, []seccomp.ScmpCondition{isFGetfl}); err != nil {
-			return err
-		}
-		if err = f.AddRuleConditional(scall, seccomp.ActAllow, []seccomp.ScmpCondition{isFGetfd}); err != nil {
-			return err
-		}
+	if err = f.AddRuleConditional(scall, seccomp.ActAllow, []seccomp.ScmpCondition{isFGetfl}); err != nil {
+		return err
+	}
+	if err = f.AddRuleConditional(scall, seccomp.ActAllow, []seccomp.ScmpCondition{isFGetfd}); err != nil {
+		return err
+	}
 
-		if err = f.AddRuleConditional(scall, seccomp.ActAllow, []seccomp.ScmpCondition{isFSetfl, isFSetflFlags}); err != nil {
-			return err
-		}
+	if err = f.AddRuleConditional(scall, seccomp.ActAllow, []seccomp.ScmpCondition{isFSetfl, isFSetflFlags}); err != nil {
+		return err
+	}
 
-		if err = f.AddRuleConditional(scall, seccomp.ActAllow, []seccomp.ScmpCondition{isFSetfd, isFdCloexec}); err != nil {
-			return err
-		}
+	if err = f.AddRuleConditional(scall, seccomp.ActAllow, []seccomp.ScmpCondition{isFSetfd, isFdCloexec}); err != nil {
+		return err
 	}
 
 	return nil
@@ -656,18 +568,10 @@ func obfsFilterSetsockopt(f *seccomp.ScmpFilter) error {
 }
 
 // `mmap` -> `arg2 == PROT_NONE && (arg3 == MAP_PRIVATE|MAP_ANONYMOUS || arg3 == MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS)`
-func obfsFilterMmap(f *seccomp.ScmpFilter, is386 bool) error {
-	scallMmap, err := seccomp.GetSyscallFromName("mmap")
+func obfsFilterMmap(f *seccomp.ScmpFilter) error {
+	scall, err := seccomp.GetSyscallFromName("mmap")
 	if err != nil {
 		return err
-	}
-	scalls := []seccomp.ScmpSyscall{scallMmap}
-	if is386 {
-		scallMmap2, err := seccomp.GetSyscallFromName("mmap2")
-		if err != nil {
-			return err
-		}
-		scalls = append(scalls, scallMmap2)
 	}
 
 	isProtNone, err := seccomp.MakeCondition(2, seccomp.CompareEqual, syscall.PROT_NONE)
@@ -683,10 +587,8 @@ func obfsFilterMmap(f *seccomp.ScmpFilter, is386 bool) error {
 		if err != nil {
 			return err
 		}
-		for _, scall := range scalls {
-			if err = f.AddRuleConditional(scall, seccomp.ActAllow, []seccomp.ScmpCondition{isProtNone, isFlag}); err != nil {
-				return err
-			}
+		if err = f.AddRuleConditional(scall, seccomp.ActAllow, []seccomp.ScmpCondition{isProtNone, isFlag}); err != nil {
+			return err
 		}
 	}
 	return nil

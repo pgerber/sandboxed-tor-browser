@@ -37,7 +37,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to create output: %v", err)
 	}
-	if err = compileTorSeccompProfile(f, false, false); err != nil {
+	if err = compileTorSeccompProfile(f, false); err != nil {
 		log.Fatalf("failed to create tor amd64 profile: %v", err)
 	}
 
@@ -46,7 +46,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to create output: %v", err)
 	}
-	if err = compileTorSeccompProfile(f, true, false); err != nil {
+	if err = compileTorSeccompProfile(f, true); err != nil {
 		log.Fatalf("failed to create tor-obfs4 amd64 profile: %v", err)
 	}
 
@@ -55,34 +55,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to create output: %v", err)
 	}
-	if err = compileTorBrowserSeccompProfile(f, false); err != nil {
+	if err = compileTorBrowserSeccompProfile(f); err != nil {
 		log.Fatalf("failed to create firefox amd64 profile: %v", err)
-	}
-
-	// Tor Browser (386)
-	f, err = os.Create(filepath.Join(outDir, "tor-386.bpf"))
-	if err != nil {
-		log.Fatalf("failed to create output: %v", err)
-	}
-	if err = compileTorSeccompProfile(f, false, true); err != nil {
-		log.Fatalf("failed to create tor 386 profile: %v", err)
-	}
-
-	// Tor Browser + obfs4proxy (386)
-	f, err = os.Create(filepath.Join(outDir, "tor-obfs4-386.bpf"))
-	if err != nil {
-		log.Fatalf("failed to create output: %v", err)
-	}
-	if err = compileTorSeccompProfile(f, true, true); err != nil {
-		log.Fatalf("failed to create tor-obfs4 386 profile: %v", err)
-	}
-
-	// Firefox (386)
-	f, err = os.Create(filepath.Join(outDir, "torbrowser-386.bpf"))
-	if err != nil {
-		log.Fatalf("failed to create output: %v", err)
-	}
-	if err = compileTorBrowserSeccompProfile(f, true); err != nil {
-		log.Fatalf("failed to create firefox 386 profile: %v", err)
 	}
 }

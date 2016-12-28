@@ -819,9 +819,8 @@ func (h *hugbox) appendLibraries(cache *dynlib.Cache, binaries []string, extraLi
 	case "amd64":
 		h.symlink("/lib", "/lib64")
 		h.symlink(restrictedLibDir, "/usr/lib64")
-	case "386":
-		h.symlink("/lib", "/lib32")
-		h.symlink(restrictedLibDir, "/usr/lib32")
+	default:
+		panic("sandbox: unsupported architecture: " + runtime.GOARCH)
 	}
 
 	h.standardLibs = false
@@ -839,11 +838,8 @@ func init() {
 			"/usr/lib64",                // Fedora 25
 			"/usr/lib/x86_64-linux-gnu", // Debian
 		}, searchPaths...)
-	case "386":
-		searchPaths = append([]string{
-			"/usr/lib32",
-			"/usr/lib/i386-linux-gnu", // Debian
-		}, searchPaths...)
+	default:
+		panic("sandbox: unsupported architecture: " + runtime.GOARCH)
 	}
 
 	distributionDependentLibSearchPath = searchPaths

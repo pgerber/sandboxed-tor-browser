@@ -1,4 +1,3 @@
 {
-  "linux64": [ "release", "alpha", "hardened" ],
-  "linux32": [ "release", "alpha" ]
+  "linux64": [ "release", "alpha", "hardened" ]
 }

@@ -462,8 +462,6 @@ func New(version string) (*Config, error) {
 		return nil, fmt.Errorf("unsupported OS: %v", runtime.GOOS)
 	}
 	switch runtime.GOARCH {
-	case "386":
-		cfg.Architecture = archLinux32
 	case "amd64":
 		cfg.Architecture = archLinux64
 	default:

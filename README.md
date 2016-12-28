@@ -16,7 +16,7 @@ Qubes, Subgraph or Tails.
 
 Runtime dependencies:
 
- * A modern Linux system on x86/x86_64 architecture.
+ * A modern Linux system on x86_64 architecture.
  * bubblewrap >= 0.1.3 (https://github.com/projectatomic/bubblewrap).
  * Gtk+ >= 3.14.0
  * (Optional) PulseAudio

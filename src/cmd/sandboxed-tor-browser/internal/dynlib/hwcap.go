@@ -26,39 +26,8 @@ import "C"
 
 import (
 	"bytes"
-	"runtime"
 	"syscall"
 )
-
-const (
-	x86HwcapFirstPlatform = 48
-	hwcapMask             = 0xffffffff
-)
-
-func getHwcap() uint64 {
-	if runtime.GOARCH != "386" {
-		return 0
-	}
-
-	// HWCAP_I386_XMM2  = 1 << 26
-	// HWCAP_I386_CMOV  = 1 << 15 (Debian-ism)
-	important := uint32((1 << 26) | (1 << 15))
-	hwcap := uint64(uint32(C.getauxval(C.AT_HWCAP)) & important)
-
-	// On x86, glibc stores the x86 architecture family in hwcap as well.
-	x86Platforms := []string{"i386", "i486", "i586", "i686"}
-
-	platform := C.GoString(C.getPlatform())
-	for i, v := range x86Platforms {
-		if v == platform {
-			i += x86HwcapFirstPlatform
-			hwcap = hwcap | (uint64(i) << x86HwcapFirstPlatform)
-			break
-		}
-	}
-
-	return hwcap
-}
 
 func getOsVersion() uint32 {
 	var buf syscall.Utsname
