@@ -148,7 +148,7 @@ func (ui *gtkUI) Run() error {
 			case <-gtkPumpTicker.C:
 				// This is so stupid, but is needed for notification actions
 				// to work.
-				gtk3.MainIteration()
+				gtk3.MainIterationDo(false)
 				continue
 			case action := <-ui.updateNotificationCh:
 				// Notification action was triggered, probably a restart.
