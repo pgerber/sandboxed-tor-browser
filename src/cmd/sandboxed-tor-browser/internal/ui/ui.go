@@ -143,17 +143,17 @@ func (c *Common) Init() error {
 		BundleChannels[c.Cfg.Architecture] = channels
 	}
 
-	// If the config is clearly from an old version, re-assert our will over
-	// firefox, by re-writing the autoconfig files.
-	if c.Cfg.ConfigVersionChanged {
-		if err = writeAutoconfig(c.Cfg); err != nil {
-			return err
-		}
-	}
-
 	if c.Manif != nil {
 		if err = c.Manif.Sync(); err != nil {
 			return err
+		}
+
+		// If the config is clearly from an old version, re-assert our will
+		// over firefox, by re-writing the autoconfig files.
+		if c.Cfg.ConfigVersionChanged {
+			if err = writeAutoconfig(c.Cfg); err != nil {
+				return err
+			}
 		}
 	}
 	return c.Cfg.Sync()
