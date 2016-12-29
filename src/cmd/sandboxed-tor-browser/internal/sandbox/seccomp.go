@@ -17,34 +17,81 @@
 package sandbox
 
 import (
+	"encoding/binary"
+	"fmt"
 	"os"
 	"runtime"
+
+	"github.com/twtiger/gosecco"
+	"github.com/twtiger/gosecco/parser"
 
 	"cmd/sandboxed-tor-browser/internal/data"
 )
 
 func installTorSeccompProfile(fd *os.File, useBridges bool) error {
-	assetFile := "tor-"
+	commonAssetFile := "tor-common-" + runtime.GOARCH + ".seccomp"
+
+	assets := []string{commonAssetFile}
 	if useBridges {
-		assetFile = assetFile + "obfs4-"
-	}
-	assetFile = assetFile + runtime.GOARCH + ".bpf"
-
-	bpf, err := data.Asset(assetFile)
-	if err != nil {
-		return err
+		assets = append(assets, "tor-obfs4-"+runtime.GOARCH+".seccomp")
+	} else {
+		assets = append(assets, "tor-"+runtime.GOARCH+".seccomp")
 	}
 
-	return writeBuffer(fd, bpf)
+	return installSeccomp(fd, assets)
 }
 
 func installTorBrowserSeccompProfile(fd *os.File) error {
-	assetFile := "torbrowser-" + runtime.GOARCH + ".bpf"
+	assetFile := "torbrowser-" + runtime.GOARCH + ".seccomp"
 
-	bpf, err := data.Asset(assetFile)
+	return installSeccomp(fd, []string{assetFile})
+}
+
+func installSeccomp(fd *os.File, ruleAssets []string) error {
+	defer fd.Close()
+
+	settings := gosecco.SeccompSettings{
+		DefaultPositiveAction: "allow",
+		DefaultNegativeAction: "ENOSYS",
+		DefaultPolicyAction:   "ENOSYS",
+		ActionOnX32:           "kill",
+		ActionOnAuditFailure:  "kill",
+	}
+
+	if len(ruleAssets) == 0 {
+		return fmt.Errorf("installSeccomp() called with no rules")
+	}
+
+	// Combine the rules into a single source.
+	var sources []parser.Source
+	for _, asset := range ruleAssets {
+		rules, err := data.Asset(asset)
+		if err != nil {
+			return err
+		}
+		source := &parser.StringSource{
+			Name:    asset,
+			Content: string(rules),
+		}
+		sources = append(sources, source)
+	}
+
+	// Compile the combined source into bpf bytecode.
+	combined := parser.CombineSources(sources...)
+	bpf, err := gosecco.PrepareSource(combined, settings)
 	if err != nil {
 		return err
 	}
 
-	return writeBuffer(fd, bpf)
+	// Install the bpf bytecode.
+	if size, limit := len(bpf), 0xffff; size > limit {
+		return fmt.Errorf("filter program too big: %d bpf instructions (limit = %d)", size, limit)
+	}
+	for _, rule := range bpf {
+		if err := binary.Write(fd, binary.LittleEndian, rule); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

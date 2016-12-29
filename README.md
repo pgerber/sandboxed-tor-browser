@@ -29,7 +29,6 @@ Build time dependencies:
  * A C compiler
  * gb (https://getgb.io/ Yes I know it's behind fucking cloudflare)
  * Go (Tested with 1.7.x)
- * libseccomp2 >= 2.2.1
  * libnotify
 
 Things that the sandbox breaks:

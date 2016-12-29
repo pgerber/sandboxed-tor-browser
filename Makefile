@@ -9,9 +9,8 @@ sandboxed-tor-browser: static-assets
 	gb build -tags $(GTK3TAG) cmd/sandboxed-tor-browser
 	mv ./bin/sandboxed-tor-browser-$(GTK3TAG) ./bin/sandboxed-tor-browser
 
-static-assets: go-bindata gen-seccomp tbb_stub
+static-assets: go-bindata tbb_stub
 	git rev-parse --short HEAD > data/revision
-	./bin/gen-seccomp -o ./data
 	./bin/go-bindata -nometadata -pkg data -prefix data -o ./src/cmd/sandboxed-tor-browser/internal/data/bindata.go data/...
 
 tbb_stub: go-bindata
@@ -19,9 +18,6 @@ tbb_stub: go-bindata
 
 go-bindata:
 	gb build github.com/jteeuwen/go-bindata/go-bindata
-
-gen-seccomp:
-	gb build cmd/gen-seccomp
 
 clean:
 	rm -f ./src/cmd/sandboxed-tor-browser/internal/data/bindata.go
