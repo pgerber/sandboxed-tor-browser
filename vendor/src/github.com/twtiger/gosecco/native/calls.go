@@ -1,5 +1,45 @@
 package native
 
+// XXX/Yawning: Debian still ships 3.16, and all sandboxed-tor-browser uses this
+// for is the compiler anyway.
+
+import (
+	"fmt"
+
+	"github.com/twtiger/gosecco/data"
+)
+
+// InstallSeccomp will install seccomp using native methods
+func InstallSeccomp(prog *data.SockFprog) error {
+	return fmt.Errorf("BUG: sandboxed-tor-browser called native.InstallSeccomp")
+}
+
+// NoNewPrivs will use prctl to stop new privileges using native methods
+func NoNewPrivs() error {
+	return fmt.Errorf("BUG: sandboxed-tor-browser called native.NoNewPrivs")
+}
+
+// CheckGetSeccomp will check if we have seccomp available
+func CheckGetSeccomp() error {
+	return fmt.Errorf("BUG: sandboxed-tor-browser called native.CheckGetSeccomp")
+}
+
+// CheckSetSeccompModeFilter will check if we have seccomp mode filter available
+func CheckSetSeccompModeFilter() error {
+	return fmt.Errorf("BUG: sandboxed-tor-browser called native.CheckSetSeccompModeFilter")
+}
+
+// CheckSetSeccompModeFilterWithSeccomp will check if we have the seccomp syscall available
+func CheckSetSeccompModeFilterWithSeccomp() error {
+	return fmt.Errorf("BUG: sandboxed-tor-browser called native.CheckSetSeccompModeFilterWithSeccomp")
+}
+
+// CheckSetSeccompModeTsync will check that we can set tsync
+func CheckSetSeccompModeTsync() error {
+	return fmt.Errorf("BUG: sandboxed-tor-browser called native.CheckSetSeccompModeTsync")
+}
+
+/*
 import (
 	"syscall"
 	"unsafe"
@@ -68,3 +108,4 @@ func CheckSetSeccompModeFilterWithSeccomp() error {
 func CheckSetSeccompModeTsync() error {
 	return seccomp(C.SECCOMP_SET_MODE_FILTER, C.SECCOMP_FILTER_FLAG_TSYNC, nil)
 }
+*/
