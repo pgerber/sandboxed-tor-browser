@@ -145,6 +145,12 @@ func (c *Common) FetchUpdate(async *Async, patch *installer.Patch) []byte {
 	log.Printf("update: Validating Tor Browser Update.")
 	async.UpdateProgress("Validating Tor Browser Update.")
 
+	// Validate the size against that listed in the XML file.
+	if len(mar) != patch.Size {
+		async.Err = fmt.Errorf("downloaded patch size does not match patch metadata")
+		return nil
+	}
+
 	// Validate the hash against that listed in the XML file.
 	expectedHash, err := hex.DecodeString(patch.HashValue)
 	if err != nil {
