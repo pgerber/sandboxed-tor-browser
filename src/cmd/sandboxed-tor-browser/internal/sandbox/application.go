@@ -163,7 +163,7 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (cm
 	h.setenv("TOR_CONTROL_PORT", "9151")
 	h.setenv("TOR_SKIP_LAUNCH", "1")
 	h.setenv("TOR_NO_DISPLAY_NETWORK_SETTINGS", "1")
-	h.setenv("TOR_SANDBOX", "linux-v0")
+	h.setenv("TOR_HIDE_UPDATE_CHECK_UI", "1")
 
 	// Inject the AF_LOCAL compatibility hack stub into the filesystem, and
 	// supply the relevant args required for functionality.
