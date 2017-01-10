@@ -245,8 +245,9 @@ func (t *Tor) launchSurrogates(cfg *config.Config) error {
 }
 
 func (t *Tor) eventReader() {
+	ctrl := t.ctrl
 	for {
-		resp, err := t.ctrl.NextEvent()
+		resp, err := ctrl.NextEvent()
 		if err != nil {
 			break
 		}
