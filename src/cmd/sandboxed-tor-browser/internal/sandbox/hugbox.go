@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"cmd/sandboxed-tor-browser/internal/data"
+	. "cmd/sandboxed-tor-browser/internal/sandbox/process"
 	. "cmd/sandboxed-tor-browser/internal/utils"
 )
 
@@ -54,6 +55,10 @@ func (u *unshareOpts) toArgs() []string {
 	}
 	if u.pid {
 		args = append(args, "--unshare-pid")
+	} else {
+		// Until bubblewrap > 0.1.5 when the child calls setsid(),
+		// we have to rely on SIGKILL-ing the init fork for cleanup.
+		panic("sandbox: unshare.pid is required")
 	}
 	if u.net {
 		args = append(args, "--unshare-net")
@@ -152,7 +157,7 @@ func (h *hugbox) assetFile(dest, asset string) {
 	h.file(dest, b)
 }
 
-func (h *hugbox) run() (*exec.Cmd, error) {
+func (h *hugbox) run() (*Process, error) {
 	// Create the command struct for the sandbox.
 	cmd := &exec.Cmd{
 		Path:   h.bwrapPath,
@@ -298,9 +303,10 @@ func (h *hugbox) run() (*exec.Cmd, error) {
 	// Do the rest of the setup in a go routine, and monitor completion and
 	// a watchdog timer.
 	doneCh := make(chan error)
-	bwrapPid := cmd.Process.Pid
 	hz := time.NewTicker(1 * time.Second)
 	defer hz.Stop()
+
+	process := NewProcess(cmd)
 
 	go func() {
 		// Flush the pending writes.
@@ -330,7 +336,7 @@ func (h *hugbox) run() (*exec.Cmd, error) {
 			panic("sandbox: seccomp fd exists when there are no rules to be written")
 		}
 
-		// Read back the child pid.
+		// Read back the init child pid.
 		decoder := json.NewDecoder(infoRdFd)
 		info := &bwrapInfo{}
 		if err := decoder.Decode(info); err != nil {
@@ -339,11 +345,11 @@ func (h *hugbox) run() (*exec.Cmd, error) {
 		}
 
 		Debugf("sandbox: bwrap pid is: %v", cmd.Process.Pid)
-		Debugf("sandbox: child pid is: %v", info.Pid)
+		Debugf("sandbox: bwrap init pid is: %v", info.Pid)
 
-		// This is more useful to us, since it's the bubblewrap child inside
-		// the container.
-		cmd.Process.Pid = info.Pid
+		// Sending a SIGKILL to this will terminate every process in the PID
+		// namespace.  If people aren't using unshare.pid, bad things happen.
+		process.SetInitPid(info.Pid)
 
 		doneCh <- nil
 	}()
@@ -354,15 +360,11 @@ timeoutLoop:
 		select {
 		case err = <-doneCh:
 			if err == nil {
-				return cmd, nil
+				return process, nil
 			}
 			break timeoutLoop
 		case <-hz.C:
-			var wstatus syscall.WaitStatus
-			_, err = syscall.Wait4(bwrapPid, &wstatus, syscall.WNOHANG, nil)
-			if err != nil {
-				break timeoutLoop
-			} else if wstatus.Exited() {
+			if !process.Running() {
 				err = fmt.Errorf("sandbox: bubblewrap exited unexpectedly")
 				break timeoutLoop
 			}
@@ -370,7 +372,7 @@ timeoutLoop:
 		}
 	}
 
-	cmd.Process.Kill()
+	process.Kill()
 	return nil, err
 }
 

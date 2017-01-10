@@ -1,5 +1,6 @@
 Changes in version 0.0.3 - UNRELEASED:
- * Bug 21903: Go back to using gosecco for seccomp rule compilation.
+ * Bug 21184: Do a better job of killing/cleaning up bwrap children.
+ * Bug 21093: Go back to using gosecco for seccomp rule compilation.
  * Bug 20940: Deprecate x86 support.
  * Bug 20778: Check for updates in the background.
  * Bug 20851: If the incremental update fails, fall back to the complete

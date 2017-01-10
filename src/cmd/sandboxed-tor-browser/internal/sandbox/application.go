@@ -25,7 +25,6 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -33,6 +32,7 @@ import (
 	"syscall"
 
 	"cmd/sandboxed-tor-browser/internal/dynlib"
+	. "cmd/sandboxed-tor-browser/internal/sandbox/process"
 	"cmd/sandboxed-tor-browser/internal/tor"
 	"cmd/sandboxed-tor-browser/internal/ui/config"
 	. "cmd/sandboxed-tor-browser/internal/utils"
@@ -46,7 +46,7 @@ var (
 )
 
 // RunTorBrowser launches sandboxed Tor Browser.
-func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (cmd *exec.Cmd, err error) {
+func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (process *Process, err error) {
 	const (
 		profileSubDir = "TorBrowser/Data/Browser/profile.default"
 		cachesSubDir  = "TorBrowser/Data/Browser/Caches"
@@ -492,7 +492,7 @@ func stageUpdate(updateDir, installDir string, mar []byte) error {
 }
 
 // RunTor launches sandboxeed Tor.
-func RunTor(cfg *config.Config, manif *config.Manifest, torrc []byte) (cmd *exec.Cmd, err error) {
+func RunTor(cfg *config.Config, manif *config.Manifest, torrc []byte) (process *Process, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("%v", r)

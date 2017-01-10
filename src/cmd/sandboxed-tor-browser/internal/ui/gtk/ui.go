@@ -213,13 +213,14 @@ func (ui *gtkUI) Run() error {
 		}
 
 		// Kill the browser.  It's not as if firefox does the right thing on
-		// SIGTERM/SIGINT and we have the pid of the bubblewrap child instead
-		// of the firefox process anyway...
+		// SIGTERM/SIGINT and we have the pid of init inside the sandbox
+		// anyway...
 		//
 		// https://bugzilla.mozilla.org/show_bug.cgi?id=336193
-		ui.Sandbox.Process.Kill()
+		ui.Sandbox.Kill()
 		<-waitCh
 
+		ui.Sandbox = nil
 		ui.PendingUpdate = update
 		ui.ForceConfig = false
 		ui.NoKillTor = true // Don't re-lauch tor on the first pass.

@@ -28,7 +28,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -39,6 +38,7 @@ import (
 	"cmd/sandboxed-tor-browser/internal/data"
 	"cmd/sandboxed-tor-browser/internal/installer"
 	"cmd/sandboxed-tor-browser/internal/sandbox"
+	"cmd/sandboxed-tor-browser/internal/sandbox/process"
 	"cmd/sandboxed-tor-browser/internal/tor"
 	. "cmd/sandboxed-tor-browser/internal/ui/async"
 	"cmd/sandboxed-tor-browser/internal/ui/config"
@@ -96,7 +96,7 @@ type UI interface {
 type Common struct {
 	Cfg     *config.Config
 	Manif   *config.Manifest
-	Sandbox *exec.Cmd
+	Sandbox *process.Process
 	tor     *tor.Tor
 	lock    *lockFile
 
@@ -322,14 +322,14 @@ func (c *Common) launchTor(async *Async, onlySystem bool) error {
 		os.Remove(filepath.Join(c.Cfg.TorDataDir, "control_port"))
 
 		async.UpdateProgress("Launching Tor executable.")
-		cmd, err := sandbox.RunTor(c.Cfg, c.Manif, torrc)
+		process, err := sandbox.RunTor(c.Cfg, c.Manif, torrc)
 		if err != nil {
 			async.Err = err
 			return err
 		}
 
 		async.UpdateProgress("Waiting on Tor bootstrap.")
-		c.tor = tor.NewSandboxedTor(c.Cfg, cmd)
+		c.tor = tor.NewSandboxedTor(c.Cfg, process)
 		if err = c.tor.DoBootstrap(c.Cfg, async); err != nil {
 			async.Err = err
 			return err

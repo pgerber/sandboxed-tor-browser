@@ -27,12 +27,10 @@ import (
 	"log"
 	mrand "math/rand"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 	"unicode"
 
@@ -41,6 +39,7 @@ import (
 	"golang.org/x/net/proxy"
 
 	"cmd/sandboxed-tor-browser/internal/data"
+	"cmd/sandboxed-tor-browser/internal/sandbox/process"
 	. "cmd/sandboxed-tor-browser/internal/ui/async"
 	"cmd/sandboxed-tor-browser/internal/ui/config"
 	. "cmd/sandboxed-tor-browser/internal/utils"
@@ -56,7 +55,7 @@ type Tor struct {
 	isSystem       bool
 	isBootstrapped bool
 
-	cmd        *exec.Cmd
+	process    *process.Process
 	ctrl       *bulb.Conn
 	ctrlEvents chan *bulb.Response
 
@@ -146,37 +145,47 @@ func (t *Tor) getconf(arg string) (*bulb.Response, error) {
 
 // Shutdown attempts to gracefully clean up the Tor instance.  If it is a
 // system tor, only the control port connection will be closed.  Otherwise,
-// the tor daemon will be SIGTERMed.
+// the tor daemon will be terminated, gracefully if possible.
 func (t *Tor) Shutdown() {
 	t.Lock()
 	defer t.Unlock()
 
+	sentHalt := false
 	if t.ctrl != nil {
-		// Try extra hard to get tor to fuck off, if we spawned it.
+		// Try to gracefully terminate the daemon via the control port.
 		if !t.isSystem {
 			t.ctrl.Request("SIGNAL HALT")
+			sentHalt = true
 		}
 		t.ctrl.Close()
 		t.ctrl = nil
 	}
 
-	if t.cmd != nil {
-		waitCh := make(chan bool)
-		go func() {
-			t.cmd.Process.Signal(syscall.SIGTERM)
-			t.cmd.Process.Wait()
-			waitCh <- true
-		}()
-
-		select {
-		case <-waitCh:
-			Debugf("tor: Process exited after SIGTERM")
-		case <-time.After(5 * time.Second):
-			Debugf("tor: Process timed out waiting after SIGTERM, killing.")
-			t.cmd.Process.Signal(syscall.SIGKILL)
+	if t.process != nil {
+		if t.isSystem {
+			panic("tor: system tor has a sandbox child process")
 		}
 
-		t.cmd = nil
+		if sentHalt {
+			waitCh := make(chan bool)
+			go func() {
+				t.process.Wait()
+				waitCh <- true
+			}()
+
+			select {
+			case <-waitCh:
+				Debugf("tor: Process exited after HALT")
+			case <-time.After(5 * time.Second):
+				Debugf("tor: Process timed out waiting after HALT, killing.")
+				t.process.Kill()
+			}
+		} else {
+			Debugf("tor: Process has no control port, killing")
+			t.process.Kill()
+		}
+
+		t.process = nil
 	}
 
 	if t.ctrlSurrogate != nil {
@@ -281,10 +290,10 @@ func NewSystemTor(cfg *config.Config) (*Tor, error) {
 }
 
 // NewSandboxedTor creates a Tor struct around a sandboxed tor instance.
-func NewSandboxedTor(cfg *config.Config, cmd *exec.Cmd) *Tor {
+func NewSandboxedTor(cfg *config.Config, process *process.Process) *Tor {
 	t := new(Tor)
 	t.isSystem = false
-	t.cmd = cmd
+	t.process = process
 	t.socksNet = "unix"
 	t.socksAddr = filepath.Join(cfg.TorDataDir, "socks")
 	t.ctrlAddr = filepath.Join(cfg.TorDataDir, "control")
@@ -333,9 +342,10 @@ func (t *Tor) DoBootstrap(cfg *config.Config, async *Async) (err error) {
 	if t.ctrl, err = bulb.Dial("unix", t.ctrlAddr); err != nil {
 		return err
 	}
+	ctrl := t.ctrl // Shadow, so that we fail gracefully on close.
 
 	// Authenticate with the control port.
-	if err = t.ctrl.Authenticate(cfg.Tor.CtrlPassword); err != nil {
+	if err = ctrl.Authenticate(cfg.Tor.CtrlPassword); err != nil {
 		return err
 	}
 
@@ -344,22 +354,22 @@ func (t *Tor) DoBootstrap(cfg *config.Config, async *Async) (err error) {
 	// shouldn't leave a turd process lying around, though I've seen it on
 	// occaision. :(
 	log.Printf("tor: Taking ownership of the tor process")
-	if _, err = t.ctrl.Request("TAKEOWNERSHIP"); err != nil {
+	if _, err = ctrl.Request("TAKEOWNERSHIP"); err != nil {
 		return err
 	}
 
 	// Start the event async reader.
-	t.ctrl.StartAsyncReader()
+	ctrl.StartAsyncReader()
 	go t.eventReader()
 
 	// Register the `STATUS_CLIENT` event handler.
-	if _, err = t.ctrl.Request("SETEVENTS STATUS_CLIENT"); err != nil {
+	if _, err = ctrl.Request("SETEVENTS STATUS_CLIENT"); err != nil {
 		return err
 	}
 
 	// Start the bootstrap.
 	async.UpdateProgress("Connecting to the Tor network.")
-	if _, err = t.ctrl.Request("RESETCONF DisableNetwork"); err != nil {
+	if _, err = ctrl.Request("RESETCONF DisableNetwork"); err != nil {
 		return err
 	}
 
@@ -383,10 +393,9 @@ func (t *Tor) DoBootstrap(cfg *config.Config, async *Async) (err error) {
 		case <-hz.C:
 			const statusPrefix = "status/bootstrap-phase="
 
-			// As a fallback, use kill(pid, 0) to detect if the process has
-			// puked.  waitpid(2) is probably better since it's a child, but
-			// this should be good enough, and is only to catch tor crashing.
-			if err := syscall.Kill(t.cmd.Process.Pid, 0); err == syscall.ESRCH {
+			// As a fallback, periodicall poll to see if the process has
+			// crashed.
+			if !t.process.Running() {
 				return fmt.Errorf("tor process appears to have crashed.")
 			}
 
@@ -414,7 +423,7 @@ func (t *Tor) DoBootstrap(cfg *config.Config, async *Async) (err error) {
 	}
 
 	// Squelch the events, and drain the event queue.
-	if _, err = t.ctrl.Request("SETEVENTS"); err != nil {
+	if _, err = ctrl.Request("SETEVENTS"); err != nil {
 		return err
 	}
 	for len(t.ctrlEvents) > 0 {
