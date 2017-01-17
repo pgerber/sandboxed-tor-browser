@@ -56,8 +56,7 @@ func (u *unshareOpts) toArgs() []string {
 	if u.pid {
 		args = append(args, "--unshare-pid")
 	} else {
-		// Until bubblewrap > 0.1.5 when the child calls setsid(),
-		// we have to rely on SIGKILL-ing the init fork for cleanup.
+		// This is basically required for cleanup.
 		panic("sandbox: unshare.pid is required")
 	}
 	if u.net {
@@ -167,6 +166,7 @@ func (h *hugbox) run() (*Process, error) {
 		Stdout: h.stdout,
 		Stderr: h.stderr,
 		SysProcAttr: &syscall.SysProcAttr{
+			Setsid: true,
 			Pdeathsig: h.pdeathSig,
 		},
 	}
