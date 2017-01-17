@@ -1,4 +1,5 @@
 Changes in version 0.0.3 - UNRELEASED:
+ * Bug 21057: Change the metadata URL(s) for the stable bundle.
  * Bug 21184: Do a better job of killing/cleaning up bwrap children.
  * Bug 21093: Go back to using gosecco for seccomp rule compilation.
  * Bug 20940: Deprecate x86 support.
