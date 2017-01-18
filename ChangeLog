@@ -28,6 +28,7 @@ Changes in version 0.0.3 - UNRELEASED:
  * Fix a nil pointer deref on SIGINT received durring bootstrap.
  * Don't remove the PaX overrides ever, because until the JIT gets rewritten
    Firefox won't play nice with MPROTECT.
+ * setsid() related fixes and changes as bubblewrap behavior has changed.
 
 Changes in version 0.0.2 - 2016-12-10:
  * Bug #20780: Shuffle and persist the ordering of internal bridges.
