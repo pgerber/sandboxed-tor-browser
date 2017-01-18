@@ -10,9 +10,7 @@ works on Linux, and will NEVER support anything else since sandboxing is OS
 specific.
 
 There are several unresolved issues that affect security and fingerprinting.
-Do not assume that this is perfect, merely "an improvement over nothing".  If
-you require strong security, consider combining the sandbox with something like
-Qubes, Subgraph or Tails.
+Do not assume that this is perfect, merely "an improvement over nothing".
 
 Runtime dependencies:
 
