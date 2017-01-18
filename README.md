@@ -46,9 +46,6 @@ Places where the sandbox could be better:
 
 Upstream Bugs:
 
- * Hide the "Check for Tor Browser Update..." menu entry when running under
-   the sandbox.
-   (https://bugs.torproject.org/21091)
  * Tor Browser should run without a `/proc` filesystem.
    (https://bugs.torproject.org/20283)
  * OpenGL software rendering is  broken on certain Linux systems.
