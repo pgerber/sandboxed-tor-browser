@@ -300,7 +300,7 @@ func New(summary, body string, icon *gdk.Pixbuf) *Notification {
 
 	runtime.SetFinalizer(n, func(n *Notification) {
 		delete(callbackChans, unsafe.Pointer(n.n))
-		C.g_object_unref(n.n)
+		C.g_object_unref(C.gpointer(n.n))
 	})
 	n.SetImage(icon)
 
