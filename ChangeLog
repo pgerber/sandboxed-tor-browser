@@ -1,4 +1,5 @@
 Changes in version 0.0.4 - UNRELEASED:
+ * Bug 21536: Remove asn's scramblesuit bridge from Tor Browser.
  * Fix compilation with Go 1.8.
 
 Changes in version 0.0.3 - 2017-01-18:
