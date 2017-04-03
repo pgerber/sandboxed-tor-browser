@@ -1,6 +1,7 @@
 Changes in version 0.0.4 - UNRELEASED:
  * Bug 21536: Remove asn's scramblesuit bridge from Tor Browser.
  * Fix compilation with Go 1.8.
+ * Use Config.Clone() to clone TLS configs when available.
 
 Changes in version 0.0.3 - 2017-01-18:
  * Bug 21057: Change the metadata URL(s) for the stable bundle.

@@ -1,6 +1,6 @@
-// Go 1.7 and later tls.Config deep copy.
+// Go 1.7 tls.Config deep copy.
 
-// +build go1.7
+// +build go1.7,!go1.8
 
 package hpkp
 
