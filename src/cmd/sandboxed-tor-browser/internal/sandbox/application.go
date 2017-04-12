@@ -190,8 +190,15 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (pr
 	// Tor Browser currently is incompatible with PaX MPROTECT, apply the
 	// override if needed.
 	realFirefoxPath := filepath.Join(realBrowserHome, "firefox")
-	if err = applyPaXAttributes(manif, realFirefoxPath); err != nil {
-		return nil, err
+	needsPaXPaths := []string{
+		realFirefoxPath,
+		filepath.Join(realBrowserHome, "plugin-container"),
+	}
+	for _, p := range needsPaXPaths {
+		err := applyPaXAttributes(manif, p)
+		if err != nil {
+			log.Printf("sandbox: Failed to apply PaX attributes to `%v`: %v", p, err)
+		}
 	}
 
 	extraLdLibraryPath := ""
@@ -329,11 +336,12 @@ func applyPaXAttributes(manif *config.Manifest, f string) error {
 	const paxAttr = "user.pax.flags"
 
 	sz, _ := syscall.Getxattr(f, paxAttr, nil)
+	_, n := filepath.Split(f)
 
 	// Strip off the attribute if this is a non-grsec kernel.
 	if !IsGrsecKernel() {
 		if sz > 0 {
-			log.Printf("sandbox: Removing Tor Browser PaX attributes.")
+			log.Printf("sandbox: Removing PaX attributes: %v", n)
 			syscall.Removexattr(f, paxAttr)
 		}
 		return nil
@@ -346,12 +354,12 @@ func applyPaXAttributes(manif *config.Manifest, f string) error {
 			return err
 		}
 		if bytes.Contains(dest, paxOverride) {
-			log.Printf("sandbox: Tor Browser PaX attributes already set.")
+			log.Printf("sandbox: PaX attributes already set: %v", n)
 			return nil
 		}
 	}
 
-	log.Printf("sandbox: Applying Tor Browser PaX attributes.")
+	log.Printf("sandbox: Applying PaX attributes: %v", n)
 	return syscall.Setxattr(f, paxAttr, paxOverride, 0)
 }
 
