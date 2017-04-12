@@ -1,3 +1,5 @@
+Changes in version 0.0.5 - UNRELEASED:
+
 Changes in version 0.0.4 - 2017-04-12:
  * Bug 21928: Force a reinstall if an existing hardened bundle is present.
  * Bug 21929: Remove hardened/ASAN related code.
