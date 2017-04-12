@@ -70,6 +70,17 @@ func (ui *gtkUI) Run() error {
 		log.Printf("ui: libnotify wasn't found, no desktop notifications possible")
 	}
 
+	if ui.WasHardened {
+		log.Printf("ui: Previous `hardened` bundle detected")
+
+		ok := ui.ask("The hardened bundle has been discontinued, and the installation of a supported bundle is required.\n\nWARNING: The install process will delete the existing bundle, including bookmarks and downloads.  Backup all data you wish to preserve before continuing.")
+		if !ok {
+			log.Printf("ui: User denied `hardened` bundle overwrite")
+			return nil
+		}
+		log.Printf("ui: User confirmed `hardened` bundle overwrite")
+	}
+
 	if ui.NeedsInstall() || ui.ForceInstall {
 		for {
 			if !ui.installDialog.run() {
@@ -328,6 +339,15 @@ func (ui *gtkUI) bitch(format string, a ...interface{}) {
 	md.Run()
 	md.Hide()
 	ui.forceRedraw()
+}
+
+func (ui *gtkUI) ask(format string, a ...interface{}) bool {
+	md := gtk3.MessageDialogNew(ui.mainWindow, gtk3.DIALOG_MODAL, gtk3.MESSAGE_QUESTION, gtk3.BUTTONS_OK_CANCEL, format, a...)
+	result := md.Run()
+	md.Hide()
+	ui.forceRedraw()
+
+	return result == int(gtk3.RESPONSE_OK)
 }
 
 func (ui *gtkUI) notifyUpdate(update *installer.UpdateEntry) {

@@ -67,7 +67,7 @@ const (
 	// bridges.
 	DefaultBridgeTransport = "obfs4"
 
-	// chanHardened = "hardened"
+	chanHardened = "hardened"
 )
 
 func usage() {
@@ -111,6 +111,7 @@ type Common struct {
 	NoKillTor      bool
 	AdvancedConfig bool
 	PrintVersion   bool
+	WasHardened    bool
 }
 
 // Init initializes the common interface state.
@@ -144,6 +145,12 @@ func (c *Common) Init() error {
 			if err = writeAutoconfig(c.Cfg); err != nil {
 				return err
 			}
+		}
+
+		// #21928: Force a reinstall if an existing hardened bundle is present.
+		if c.Manif.Channel == chanHardened {
+			c.ForceInstall = true
+			c.WasHardened = true
 		}
 	}
 	return c.Cfg.Sync()
