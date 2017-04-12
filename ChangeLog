@@ -1,5 +1,6 @@
 Changes in version 0.0.5 - UNRELEASED:
  * Fix e10s Web Content crash on systems with grsec kernels.
+ * Add `prlimit64` to the firefox system call whitelist.
 
 Changes in version 0.0.4 - 2017-04-12:
  * Bug 21928: Force a reinstall if an existing hardened bundle is present.
