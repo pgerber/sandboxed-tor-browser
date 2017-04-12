@@ -293,8 +293,7 @@ type Config struct {
 	// "linux64").
 	Architecture string `json:"-"`
 
-	// Channel is the Tor Browser channel to install ("release", "alpha",
-	// "hardened").
+	// Channel is the Tor Browser channel to install ("release", "alpha")
 	Channel string `json:"channel,omitempty"`
 
 	// Locale is the Tor Browser locale to install ("en-US", "ja").

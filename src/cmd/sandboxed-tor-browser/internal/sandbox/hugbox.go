@@ -166,7 +166,7 @@ func (h *hugbox) run() (*Process, error) {
 		Stdout: h.stdout,
 		Stderr: h.stderr,
 		SysProcAttr: &syscall.SysProcAttr{
-			Setsid: true,
+			Setsid:    true,
 			Pdeathsig: h.pdeathSig,
 		},
 	}

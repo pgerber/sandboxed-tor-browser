@@ -1,4 +1,5 @@
 Changes in version 0.0.4 - UNRELEASED:
+ * Bug 21929: Remove hardened/ASAN related code.
  * Bug 21927: Remove the ability to install/update the hardened bundle.
  * Bug 21244: Update the MAR signing key for 7.0.
  * Bug 21536: Remove asn's scramblesuit bridge from Tor Browser.

@@ -67,7 +67,7 @@ const (
 	// bridges.
 	DefaultBridgeTransport = "obfs4"
 
-	chanHardened = "hardened"
+	// chanHardened = "hardened"
 )
 
 func usage() {
@@ -132,16 +132,6 @@ func (c *Common) Init() error {
 		return err
 	}
 	c.Cfg.Sanitize()
-
-	if sandbox.IsGrsecKernel() {
-		channels := []string{}
-		for _, v := range BundleChannels[c.Cfg.Architecture] {
-			if v != "hardened" {
-				channels = append(channels, v)
-			}
-		}
-		BundleChannels[c.Cfg.Architecture] = channels
-	}
 
 	if c.Manif != nil {
 		if err = c.Manif.Sync(); err != nil {
@@ -462,12 +452,6 @@ func init() {
 		panic(err)
 	} else if err = json.Unmarshal(d, &BundleLocales); err != nil {
 		panic(err)
-	}
-
-	// Cowardly refuse to allow the user to install the hardeened bundle on
-	// grsec kernels.
-	if sandbox.IsGrsecKernel() {
-		delete(BundleLocales, chanHardened)
 	}
 
 	Bridges = make(map[string][]string)

@@ -55,11 +55,6 @@ func (c *Common) DoLaunch(async *Async, checkUpdates bool) {
 		return
 	}
 
-	if c.Manif.Channel == chanHardened && sandbox.IsGrsecKernel() {
-		async.Err = fmt.Errorf("The 'hardened' release is incompatible with grsec.")
-		return
-	}
-
 	// Start tor if required.
 	log.Printf("launch: Connecting to the Tor network.")
 	async.UpdateProgress("Connecting to the Tor network.")

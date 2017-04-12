@@ -139,10 +139,16 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (pr
 	// h.setenv("LD_LIBRARY_PATH", filepath.Join(browserHome, "TorBrowser", "Tor"))
 	h.setenv("FONTCONFIG_PATH", filepath.Join(browserHome, "TorBrowser", "Data", "fontconfig"))
 	h.setenv("FONTCONFIG_FILE", "fonts.conf")
-	if manif.Channel == "hardened" {
-		h.setenv("ASAN_OPTIONS", "detect_leaks=0")
-		h.setenv("NSS_DISABLE_HW_AES", "1") // For selfrando.
-	}
+
+	// This used to be for `hardened` but may eventually be required for
+	// `alpha`, though according to trac, newer versions of selfrando fix the
+	// problem.
+	//
+	// https://trac.torproject.org/projects/tor/ticket/20683#comment:13
+	//
+	// if manif.Channel == "alpha" {
+	//	h.setenv("NSS_DISABLE_HW_AES", "1") // For selfrando.
+	// }
 
 	// GNOME systems will puke with a read-only home, so instead of setting
 	// $HOME to point to inside the browser bundle, setup a bunch of
@@ -176,19 +182,6 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (pr
 	h.assetFile(stubPath, "tbb_stub.so")
 
 	ldPreload := stubPath
-	if manif.Channel == "hardened" {
-		// ASAN wants to be the first entry on LD_PRELOAD, so placate it.
-		matches, err := filepath.Glob(filepath.Join(realBrowserHome, "TorBrowser", "Tor") + "/libasan.so*")
-		if err != nil {
-			return nil, err
-		}
-		if len(matches) < 1 {
-			log.Printf("sandbox: Failed to find 'libasan.so.*'")
-		} else {
-			_, f := filepath.Split(matches[0])
-			ldPreload = f + ":" + ldPreload
-		}
-	}
 	h.setenv("LD_PRELOAD", ldPreload)
 
 	// Hardware accelerated OpenGL will not work, and never will.
@@ -520,13 +513,11 @@ func RunTor(cfg *config.Config, manif *config.Manifest, torrc []byte) (process *
 	// `/proc/sys/net/core/somaxconn` - obfs4proxy, Go runtime uses this to
 	//    determine listener backlog, but will default to `128` on errors.
 	//
-	// Hardened builds are special cased because asan crashes the binary
-	// if it can't read `/proc/self/maps`.
+	// `/proc/self/maps` - ASAN.  If it's ever enabled again, this mandates
+	//    `/proc`.
 	//
 	// See: https://bugs.torproject.org/20773
-	if manif.Channel != "hardened" {
-		h.mountProc = false
-	}
+	h.mountProc = false
 
 	if err = os.MkdirAll(cfg.TorDataDir, DirMode); err != nil {
 		return

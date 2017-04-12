@@ -181,10 +181,6 @@ uname: 1
 unshare: 1
 wait4: 1
 
-# XXX: This is only required for ASAN builds, so this should be included at
-# runtime.
-setrlimit: 1
-
 #
 # System calls allowed with filtering.
 #

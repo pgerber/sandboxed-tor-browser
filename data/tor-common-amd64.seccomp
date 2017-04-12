@@ -96,10 +96,6 @@ unshare: 1
 rt_sigaction: 1
 setsid: 1
 
-# XXX: This is only required for ASAN builds, so this should be included at
-# runtime.
-readlink: 1
-
 #
 # System calls allowed with filtering.
 #
