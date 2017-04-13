@@ -91,9 +91,10 @@ type hugbox struct {
 
 	// Internal options, not to be *modified* except via helpers, unless you
 	// know what you are doing.
-	bwrapPath string
-	args      []string
-	fileData  [][]byte
+	bwrapPath    string
+	bwrapVersion *bwrapVersion
+	args         []string
+	fileData     [][]byte
 
 	runtimeDir string // Set at creation time.
 }
@@ -243,6 +244,12 @@ func (h *hugbox) run() (*Process, error) {
 	groupBody := fmt.Sprintf("amnesia:x:%d:\n", gid)
 	h.file("/etc/passwd", []byte(passwdBody))
 	h.file("/etc/group", []byte(groupBody))
+
+	dieWithParent := h.bwrapVersion.atLeast(0, 1, 8)
+	if dieWithParent {
+		Debugf("sandbox: bubblewrap supports `--die-with-parent`.")
+		fdArgs = append(fdArgs, "--die-with-parent")
+	}
 
 	if h.fakeDbus {
 		h.setupDbus()
@@ -421,23 +428,47 @@ func newHugbox() (*hugbox, error) {
 		return nil, fmt.Errorf("sandbox: unable to find bubblewrap binary")
 	}
 
-	// Bubblewrap <= 0.1.2-2 (in Debian terms, 0.1.3 for the rest of us), is
-	// a really bad idea because I'm a retard, and didn't expect bubblewrap
-	// to be ptrace-able when I contributed support for the hostname.
-	//
-	// There is a CVE for it.  Sensible people have made 0.1.3 available,
-	// including jessie-backports.  Ubuntu is still shipping an old version.
-	// Sucks to be them.
-	if ok, err := bubblewrapAtLeast(h.bwrapPath, 0, 1, 3); err != nil {
+	// Query and cache the bubblewrap version.
+	var err error
+	if h.bwrapVersion, err = getBwrapVersion(h.bwrapPath); err != nil {
 		return nil, err
-	} else if !ok {
-		return nil, fmt.Errorf("sandbox: bubblewrap appears to be older than 0.1.3, you MUST upgrade.")
+	} else {
+		Debugf("sandbox: bubblewrap '%v' detected.", h.bwrapVersion)
+
+		// Bubblewrap <= 0.1.2-2 (in Debian terms, 0.1.3 for the rest of us),
+		// is a really bad idea because I'm a retard, and didn't expect
+		// bubblewrap to be ptrace-able when I contributed support for setting
+		// the hostname.
+		if !h.bwrapVersion.atLeast(0, 1, 3) {
+			return nil, fmt.Errorf("sandbox: bubblewrap appears to be older than 0.1.3, you MUST upgrade.")
+		}
 	}
 
 	return h, nil
 }
 
-func getBubblewrapVersion(f string) (int, int, int, error) {
+type bwrapVersion struct {
+	maj, min, pl int
+}
+
+func (v *bwrapVersion) atLeast(maj, min, pl int) bool {
+	if v.maj > maj {
+		return true
+	}
+	if v.maj == maj && v.min > min {
+		return true
+	}
+	if v.maj == maj && v.min == min && v.pl >= pl {
+		return true
+	}
+	return false
+}
+
+func (v *bwrapVersion) String() string {
+	return fmt.Sprintf("%d.%d.%d", v.maj, v.min, v.pl)
+}
+
+func getBwrapVersion(f string) (*bwrapVersion, error) {
 	cmd := &exec.Cmd{
 		Path: f,
 		Args: []string{f, "--version"},
@@ -448,7 +479,7 @@ func getBubblewrapVersion(f string) (int, int, int, error) {
 	}
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("sandbox: failed to query bubblewrap version: %v", string(out))
+		return nil, fmt.Errorf("sandbox: failed to query bubblewrap version: %v", string(out))
 	}
 	vStr := strings.TrimPrefix(string(out), "bubblewrap ")
 	vStr = strings.TrimSpace(vStr)
@@ -456,37 +487,20 @@ func getBubblewrapVersion(f string) (int, int, int, error) {
 	// Split into major/minor/pl.
 	v := strings.Split(vStr, ".")
 	if len(v) < 3 {
-		return 0, 0, 0, fmt.Errorf("unable to determine bubblewrap version")
+		return nil, fmt.Errorf("unable to determine bubblewrap version")
 	}
 
+	// Parse the version.
 	var iVers [3]int
 	for i := 0; i < 3; i++ {
 		iv, err := strconv.Atoi(v[i])
 		if err != nil {
-			return 0, 0, 0, fmt.Errorf("unable to determine bubblewrap version: %v", err)
+			return nil, fmt.Errorf("unable to parse bubblewrap version: %v", err)
 		}
 		iVers[i] = iv
 	}
 
-	return iVers[0], iVers[1], iVers[2], nil
-}
-
-func bubblewrapAtLeast(f string, maj, min, pl int) (bool, error) {
-	iMaj, iMin, iPl, err := getBubblewrapVersion(f)
-	if err != nil {
-		return false, err
-	}
-
-	if iMaj > maj {
-		return true, nil
-	}
-	if iMaj == maj && iMin > min {
-		return true, nil
-	}
-	if iMaj == maj && iMin == min && iPl >= pl {
-		return true, nil
-	}
-	return false, nil
+	return &bwrapVersion{maj: iVers[0], min: iVers[1], pl: iVers[2]}, nil
 }
 
 func writeBuffer(w io.WriteCloser, contents []byte) error {
