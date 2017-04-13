@@ -1,3 +1,5 @@
+Changes in version 0.0.6 - UNRELEASED:
+
 Changes in version 0.0.5 - 2017-04-13:
  * Bug 21764: Use bubblewrap's `--die-with-parent` when supported.
  * Fix e10s Web Content crash on systems with grsec kernels.
