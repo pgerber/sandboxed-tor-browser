@@ -28,11 +28,6 @@ import (
 	"cmd/sandboxed-tor-browser/internal/data"
 )
 
-const (
-	tbbMARReleasePrimaryAsset   = "installer/release_primary.der"
-	tbbMARReleaseSecondaryAsset = "installer/release_secondary.der"
-)
-
 var tbbMARCerts []*x509.Certificate
 
 // VerifyTorBrowserMAR validates the MAR signature against the TBB MAR signing
@@ -139,7 +134,11 @@ func VerifyTorBrowserMAR(mar []byte) error {
 }
 
 func init() {
-	assets := []string{tbbMARReleasePrimaryAsset, tbbMARReleaseSecondaryAsset}
+	assets := []string{
+		"installer/release_primary_6.5.der", // Stable MAR signing key.
+		"installer/release_primary.der",     // (Unused) MAR signing key.
+		"installer/release_secondary.der",   // Alpha MAR signing key (7.0).
+	}
 
 	for _, asset := range assets {
 		if der, err := data.Asset(asset); err != nil {
