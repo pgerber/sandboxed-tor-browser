@@ -228,6 +228,26 @@ pa_mutex_new(bool recursive, bool inherit_priority) {
   return m;
 }
 
+/* This call appears to only be used as part of the `gconf` module to execute
+ * a hardcoded `gconf-helper`, and isn't exposed to IPC.  So leaving it in
+ * should be relatively harmless.  Might as well stub it out, though the
+ * utility of doing so is questionable, since nothing should call it.
+ *
+ * See: https://labs.riseup.net/code/issues/12325
+ */
+int
+pa_start_child_for_read(const char *name, const char *argv1, pid_t *pid)
+{
+#if 0
+  fprintf(stderr, "tbb_stub: pa_start_child_for_read(%s, %p, %p)\n", name, argv1, pid);
+#else
+  (void) name;
+  (void) argv1;
+  (void) pid;
+#endif
+  return -1;
+}
+
 /*  Initialize the stub. */
 static void
 stub_init(void)

@@ -1,4 +1,5 @@
 Changes in version 0.0.7 - UNRELEASED:
+ * Bug 22038: Stub out `pa_start_child_for_read`.
 
 Changes in version 0.0.6 - 2017-04-19:
  * Add back the old release MAR signing key.
