@@ -48,6 +48,9 @@ Upstream Bugs:
    (https://bugs.torproject.org/20283)
  * OpenGL software rendering is  broken on certain Linux systems.
    (https://bugs.torproject.org/20866)
+ * On certain systems, Firefox crashes with an X11 error due to the lack of
+   MIT-SHM support.  This appears to be a race condition, and still occurs
+   despite mitigations. (https://bugzilla.mozilla.org/show_bug.cgi?id=1271100)
 
 Notes:
 
