@@ -1,4 +1,4 @@
-Changes in version 0.0.7 - UNRELEASED:
+Changes in version 0.0.7 - 2017-05-22:
  * Bug 21977: Fetch install/update metadata files from a different location.
  * Bug 22038: Stub out `pa_start_child_for_read`.
 
