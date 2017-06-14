@@ -1,4 +1,5 @@
 Changes in version 0.0.8 - UNRELEASED:
+ * Bug 22648: Prevent the "easy" to fix X11 related sandbox escapes.
 
 Changes in version 0.0.7 - 2017-05-22:
  * Bug 21977: Fetch install/update metadata files from a different location.

@@ -33,6 +33,7 @@ import (
 
 	"cmd/sandboxed-tor-browser/internal/dynlib"
 	. "cmd/sandboxed-tor-browser/internal/sandbox/process"
+	"cmd/sandboxed-tor-browser/internal/sandbox/x11"
 	"cmd/sandboxed-tor-browser/internal/tor"
 	"cmd/sandboxed-tor-browser/internal/ui/config"
 	. "cmd/sandboxed-tor-browser/internal/utils"
@@ -53,6 +54,7 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (pr
 		stubPath      = "/home/amnesia/.tbb_stub.so"
 		controlSocket = "control"
 		socksSocket   = "socks"
+		x11Socket     = "xorg"
 	)
 
 	defer func() {
@@ -72,10 +74,7 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (pr
 	h.seccompFn = installTorBrowserSeccompProfile
 	h.fakeDbus = true
 
-	// X11, Gtk+, and PulseAudio.
-	if err = h.enableX11(cfg.Sandbox.Display); err != nil {
-		return
-	}
+	// Gtk+ and PulseAudio.
 	hasAdwaita := h.appendGtk2Theme()
 	h.roBind("/usr/share/icons/hicolor", "/usr/share/icons/hicolor", true)
 	h.roBind("/usr/share/mime", "/usr/share/mime", false)
@@ -277,7 +276,40 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (pr
 	h.cmd = filepath.Join(browserHome, "firefox")
 	h.cmdArgs = []string{"--class", "Tor Browser", "-profile", profileDir}
 
-	return h.run()
+	// Do X11 last, because of the surrogate.
+	x11SurrogatePath := filepath.Join(cfg.RuntimeDir, x11Socket)
+	x, err := x11.New(cfg.Sandbox.Display, h.hostname, x11SurrogatePath)
+	if err != nil {
+		return nil, err
+	} else {
+		h.setenv("DISPLAY", x.Display)
+		h.dir(x11.SockDir)
+		if x.Xauthority != nil {
+			xauthPath := filepath.Join(h.homeDir, ".Xauthority")
+			h.setenv("XAUTHORITY", xauthPath)
+			h.file(xauthPath, x.Xauthority)
+		}
+		if err = x.LaunchSurrogate(); err != nil {
+			return nil, err
+		}
+		h.bind(x.Socket(), filepath.Join(x11.SockDir, "X0"), false)
+	}
+	x11TermHook := func() {
+		if x.Surrogate != nil {
+			Debugf("sandbox: X11: Cleaning up surrogate")
+			x.Surrogate.Close()
+		}
+	}
+
+	proc, err := h.run()
+	if err != nil {
+		x11TermHook()
+		return nil, err
+	} else {
+		proc.AddTermHook(x11TermHook)
+	}
+
+	return proc, nil
 }
 
 func filterCodecs(fn string, allowFfmpeg bool) error {

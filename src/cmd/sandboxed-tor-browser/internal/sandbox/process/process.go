@@ -26,8 +26,23 @@ import (
 
 // Process is a running bwrap instance.
 type Process struct {
-	init *os.Process
-	cmd  *exec.Cmd
+	init      *os.Process
+	cmd       *exec.Cmd
+	termHooks []func()
+}
+
+func (p *Process) onExit() {
+	if p.termHooks != nil {
+		for _, fn := range p.termHooks {
+			fn()
+		}
+		p.termHooks = nil
+	}
+}
+
+// AddTermHook adds the hook function fn to be called on process exit.
+func (p *Process) AddTermHook(fn func()) {
+	p.termHooks = append(p.termHooks, fn)
 }
 
 // Kill terminates the bwrap instance and all of it's children.
@@ -41,6 +56,7 @@ func (p *Process) Kill() {
 		p.cmd.Process.Wait()
 		p.cmd = nil
 	}
+	p.onExit()
 }
 
 // Wait waits for the bwrap instance to complete.
@@ -49,6 +65,7 @@ func (p *Process) Wait() error {
 	if p.cmd != nil {
 		p.cmd.Process.Wait()
 		p.cmd = nil
+		p.onExit()
 	}
 	return nil
 }
