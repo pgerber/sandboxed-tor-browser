@@ -1,3 +1,5 @@
+Changes in version 0.0.9 - UNRELEASED:
+
 Changes in version 0.0.8 - 2017-06-19:
  * Bug 20776: Remove the X11 `MIT-SHM` workaround from the stub.
  * Bug 22470: Resync the bridges.
