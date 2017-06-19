@@ -47,13 +47,11 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <X11/Xlib.h>
 
 static pthread_once_t stub_init_once = PTHREAD_ONCE_INIT;
 static int (*real_connect)(int, const struct sockaddr *, socklen_t) = NULL;
 static int (*real_socket)(int, int, int) = NULL;
 static void *(*real_dlopen)(const char *, int) = NULL;
-static Bool (*real_XQueryExtension)(Display*, _Xconst char*, int*, int*, int*) = NULL;
 static struct sockaddr_un socks_addr;
 static struct sockaddr_un control_addr;
 
@@ -159,24 +157,6 @@ dlopen(const char *filename, int flags)
   return ret;
 }
 
-Bool
-XQueryExtension(Display *display, _Xconst char *name, int *major, int *event, int *error) {
-  pthread_once(&stub_init_once, stub_init);
-
-  if (!strcmp(name, "MIT-SHM")) {
-    *major = 0;
-    return False;
-  }
-
-  return real_XQueryExtension(display, name, major, event, error);
-}
-
-Bool
-XShmQueryExtension(Display* display) {
-  (void)display;
-  return False;
-}
-
 /* There are rumors that PI futexes have scary race conditions, that enable
  * an exploit that is being sold by the forces of darkness.  On systems where
  * we can filter futex kernel args, we reject such calls.
@@ -255,7 +235,6 @@ stub_init(void)
   char *socks_path = secure_getenv("TOR_STUB_SOCKS_SOCKET");
   char *control_path = secure_getenv("TOR_STUB_CONTROL_SOCKET");
   size_t dest_len = sizeof(socks_addr.sun_path);
-  void *handle = NULL;
 
   /* If `TOR_STUB_SOCKS_SOCKET` isn't set, bail. */
   if (socks_path == NULL) {
@@ -299,19 +278,6 @@ stub_init(void)
    */
   if ((real_dlopen = dlsym(RTLD_NEXT, "dlopen")) == NULL) {
     fprintf(stderr, "ERROR: Failed to find 'dlopen()' symbol: %s\n", dlerror());
-    goto out;
-  }
-
-  /* Firefox does not degrade gracefully when "MIT-SHM" fails.
-   *
-   * See: https://bugzilla.mozilla.org/show_bug.cgi?id=1271100#c20
-   */
-  if ((handle = real_dlopen("libXext.so.6", RTLD_LAZY)) == NULL) {
-    fprintf(stderr, "ERROR: Failed to dlopen() libXext.so: %s\n", dlerror());
-    goto out;
-  }
-  if ((real_XQueryExtension = dlsym(handle, "XQueryExtension")) == NULL) {
-    fprintf(stderr, "ERROR: Failed to find `XQueryExtension()` symbol: %s\n", dlerror());
     goto out;
   }
 
