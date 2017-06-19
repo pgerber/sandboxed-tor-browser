@@ -1,6 +1,7 @@
 Changes in version 0.0.8 - UNRELEASED:
  * Bug 20776: Remove the X11 `MIT-SHM` workaround from the stub.
  * Bug 22470: Resync the bridges.
+ * Bug 22607: Make it clear that basically 0 active development is happening.
  * Bug 22648: Prevent the "easy" to fix X11 related sandbox escapes.
  * Bug 22650: Make it clear that Pulse Audio is potentially dangerous
    to enable.

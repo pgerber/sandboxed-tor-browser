@@ -1,6 +1,8 @@
 # sandboxed-tor-browser
 ### Yawning Angel (yawning at schwanenlied dot me)
 
+##### WARNING: Active development is on indefinite hiatus.
+
 > I would build a great sandbox.  And nobody builds sandboxes better than me,
 > believe me.  I will build a great, great sandbox on our application border.
 > And I will have Tor Browser pay for that sandbox.
