@@ -237,7 +237,8 @@ func New(display, hostname, pSock string) (*SandboxedX11, error) {
 
 	var err error
 	if x.Xauthority, err = craftAuthority(hostname, displayNum); err != nil {
-		return nil, fmt.Errorf("sandbox: Xauthority: %v", err)
+		// Some systems don't have an Xauthority file, like my Fedora VM.
+		Debugf("sandbox: Xauthority: %v", err)
 	}
 
 	return x, nil
