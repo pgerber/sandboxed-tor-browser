@@ -18,6 +18,7 @@ package x11
 
 // #cgo LDFLAGS: -lxcb
 //
+// #include <xcb/xcb.h>
 // #include <xcb/xproto.h>
 // #include <stdlib.h>
 // #include <string.h>
