@@ -20,7 +20,6 @@ package x11
 
 import (
 	"encoding/binary"
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -30,8 +29,6 @@ import (
 
 	. "cmd/sandboxed-tor-browser/internal/utils"
 )
-
-var disableX11Filter bool
 
 const SockDir = "/tmp/.X11-unix"
 
@@ -186,15 +183,11 @@ func (x *SandboxedX11) Socket() string {
 
 func (x *SandboxedX11) LaunchSurrogate() error {
 	// Launch the surrogate unless disabled.
-	if !disableX11Filter {
-		Debugf("sandbox: X11: Launching surrogate")
+	Debugf("sandbox: X11: Launching surrogate")
 
-		var err error
-		if x.Surrogate, err = launchSurrogate(x.hSock, x.pSock, x.hDisplay); err != nil {
-			return err
-		}
-	} else {
-		Debugf("sandbox: X11: Direct bind-mounting X11 (UNSAFE)")
+	var err error
+	if x.Surrogate, err = launchSurrogate(x.hSock, x.pSock, x.hDisplay); err != nil {
+		return err
 	}
 	x.launched = true
 	return nil
@@ -242,8 +235,4 @@ func New(display, hostname, pSock string) (*SandboxedX11, error) {
 	}
 
 	return x, nil
-}
-
-func init() {
-	flag.BoolVar(&disableX11Filter, "disable-X11-filter", false, "Use X11 directly (Unsafe)")
 }

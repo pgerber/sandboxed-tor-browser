@@ -20,7 +20,6 @@ package sandbox
 
 import (
 	"bytes"
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -41,10 +40,7 @@ import (
 
 const restrictedLibDir = "/usr/lib"
 
-var (
-	distributionDependentLibSearchPath []string
-	allowGstreamer                     bool
-)
+var distributionDependentLibSearchPath []string
 
 // RunTorBrowser launches sandboxed Tor Browser.
 func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (process *Process, err error) {
@@ -322,10 +318,9 @@ func filterCodecs(fn string, allowFfmpeg bool) error {
 		"libgstapp",
 		"libgstvideo",
 	}
-	if allowGstreamer && allowFfmpeg {
+	if allowFfmpeg {
 		codecPrefixes = []string{}
-	}
-	if !allowFfmpeg {
+	} else if !allowFfmpeg {
 		codecPrefixes = append(codecPrefixes, "libavcodec")
 	}
 
@@ -874,6 +869,4 @@ func init() {
 	}
 
 	distributionDependentLibSearchPath = searchPaths
-
-	flag.BoolVar(&allowGstreamer, "allow-gstreamer", false, "Don't blacklist gstreamer libraries.")
 }
