@@ -1,4 +1,5 @@
 Changes in version 0.0.9 - UNRELEASED:
+ * Bug 22712: Suppress ATK Bridge initialization which will never work.
  * Fix the build being broken on Debian Jessie due to #22648.
  * Remove the undocumented command line options that enable unsafe behavior.
 

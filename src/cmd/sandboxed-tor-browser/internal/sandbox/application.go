@@ -770,6 +770,14 @@ func (h *hugbox) appendRestrictedGtk2(hasAdwaita bool) ([]string, string, error)
 		h.setenv("GDK_PIXBUF_MODULE_FILE", "/dev/null")
 	}
 
+	// Bug #22712 - Spurious AT-SPI warnings.
+	//
+	// The Accessibility subsystem uses a subsystem via D-Bus to function,
+	// and will warn if said subsystem is inaccessible.  As the host D-Bus
+	// is not, and likely will never be accesible from within the container,
+	// attempt to suppress the warnings.
+	h.setenv("NO_AT_BRIDGE", "yes");
+
 	return gtkLibs, gtkLibPath, nil
 }
 
