@@ -1,3 +1,5 @@
+Changes in version 0.0.10 - UNRELEASED:
+
 Changes in version 0.0.9 - 2017-07-03:
  * Bug 22712: Suppress ATK Bridge initialization which will never work.
  * Bug 20773: Stop mounting /proc in the Tor Browser container.
