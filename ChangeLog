@@ -1,4 +1,4 @@
-Changes in version 0.0.9 - UNRELEASED:
+Changes in version 0.0.9 - 2017-07-03:
  * Bug 22712: Suppress ATK Bridge initialization which will never work.
  * Bug 20773: Stop mounting /proc in the Tor Browser container.
  * Fix the build being broken on Debian Jessie due to #22648.
