@@ -37,6 +37,9 @@
 
 #define _GNU_SOURCE /* Fuck *BSD and Macintoys. */
 
+#include <sys/types.h>
+#include <sys/syscall.h>
+#include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <arpa/inet.h>
@@ -47,11 +50,13 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 static pthread_once_t stub_init_once = PTHREAD_ONCE_INIT;
 static int (*real_connect)(int, const struct sockaddr *, socklen_t) = NULL;
 static int (*real_socket)(int, int, int) = NULL;
 static void *(*real_dlopen)(const char *, int) = NULL;
+static int (*real_pthread_attr_getstack)(const pthread_attr_t *, void **, size_t *);
 static struct sockaddr_un socks_addr;
 static struct sockaddr_un control_addr;
 
@@ -228,6 +233,73 @@ pa_start_child_for_read(const char *name, const char *argv1, pid_t *pid)
   return -1;
 }
 
+/* Firefox will crash if pthread_attr_getstack doesn't return a sensible stack
+ * size, which will happen if /proc is missing, since glibc grovels through
+ * /proc/self/maps to determine this information for the default thread.
+ *
+ * See: glibc/nptl/pthread_getattr_np.c
+ */
+int
+pthread_attr_getstack(const pthread_attr_t *attr, void **stackaddr, size_t *stacksize)
+{
+  int ret;
+
+  ret = real_pthread_attr_getstack(attr, stackaddr, stacksize);
+  if (ret != 0) {
+    fprintf(stderr, "WARN: pthread_attr_getstack(%p, %p, %p) = %d\n", attr, stackaddr, stacksize, ret);
+    return ret;
+  }
+
+#if 0
+  fprintf(stderr, "tbb_stub: pthread_attr_getstack(%p, %p, %p) = %d\n", attr, stackaddr, stacksize, ret);
+  fprintf(stderr, "tbb_stub:  stackaddr: %p\n", stackaddr);
+  fprintf(stderr, "tbb_stub:  stacksize: %ld\n", *stacksize);
+#endif
+
+  /* If we got a sensible value for the stack size, then return. */
+  if (*stacksize != 0) {
+    return ret;
+  } else {
+    /* Otherwise, we should be the initial thread (pid == tid). */
+    pid_t tid = syscall(__NR_gettid);
+    pid_t pid = getpid();
+
+    if (tid != pid) {
+      fprintf(stderr, "ERROR: Got a 0 stack size when pid = %d != tid = %d\n", pid, tid);
+      abort();
+    }
+  }
+
+  /* First try pthread_attr_getstacksize(), which works on glibc 2.25. */
+  ret = pthread_attr_getstacksize(attr, stacksize);
+  if (ret != 0 || *stacksize == 0) {
+    /* Fall back to getrlimit(). */
+    struct rlimit rl;
+
+    ret = getrlimit(RLIMIT_STACK, &rl);
+    if (ret != 0) {
+      fprintf(stderr, "ERROR: Failed to query rlimit: %d", ret);
+      abort();
+    }
+
+    /* So, the main reason why glibc digs through proc is so that it can
+     * return the current committed stack size, and not the upper bound on
+     * the stack size.  But without /proc, there's no good way to get this
+     * information.
+     *
+     * This is probably ok, pthread_attr_getstacksize() without proc mounted
+     * appears to do the same thing.
+     */
+    *stacksize = rl.rlim_cur;
+  }
+
+#if 0
+  fprintf(stderr, "tbb_stub: Fallback stacksize: %ld\n", *stacksize);
+#endif
+
+  return ret;
+}
+
 /*  Initialize the stub. */
 static void
 stub_init(void)
@@ -255,6 +327,10 @@ stub_init(void)
   }
   if ((real_socket = dlsym(RTLD_NEXT, "socket")) == NULL) {
     fprintf(stderr, "ERROR: Failed to find `socket()` symbol: %s\n", dlerror());
+    goto out;
+  }
+  if ((real_pthread_attr_getstack = dlsym(RTLD_NEXT, "pthread_attr_getstack")) == NULL) {
+    fprintf(stderr, "ERROR: Failed to find `pthread_attr_getstack()` symbol: %s\n", dlerror());
     goto out;
   }
 

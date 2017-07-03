@@ -69,6 +69,7 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (pr
 	h.stderr = logger
 	h.seccompFn = installTorBrowserSeccompProfile
 	h.fakeDbus = true
+	h.mountProc = false
 
 	// Gtk+ and PulseAudio.
 	hasAdwaita := h.appendGtk2Theme()

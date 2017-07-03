@@ -41,18 +41,16 @@ Things that the sandbox breaks:
 
 Places where the sandbox could be better:
 
- * More about the host system is exposed than neccecary, primarily because
-   Firefox crashes without `/proc`.
+ * The updater container still mounts `/proc`.
+ * PulseAudio is likely unsafe without a protocol filter like X11.
+ * X11 is still X11, and despite mitigations is likely still unsafe.
 
 Upstream Bugs:
 
- * Tor Browser should run without a `/proc` filesystem.
-   (https://bugs.torproject.org/20283)
+ * Tor Browser should run without a `/proc` filesystem, worked around in
+   the worst possible way.  (https://bugs.torproject.org/20283)
  * OpenGL software rendering is  broken on certain Linux systems.
    (https://bugs.torproject.org/20866)
- * On certain systems, Firefox crashes with an X11 error due to the lack of
-   MIT-SHM support.  This appears to be a race condition, and still occurs
-   despite mitigations. (https://bugzilla.mozilla.org/show_bug.cgi?id=1271100)
 
 Notes:
 
