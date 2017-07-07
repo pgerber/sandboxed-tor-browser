@@ -1,6 +1,6 @@
 Changes in version 0.0.10 - UNRELEASED:
  * Bug 22829: Remove default obfs4 bridge riemann.
- * Bug 22853: Something in Ubuntu's libraries is totally brain damaged.
+ * Bug 22853: Something in SelfRando is totally brain damaged.
 
 Changes in version 0.0.9 - 2017-07-03:
  * Bug 22712: Suppress ATK Bridge initialization which will never work.

@@ -71,10 +71,8 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (pr
 	h.fakeDbus = true
 	h.mountProc = false
 
-	// Dear Ubuntu.  While I realize that this may be a hard concept to grasp,
-	// if `openat()` returns -1 (ENOENT), the correct thing to do is NOT spin
-	// endlessly calling `read()` in a tight loop (ignoring the -1/EBADFD)
-	// status.
+	// Work around the SelfRando developers not knowing how the x86_64 Linux
+	// system call calling convention works.
 	h.file("/proc/self/environ", []byte{})
 
 	// Gtk+ and PulseAudio.
