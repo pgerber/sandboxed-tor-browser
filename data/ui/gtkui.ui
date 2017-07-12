@@ -528,7 +528,7 @@
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
                         <property name="halign">start</property>
-                        <property name="label" translatable="yes">Pulse Audio (UNSAFE)</property>
+                        <property name="label" translatable="yes">Pulse Audio (UNSAFE: Security, Anonymity)</property>
                       </object>
                       <packing>
                         <property name="expand">True</property>
@@ -564,7 +564,7 @@
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
                         <property name="halign">start</property>
-                        <property name="label" translatable="yes">Extra Audio/Video Codecs</property>
+                        <property name="label" translatable="yes">Extra Audio/Video Codecs (UNSAFE: Security, Anonymity)</property>
                       </object>
                       <packing>
                         <property name="expand">True</property>
@@ -601,7 +601,7 @@
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
                         <property name="halign">start</property>
-                        <property name="label" translatable="yes">Circuit Display</property>
+                        <property name="label" translatable="yes">Circuit Display (UNSAFE: Anonymity)</property>
                       </object>
                       <packing>
                         <property name="expand">True</property>
@@ -637,7 +637,7 @@
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
                         <property name="halign">start</property>
-                        <property name="label" translatable="yes">Modifiable Extensions</property>
+                        <property name="label" translatable="yes">Modifiable Extensions (UNSAFE: Security, Anonymity)</property>
                       </object>
                       <packing>
                         <property name="expand">True</property>
