@@ -1,6 +1,8 @@
 Changes in version 0.0.10 - UNRELEASED:
  * Bug 22829: Remove default obfs4 bridge riemann.
  * Bug 22853: Something in SelfRando is totally brain damaged.
+ * Bug 22899: `about:addons`'s "Get Addons" pane is unsafe and should be
+              treated as such.
  * Bug 22901: Clarify/expand on the warnings for all the config settings.
 
 Changes in version 0.0.9 - 2017-07-03:
