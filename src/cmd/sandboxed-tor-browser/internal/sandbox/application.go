@@ -102,6 +102,7 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (pr
 	realCachesDir := filepath.Join(realBrowserHome, cachesSubDir)
 	realDesktopDir := filepath.Join(realBrowserHome, "Desktop")
 	realDownloadsDir := filepath.Join(realBrowserHome, "Downloads")
+	realExtensionsDir := filepath.Join(realProfileDir, "extensions")
 
 	// Ensure that the `Caches`, `Downloads` and `Desktop` mount points exist.
 	if err = os.MkdirAll(realCachesDir, DirMode); err != nil {
@@ -126,6 +127,7 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (pr
 	cachesDir := filepath.Join(browserHome, cachesSubDir)
 	downloadsDir := filepath.Join(browserHome, "Downloads")
 	desktopDir := filepath.Join(browserHome, "Desktop")
+	extensionsDir := filepath.Join(profileDir, "extensions")
 
 	// Filesystem stuff.
 	h.roBind(cfg.BundleInstallDir, filepath.Join(h.homeDir, "sandboxed-tor-browser", "tor-browser"), false)
@@ -135,10 +137,20 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (pr
 	h.bind(realCachesDir, cachesDir, false) // XXX: Do I need this?
 	h.roBind(filepath.Join(realProfileDir, "preferences"), filepath.Join(profileDir, "preferences"), false)
 	h.chdir = browserHome
-	if !cfg.Sandbox.VolatileExtensionsDir {
-		// Unless overridden, the extensions directory should be mounted
-		// read-only.
-		h.roBind(filepath.Join(realProfileDir, "extensions"), filepath.Join(profileDir, "extensions"), false)
+
+	// Explicitly bind mount the expected extensions in.
+	//
+	// If the Tor Browser developers ever decide to do something sensible like
+	// sign their XPI files, then the whitelist could be public key based, till
+	// then this may be somewhat fragile.
+	h.tmpfs(extensionsDir)
+	for _, extName := range []string{
+		"{73a6fe31-595d-460b-a920-fcc0f8843232}.xpi", // NoScript
+		"torbutton@torproject.org.xpi",
+		"https-everywhere-eff@eff.org.xpi",
+		"tor-launcher@torproject.org.xpi",
+	} {
+		h.roBind(filepath.Join(realExtensionsDir, extName), filepath.Join(extensionsDir, extName), false)
 	}
 
 	// Env vars taken from start-tor-browser.
@@ -787,7 +799,7 @@ func (h *hugbox) appendRestrictedGtk2(hasAdwaita bool) ([]string, string, error)
 	// and will warn if said subsystem is inaccessible.  As the host D-Bus
 	// is not, and likely will never be accesible from within the container,
 	// attempt to suppress the warnings.
-	h.setenv("NO_AT_BRIDGE", "yes");
+	h.setenv("NO_AT_BRIDGE", "yes")
 
 	return gtkLibs, gtkLibPath, nil
 }

@@ -200,11 +200,6 @@ type Sandbox struct {
 	// host system DISPLAY from the env var will be used.
 	Display string `json:"display,omitEmpty"`
 
-	// VolatileExtensionsDir mounts the extensions directorey read/write to
-	// allow the installation of addons.  The addon auto-update mechanism is
-	// still left disabled.
-	VolatileExtensionsDir bool `json:"volatileExtensionsDir"`
-
 	// EnablePulseAudio enables access to the host PulseAudio daemon inside the
 	// sandbox.
 	EnablePulseAudio bool `json:"enablePulseAudio"`
@@ -256,15 +251,6 @@ func (sb *Sandbox) SetEnableAVCodec(b bool) {
 func (sb *Sandbox) SetEnableCircuitDisplay(b bool) {
 	if sb.EnableCircuitDisplay != b {
 		sb.EnableCircuitDisplay = b
-		sb.cfg.isDirty = true
-	}
-}
-
-// SetVolatileExtensionsDir sets the sandbox extension directory write enable
-// and marks the config dirty.
-func (sb *Sandbox) SetVolatileExtensionsDir(b bool) {
-	if sb.VolatileExtensionsDir != b {
-		sb.VolatileExtensionsDir = b
 		sb.cfg.isDirty = true
 	}
 }

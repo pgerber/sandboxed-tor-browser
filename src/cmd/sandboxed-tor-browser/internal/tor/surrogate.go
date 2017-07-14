@@ -35,7 +35,6 @@ import (
 
 	"cmd/sandboxed-tor-browser/internal/socks5"
 	"cmd/sandboxed-tor-browser/internal/ui/config"
-	. "cmd/sandboxed-tor-browser/internal/utils"
 )
 
 const (
@@ -140,8 +139,6 @@ type socksProxy struct {
 	sNet, sAddr string
 	tag         string
 
-	allowAboutAddons bool
-
 	l net.Listener
 }
 
@@ -191,18 +188,6 @@ func (p *socksProxy) handleConn(conn net.Conn) {
 	req, err := socks5.Handshake(conn)
 	if err != nil {
 		return
-	}
-
-	// Disallow `about:addons` unless the extensions directory is volatile,
-	// because regardless of what Mozilla PR says about respecting privacy,
-	// loading Google Analytics in a page that gets loaded as an IFRAME as
-	// part of an `about:` internal page, is anything but.
-	if host, _ := req.Addr.HostPort(); strings.ToLower(host) == aboutAddonsUnsafeHost {
-		if !p.allowAboutAddons {
-			Debugf("sandbox: Rejecting request to `%s`", aboutAddonsUnsafeHost)
-			req.Reply(socks5.ReplyConnectionNotAllowed)
-			return
-		}
 	}
 
 	// Append our isolation tag.
@@ -262,7 +247,6 @@ func launchSocksProxy(cfg *config.Config, tor *Tor) (*socksProxy, error) {
 	if err != nil {
 		return nil, err
 	}
-	p.allowAboutAddons = cfg.Sandbox.VolatileExtensionsDir
 
 	go p.acceptLoop()
 

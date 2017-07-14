@@ -157,6 +157,10 @@ func (h *hugbox) assetFile(dest, asset string) {
 	h.file(dest, b)
 }
 
+func (h *hugbox) tmpfs(dest string) {
+	h.args = append(h.args, "--tmpfs", dest)
+}
+
 func (h *hugbox) run() (*Process, error) {
 	// Create the command struct for the sandbox.
 	cmd := &exec.Cmd{

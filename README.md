@@ -36,7 +36,7 @@ Things that the sandbox breaks:
  * Audio (Unless allowed via the config)
  * DRI
  * X11 input methods (IBus requires access to the host D-Bus)
- * Installing addons via the browser UI (Unless allowed via the config)
+ * Installing addons (Addons are whitelisted)
  * Tor Browser's updater (launcher handles keeping the bundle up to date)
 
 Places where the sandbox could be better:
