@@ -211,7 +211,7 @@ type Sandbox struct {
 	// EnableCircuitDisplay enables the Tor Browser circuit display.
 	EnableCircuitDisplay bool `json:"enableCircuitDisplay"`
 
-	// EnableAmnesiacProfileDirectory enables read-only profile directories.
+	// EnableAmnesiacProfileDirectory enables amnesiac profile directories.
 	EnableAmnesiacProfileDirectory bool `json:"enableAmnesiacProfileDirectory"`
 
 	// DesktopDir is the directory to be bind mounted instead of the default
@@ -249,7 +249,7 @@ func (sb *Sandbox) SetEnableAVCodec(b bool) {
 	}
 }
 
-// SetEnableCircuitDisplay sets tthe circit display enable and marks the config
+// SetEnableCircuitDisplay sets the circit display enable and marks the config
 // dirty.
 func (sb *Sandbox) SetEnableCircuitDisplay(b bool) {
 	if sb.EnableCircuitDisplay != b {
@@ -258,8 +258,8 @@ func (sb *Sandbox) SetEnableCircuitDisplay(b bool) {
 	}
 }
 
-// SetEnableAmnesiacProfileDirectory sets tthe circit display enable and marks
-// the config dirty.
+// SetEnableAmnesiacProfileDirectory sets the amnesiac profile directory enable
+// and marks the config dirty.
 func (sb *Sandbox) SetEnableAmnesiacProfileDirectory(b bool) {
 	if sb.EnableAmnesiacProfileDirectory != b {
 		sb.EnableAmnesiacProfileDirectory = b
