@@ -99,15 +99,11 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (pr
 	browserHome := filepath.Join(h.homeDir, "sandboxed-tor-browser", "tor-browser", "Browser")
 	realBrowserHome := filepath.Join(cfg.BundleInstallDir, "Browser")
 	realProfileDir := filepath.Join(realBrowserHome, profileSubDir)
-	realCachesDir := filepath.Join(realBrowserHome, cachesSubDir)
 	realDesktopDir := filepath.Join(realBrowserHome, "Desktop")
 	realDownloadsDir := filepath.Join(realBrowserHome, "Downloads")
 	realExtensionsDir := filepath.Join(realProfileDir, "extensions")
 
 	// Ensure that the `Caches`, `Downloads` and `Desktop` mount points exist.
-	if err = os.MkdirAll(realCachesDir, DirMode); err != nil {
-		return
-	}
 	if err = os.MkdirAll(realDesktopDir, DirMode); err != nil {
 		return
 	}
@@ -131,11 +127,19 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (pr
 
 	// Filesystem stuff.
 	h.roBind(cfg.BundleInstallDir, filepath.Join(h.homeDir, "sandboxed-tor-browser", "tor-browser"), false)
-	h.bind(realProfileDir, profileDir, false)
+	if cfg.Sandbox.EnableAmnesiacProfileDirectory {
+		excludes := []string{
+			filepath.Join(realProfileDir, "preferences"),
+			realExtensionsDir,
+		}
+		h.shadowDir(profileDir, realProfileDir, excludes)
+	} else {
+		h.bind(realProfileDir, profileDir, false)
+	}
+	h.roBind(filepath.Join(realProfileDir, "preferences"), filepath.Join(profileDir, "preferences"), false)
 	h.bind(realDesktopDir, desktopDir, false)
 	h.bind(realDownloadsDir, downloadsDir, false)
-	h.bind(realCachesDir, cachesDir, false) // XXX: Do I need this?
-	h.roBind(filepath.Join(realProfileDir, "preferences"), filepath.Join(profileDir, "preferences"), false)
+	h.tmpfs(cachesDir)
 	h.chdir = browserHome
 
 	// Explicitly bind mount the expected extensions in.

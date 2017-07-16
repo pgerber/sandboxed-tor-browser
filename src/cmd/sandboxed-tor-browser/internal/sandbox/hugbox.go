@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -159,6 +160,71 @@ func (h *hugbox) assetFile(dest, asset string) {
 
 func (h *hugbox) tmpfs(dest string) {
 	h.args = append(h.args, "--tmpfs", dest)
+}
+
+func (h *hugbox) shadowDir(dest, src string, exclude []string) {
+	Debugf("sandbox: shadowDir: %s -> %s", src, dest)
+
+	excludeMap := make(map[string]bool)
+	for _, s := range exclude {
+		excludeMap[s] = true
+	}
+
+	shadowWalk := func(path string, info os.FileInfo, err error) error {
+		if path == src {
+			h.tmpfs(dest)
+			return nil
+		}
+
+		isDir := info.IsDir()
+		if excludeMap[path] {
+			Debugf("sandbox: shadowDir: excluding '%s'", path)
+			if isDir {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		// Dealing with this is annoying, and it doesn't happen under
+		// normal usage.
+		const (
+			modeIrregular  = os.ModeSymlink | os.ModeNamedPipe | os.ModeSocket | os.ModeDevice
+			modeExecutable = 0111
+		)
+		mode := info.Mode()
+		if mode&modeIrregular != 0 {
+			Debugf("sandbox: shadowDir: '%s' irregular perm bits: %s", path, mode)
+			return fmt.Errorf("sandbox: shadowDir: '%s' irregular perm bits: %s", path, mode)
+		} else if mode&modeExecutable != 0 && !isDir {
+			// Alas shadowDir has limits, because bwrap doesn't give a easy way
+			// to set this up.
+			Debugf("sandbox: shadowDir: '%s' ignoring executable perm bits: %s", path, mode)
+		}
+
+		relPath := filepath.Clean(strings.TrimPrefix(path, src))
+		destPath := filepath.Join(dest, relPath)
+		if isDir {
+			h.dir(destPath)
+		} else {
+			// XXX: This guzzles memory, and it'll be easier just to open
+			// the source file, but cleanup on errors would be a huge
+			// nightmare, because Go is too cool for destructors.
+			b, err := ioutil.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			h.file(destPath, b)
+		}
+
+		// Debugf("shadow: '%s' -> '%s'", relPath, destPath)
+
+		return nil
+	}
+
+	// Create the directory, and then walk.
+	if err := filepath.Walk(src, shadowWalk); err != nil {
+		panic(err)
+	}
 }
 
 func (h *hugbox) run() (*Process, error) {

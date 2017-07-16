@@ -60,15 +60,17 @@ type configDialog struct {
 	torSystemIndicator *gtk3.Box
 
 	// Sandbox config elements.
-	pulseAudioSwitch     *gtk3.Switch
-	avCodecSwitch        *gtk3.Switch
-	circuitDisplaySwitch *gtk3.Switch
-	displayBox           *gtk3.Box
-	displayEntry         *gtk3.Entry
-	downloadsDirBox      *gtk3.Box
-	downloadsDirChooser  *gtk3.FileChooserButton
-	desktopDirBox        *gtk3.Box
-	desktopDirChooser    *gtk3.FileChooserButton
+	pulseAudioSwitch      *gtk3.Switch
+	avCodecSwitch         *gtk3.Switch
+	circuitDisplaySwitch  *gtk3.Switch
+	amnesiacProfileBox    *gtk3.Box
+	amnesiacProfileSwitch *gtk3.Switch
+	displayBox            *gtk3.Box
+	displayEntry          *gtk3.Entry
+	downloadsDirBox       *gtk3.Box
+	downloadsDirChooser   *gtk3.FileChooserButton
+	desktopDirBox         *gtk3.Box
+	desktopDirChooser     *gtk3.FileChooserButton
 }
 
 const proxySOCKS4 = "SOCKS 4"
@@ -111,6 +113,10 @@ func (d *configDialog) loadFromConfig() {
 	d.pulseAudioSwitch.SetActive(d.ui.Cfg.Sandbox.EnablePulseAudio)
 	d.avCodecSwitch.SetActive(d.ui.Cfg.Sandbox.EnableAVCodec)
 	d.circuitDisplaySwitch.SetActive(d.ui.Cfg.Sandbox.EnableCircuitDisplay)
+	d.amnesiacProfileSwitch.SetActive(d.ui.Cfg.Sandbox.EnableAmnesiacProfileDirectory)
+	if d.ui.Cfg.Sandbox.EnableAmnesiacProfileDirectory {
+		forceAdv = true
+	}
 	if d.ui.Cfg.Sandbox.Display != "" {
 		d.displayEntry.SetText(d.ui.Cfg.Sandbox.Display)
 		forceAdv = true
@@ -125,7 +131,7 @@ func (d *configDialog) loadFromConfig() {
 	}
 
 	// Hide certain options from the masses, that are probably confusing.
-	for _, w := range []*gtk3.Box{d.displayBox, d.downloadsDirBox, d.desktopDirBox} {
+	for _, w := range []*gtk3.Box{d.amnesiacProfileBox, d.displayBox, d.downloadsDirBox, d.desktopDirBox} {
 		w.SetVisible(d.ui.AdvancedConfig || forceAdv)
 	}
 	d.loaded = true
@@ -193,6 +199,7 @@ func (d *configDialog) onOk() error {
 	d.ui.Cfg.Sandbox.SetEnablePulseAudio(d.pulseAudioSwitch.GetActive())
 	d.ui.Cfg.Sandbox.SetEnableAVCodec(d.avCodecSwitch.GetActive())
 	d.ui.Cfg.Sandbox.SetEnableCircuitDisplay(d.circuitDisplaySwitch.GetActive())
+	d.ui.Cfg.Sandbox.SetEnableAmnesiacProfileDirectory(d.amnesiacProfileSwitch.GetActive())
 	if s, err := d.displayEntry.GetText(); err != nil {
 		return err
 	} else {
@@ -378,6 +385,12 @@ func (ui *gtkUI) initConfigDialog(b *gtk3.Builder) error {
 		return err
 	}
 	if d.circuitDisplaySwitch, err = getSwitch(b, "circuitDisplaySwitch"); err != nil {
+		return err
+	}
+	if d.amnesiacProfileSwitch, err = getSwitch(b, "amnesiacProfileSwitch"); err != nil {
+		return err
+	}
+	if d.amnesiacProfileBox, err = getBox(b, "amnesiacProfileBox"); err != nil {
 		return err
 	}
 	if d.displayBox, err = getBox(b, "displayBox"); err != nil {
