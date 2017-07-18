@@ -1,4 +1,4 @@
-Changes in version 0.0.11 - UNRELEASED:
+Changes in version 0.0.11 - 2017-07-18:
  * Bug 22910: Deprecate the volatile extension dir option.
  * Bug 22932: Add experimental Amensiac Profile Directory support.
 
