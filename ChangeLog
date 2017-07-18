@@ -1,4 +1,5 @@
 Changes in version 0.0.12 - UNRELEASED:
+ * Bug 22969: Disable the addon blocklist.
 
 Changes in version 0.0.11 - 2017-07-18:
  * Bug 22910: Deprecate the volatile extension dir option.
