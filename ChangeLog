@@ -1,12 +1,12 @@
 Changes in version 0.0.12 - UNRELEASED:
  * Bug 22969: Disable the addon blocklist.
  * Bug 22984: Force IDNs to be displayed as punycode to thwart homograph
-   attacks.
+              attacks.
  * Bug 22967: Force disable crashdump reporting.
 
 Changes in version 0.0.11 - 2017-07-18:
  * Bug 22910: Deprecate the volatile extension dir option.
- * Bug 22932: Add experimental Amensiac Profile Directory support.
+ * Bug 22932: Add experimental Amnesiac Profile Directory support.
 
 Changes in version 0.0.10 - 2017-07-12:
  * Bug 22829: Remove default obfs4 bridge riemann.
