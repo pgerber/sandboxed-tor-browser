@@ -209,6 +209,9 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (pr
 	// Hardware accelerated OpenGL will not work, and never will.
 	h.setenv("LIBGL_ALWAYS_SOFTWARE", "1")
 
+	// Crashdumps regardless of being sanitized or not, not to be trusted.
+	h.setenv("MOZ_CRASHREPORTER_DISABLE", "1")
+
 	// Tor Browser currently is incompatible with PaX MPROTECT, apply the
 	// override if needed.
 	realFirefoxPath := filepath.Join(realBrowserHome, "firefox")
