@@ -3,6 +3,7 @@ Changes in version 0.0.12 - UNRELEASED:
  * Bug 22984: Force IDNs to be displayed as punycode to thwart homograph
               attacks.
  * Bug 22967: Force disable crashdump reporting.
+ * Default disable `dom.securecontext.whitelist_onions`.
 
 Changes in version 0.0.11 - 2017-07-18:
  * Bug 22910: Deprecate the volatile extension dir option.
