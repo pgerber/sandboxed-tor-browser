@@ -71,10 +71,13 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (pr
 	h.fakeDbus = true
 	h.mountProc = false
 
-	if manif.Channel == "alpha" && !manif.BundleVersionAtLeast("7.5a3") {
+	if manif.Channel == "alpha" && !manif.BundleVersionAtLeast("7.5a4") {
 		// SelfRando prior to c619441e1ceec3599bc81bf9bbaf4d17c68b54b7 has a
 		// bug in how it handles system call return values, leading to a
 		// infinite loop if `/proc/self/environ` doesn't exist.
+		//
+		// Despite the fix for this being available upstream, the browser
+		// people didn't pull it in for the 7.5a3 release.
 		//
 		// See: https://trac.torproject.org/projects/tor/ticket/22853
 		Debugf("sandbox: SelfRando /proc/self/environ workaround enabled")
