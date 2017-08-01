@@ -1,4 +1,4 @@
-Changes in version 0.0.12 - UNRELEASED:
+Changes in version 0.0.12 - 2017-08-01:
  * Bug 22969: Disable the addon blocklist.
  * Bug 22984: Force IDNs to be displayed as punycode to thwart homograph
               attacks.
