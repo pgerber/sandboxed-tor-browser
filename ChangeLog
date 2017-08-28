@@ -3,6 +3,7 @@ Changes in version 0.0.13 - UNRELEASED:
  * Use lockPref for the IDN override done as part of #22984.
  * Unset the addon autoupdater URL prefs.
  * Force disable `navigator.sendBeacon()`.
+ * Disable the "Open with" dialog, which will never work.
 
 Changes in version 0.0.12 - 2017-08-01:
  * Bug 22969: Disable the addon blocklist.
