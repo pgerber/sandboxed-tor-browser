@@ -1,5 +1,5 @@
 /**
- * tbb_stub.c: AF_LOCAL-ify Tor Browser.
+ * tbb_stub.c: Sandboxed Tor Browser Firefox LD_PRELOAD stub.
  * Copyright (C) 2016  Yawning Angel.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -17,22 +17,13 @@
  */
 
 /*
- * This is a minimal stub intended to be loaded with LD_PRELOAD that attempts
- * to force Firefox to use AF_LOCAL (aka AF_UNIX) sockets, so people that want
- * to deny external network access with a sandboxing mechanism can do so.
+ * This is a stub used to make Firefox work with sandboxed-tor-browser.
+ * It is loaded at runtime via LD_PRELOAD, and is responsible for fixing
+ * a number of issues that ordinarily would require patching the Firefox
+ * source code.
  *
- * In an ideal world Firefox will have support for accessing proxies over
- * AF_LOCAL in mainline.  I am told this will happen sooner or later but:
- *  * I didn't feel like waiting.
- *  * My eyes glazed over when I looked at the Firefox networking code.
- *
- * WARNINGS:
- *  * This does not attempt to prevent other methods of creating sockets,
- *    so if you are using this outside of the scope of a sandboxing
- *    solution, you are doing something horribly wrong.
- *  * If the app you are preloading this into is not Tor Browser, you are
- *    doing something wrong, and probably want torsocks instead.
- *  * If you can't figure out how to compile this, fuck off and leave me alone.
+ * It is not intended to be used by anything except for sandboxed-tor-browser,
+ * and anyone that attempts to do so will be laughed at.
  */
 
 #define _GNU_SOURCE /* Fuck *BSD and Macintoys. */
