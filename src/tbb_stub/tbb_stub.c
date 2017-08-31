@@ -52,7 +52,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-static pthread_once_t stub_init_once = PTHREAD_ONCE_INIT;
 static int (*real_connect)(int, const struct sockaddr *, socklen_t) = NULL;
 static int (*real_socket)(int, int, int) = NULL;
 static void *(*real_dlopen)(const char *, int) = NULL;
@@ -66,9 +65,6 @@ static struct sockaddr_un control_addr;
 #define TBB_SOCKS_PORT 9150
 #define TBB_CONTROL_PORT 9151
 
-
-static void stub_init(void);
-
 int
 connect(int fd, const struct sockaddr *address, socklen_t address_len)
 {
@@ -79,8 +75,6 @@ connect(int fd, const struct sockaddr *address, socklen_t address_len)
     errno = EINVAL;
     return -1;
   }
-
-  pthread_once(&stub_init_once, stub_init);
 
   /* Fast path for non-outgoing sockets. */
   if (address->sa_family == AF_LOCAL) {
@@ -121,8 +115,6 @@ connect(int fd, const struct sockaddr *address, socklen_t address_len)
 int
 socket(int domain, int type, int protocol)
 {
-  pthread_once(&stub_init_once, stub_init);
-
   /* Replace AF_INET with AF_LOCAL. */
   if (domain == AF_INET)
     domain = AF_LOCAL;
@@ -145,7 +137,6 @@ void *
 dlopen(const char *filename, int flags)
 {
   void *ret;
-  pthread_once(&stub_init_once, stub_init);
 
   if (filename != NULL) {
     if (has_prefix(filename, "libgnomeui"))
@@ -301,7 +292,7 @@ pthread_attr_getstack(const pthread_attr_t *attr, void **stackaddr, size_t *stac
 }
 
 /*  Initialize the stub. */
-static void
+__attribute__((constructor)) static void
 stub_init(void)
 {
   char *socks_path = secure_getenv("TOR_STUB_SOCKS_SOCKET");
