@@ -33,6 +33,7 @@ close: 1
 clone: 1
 epoll_create: 1
 epoll_wait: 1
+epoll_pwait: 1
 eventfd2: 1
 pipe2: 1
 pipe: 1
