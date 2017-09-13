@@ -1,4 +1,4 @@
-Changes in version 0.0.13 - UNRELEASED:
+Changes in version 0.0.13 - 2017-09-13:
  * Bug 13170: Disable the rest of the Firefox experiments botnet prefs.
  * Bug 23449: Allow `epool_pwait` in the tor seccomp rules.
  * Use lockPref for the IDN override done as part of #22984.
