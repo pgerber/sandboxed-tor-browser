@@ -1,3 +1,5 @@
+Changes in version 0.0.15 - UNRELEASED:
+
 Changes in version 0.0.14 - 2017-09-29:
  * Bug 8706: Fully disable the .recently-used.xbel.
  * Bug 22814: Revert the upstream fix by default.
