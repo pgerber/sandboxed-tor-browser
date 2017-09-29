@@ -1,6 +1,7 @@
 Changes in version 0.0.14 - UNRELEASED:
  * Bug 8706: Fully disable the .recently-used.xbel.
  * Bug 22814: Revert the upstream fix by default.
+ * Bug 23692: Add PR_SET_NO_NEW_PRIVS as an allowed prctl() operation.
 
 Changes in version 0.0.13 - 2017-09-13:
  * Bug 13170: Disable the rest of the Firefox experiments botnet prefs.

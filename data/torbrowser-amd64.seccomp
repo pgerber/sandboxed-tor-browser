@@ -36,6 +36,8 @@ FUTEX_WAKE_OP_PRIVATE=FUTEX_WAKE_OP | FUTEX_PRIVATE_FLAG
 #FUTEX_UNLOCK_PI_PRIVATE=FUTEX_UNLOCK_PI | FUTEX_PRIVATE_FLAG
 FUTEX_WAIT_BITSET_PRIVATE=FUTEX_WAIT_BITSET | FUTEX_PRIVATE_FLAG
 
+PR_SET_NO_NEW_PRIVS=38
+
 #
 # System calls allowed unconditionally without argument filtering.
 #
@@ -192,7 +194,7 @@ wait4: 1
 futex: arg1 == FUTEX_CMP_REQUEUE_PRIVATE || arg1 == FUTEX_WAIT || arg1 == FUTEX_WAIT_BITSET_PRIVATE|FUTEX_CLOCK_REALTIME || arg1 == FUTEX_WAIT_PRIVATE || arg1 == FUTEX_WAKE || arg1 == FUTEX_WAKE_OP_PRIVATE || arg1 == FUTEX_WAKE_PRIVATE || arg1 == FUTEX_WAIT_BITSET_PRIVATE
 madvise: arg2 == MADV_NORMAL || arg2 == MADV_DONTNEED || arg2 == MADV_FREE
 ioctl: arg1 == FIONREAD || arg1 == TCGETS || arg1 == TIOCGPGRP
-prctl: arg0 == PR_SET_NAME || arg0 == PR_GET_NAME || arg0 == PR_GET_TIMERSLACK || arg0 == PR_SET_SECCOMP
+prctl: arg0 == PR_SET_NAME || arg0 == PR_GET_NAME || arg0 == PR_GET_TIMERSLACK || arg0 == PR_SET_SECCOMP || arg0 == PR_SET_NO_NEW_PRIVS
 socket: arg0 == AF_UNIX
 
 # Calls that other people think we should have but we deny:
