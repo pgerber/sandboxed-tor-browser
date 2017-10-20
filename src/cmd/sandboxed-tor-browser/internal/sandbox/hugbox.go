@@ -80,6 +80,7 @@ type hugbox struct {
 	homeDir   string
 	chdir     string
 	mountProc bool
+	fakeProc  bool
 	unshare   unshareOpts
 	stdin     io.Reader
 	stdout    io.Writer
@@ -297,6 +298,14 @@ func (h *hugbox) run() (*Process, error) {
 	}
 	if h.mountProc {
 		fdArgs = append(fdArgs, "--proc", "/proc")
+	} else if h.fakeProc {
+		// Firefox attempts to figure out if a given process is multithreaded
+		// or not by stat(2)ing `/proc/self/task` and examining `st_nlink`.
+		//
+		// This error is harmless on most systems, but as of 7.0.7, will
+		// totally break everything if `SECCOMP_FILTER_FLAG_TSYNC` is not
+		// supported (Linux < 3.17).
+		fdArgs = append(fdArgs, "--dir", "/proc/self/task/fakeProc")
 	}
 	if h.chdir != "" {
 		fdArgs = append(fdArgs, "--chdir", h.chdir)

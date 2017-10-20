@@ -70,6 +70,7 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (pr
 	h.seccompFn = installTorBrowserSeccompProfile
 	h.fakeDbus = true
 	h.mountProc = false
+	h.fakeProc = true
 
 	if manif.Channel == "alpha" && !manif.BundleVersionAtLeast("7.5a4") {
 		// SelfRando prior to c619441e1ceec3599bc81bf9bbaf4d17c68b54b7 has a
