@@ -1,4 +1,4 @@
-Changes in version 0.0.15 - UNRELEASED:
+Changes in version 0.0.15 - 2017-10-30:
  * Bug 23915: 7.0.7 and later fails to work without `SECCOMP_FILTER_FLAG_TSYNC`.
  * Bug 23166: Add Felix's obfs4 bridges to the built-in bridges.
  * Bug 23943: obfs4proxy crashes on certain systems.
