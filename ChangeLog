@@ -1,5 +1,6 @@
 Changes in version 0.0.15 - UNRELEASED:
  * Bug 23915: 7.0.7 and later fails to work without `SECCOMP_FILTER_FLAG_TSYNC`.
+ * Bug 23166: Add Felix's obfs4 bridges to the built-in bridges.
  * Disable the 2017 donation campaign banner.
 
 Changes in version 0.0.14 - 2017-09-29:
