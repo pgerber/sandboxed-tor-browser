@@ -102,12 +102,16 @@ func RunTorBrowser(cfg *config.Config, manif *config.Manifest, tor *tor.Tor) (pr
 
 	browserHome := filepath.Join(h.homeDir, "sandboxed-tor-browser", "tor-browser", "Browser")
 	realBrowserHome := filepath.Join(cfg.BundleInstallDir, "Browser")
+	realCachesDir := filepath.Join(realBrowserHome, cachesSubDir)
 	realProfileDir := filepath.Join(realBrowserHome, profileSubDir)
 	realDesktopDir := filepath.Join(realBrowserHome, "Desktop")
 	realDownloadsDir := filepath.Join(realBrowserHome, "Downloads")
 	realExtensionsDir := filepath.Join(realProfileDir, "extensions")
 
 	// Ensure that the `Caches`, `Downloads` and `Desktop` mount points exist.
+	if err = os.MkdirAll(realCachesDir, DirMode); err != nil {
+		return
+	}
 	if err = os.MkdirAll(realDesktopDir, DirMode); err != nil {
 		return
 	}
