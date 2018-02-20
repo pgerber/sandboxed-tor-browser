@@ -84,8 +84,9 @@ func (c *Cache) GetLibraryPath(name string) string {
 // ResolveLibraries returns a map of library paths and their aliases for a
 // given set of binaries, based off the ld.so.cache, libraries known to be
 // internal, and a search path.
-func (c *Cache) ResolveLibraries(binaries []string, extraLibs []string, ldLibraryPath string, filterFn FilterFunc) (map[string][]string, error) {
+func (c *Cache) ResolveLibraries(binaries []string, extraLibs []string, ldLibraryPath, fallbackSearchPath string, filterFn FilterFunc) (map[string][]string, error) {
 	searchPaths := filepath.SplitList(ldLibraryPath)
+	fallbackSearchPaths := filepath.SplitList(fallbackSearchPath)
 	libraries := make(map[string]string)
 
 	// Breadth-first iteration of all the binaries, and their dependencies.
@@ -124,25 +125,39 @@ func (c *Cache) ResolveLibraries(binaries []string, extraLibs []string, ldLibrar
 					continue
 				}
 
-				// Look for the library in the search path.
-				libPath := ""
-				inLdLibraryPath := false
-				for _, d := range searchPaths {
-					maybePath := filepath.Join(d, lib)
-					if FileExists(maybePath) {
-						libPath = maybePath
-						inLdLibraryPath = true
-						break
+				isInPath := func(l string, p []string) string {
+					for _, d := range p {
+						maybePath := filepath.Join(d, l)
+						if FileExists(maybePath) {
+							return maybePath
+						}
 					}
+					return ""
 				}
 
-				// Look for the library in the ld.so.cache.
-				if libPath == "" {
-					libPath = c.GetLibraryPath(lib)
-					if libPath == "" {
-						return nil, fmt.Errorf("dynlib: Failed to find library: %v", lib)
-					}
+				// Look for the library in the various places.
+				var libPath string
+				var inLdLibraryPath, inCache, inFallbackPath bool
+				if libPath = isInPath(lib, searchPaths); libPath != "" {
+					inLdLibraryPath = true
+				} else if libPath = c.GetLibraryPath(lib); libPath != "" {
+					inCache = true
+				} else if libPath = isInPath(lib, fallbackSearchPaths); libPath != "" {
+					inFallbackPath = true
+				} else {
+					return nil, fmt.Errorf("dynlib: Failed to find library: %v", lib)
 				}
+
+				var libSrc string
+				switch {
+				case inLdLibraryPath:
+					libSrc = "LD_LIBRARY_PATH"
+				case inCache:
+					libSrc = "ld.so.conf"
+				case inFallbackPath:
+					libSrc = "Filesystem"
+				}
+				Debugf("dynlib: Found %v (%v).", lib, libSrc)
 
 				// Register the library, assuming it's not in what will
 				// presumably be `LD_LIBRARY_PATH` inside the hugbox.

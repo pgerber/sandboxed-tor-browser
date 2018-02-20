@@ -835,7 +835,9 @@ func (h *hugbox) appendLibraries(cache *dynlib.Cache, binaries []string, extraLi
 		ldSoAlias = filepath.Join("/lib", ldSoAliasFn)
 	}
 
-	toBindMount, err := cache.ResolveLibraries(binaries, extraLibs, ldLibraryPath, filterFn)
+	// Search the distribution specific directories as well.
+	fallbackLibSearchPath := strings.Join(distributionDependentLibSearchPath, fmt.Sprintf("%c", filepath.ListSeparator))
+	toBindMount, err := cache.ResolveLibraries(binaries, extraLibs, ldLibraryPath, fallbackLibSearchPath, filterFn)
 	if err != nil {
 		return err
 	}
