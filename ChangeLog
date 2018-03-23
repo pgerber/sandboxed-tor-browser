@@ -1,4 +1,5 @@
 Changes in version 0.0.17 - UNRELEASED:
+ * dynlib: Search the system library path(s) as the last resort.
 
 Changes in version 0.0.16 - 2017-11-24:
  * Bug 24171: Create the `Caches` directory properly.
