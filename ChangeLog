@@ -1,4 +1,5 @@
 Changes in version 0.0.17 - UNRELEASED:
+ * Bug 25154: Fix a content process crash on JS heavy pages.
  * dynlib: Search the system library path(s) as the last resort.
 
 Changes in version 0.0.16 - 2017-11-24:

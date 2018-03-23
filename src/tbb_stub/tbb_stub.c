@@ -42,6 +42,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <inttypes.h>
 
 static int (*real_connect)(int, const struct sockaddr *, socklen_t) = NULL;
 static int (*real_socket)(int, int, int) = NULL;
@@ -49,7 +50,7 @@ static void *(*real_dlopen)(const char *, int) = NULL;
 static int (*real_pthread_attr_getstack)(const pthread_attr_t *, void **, size_t *);
 static struct sockaddr_un socks_addr;
 static struct sockaddr_un control_addr;
-
+extern char **environ;
 
 #define SYSTEM_SOCKS_PORT 9050
 #define SYSTEM_CONTROL_PORT 9051
@@ -234,7 +235,7 @@ pthread_attr_getstack(const pthread_attr_t *attr, void **stackaddr, size_t *stac
 
 #if 0
   fprintf(stderr, "tbb_stub: pthread_attr_getstack(%p, %p, %p) = %d\n", attr, stackaddr, stacksize, ret);
-  fprintf(stderr, "tbb_stub:  stackaddr: %p\n", stackaddr);
+  fprintf(stderr, "tbb_stub:  stackaddr: %p\n", *stackaddr);
   fprintf(stderr, "tbb_stub:  stacksize: %ld\n", *stacksize);
 #endif
 
@@ -275,8 +276,31 @@ pthread_attr_getstack(const pthread_attr_t *attr, void **stackaddr, size_t *stac
     *stacksize = rl.rlim_cur;
   }
 
+  /* There is no easy way to derive this information, so do it the hard way. */
+  if (*stackaddr == NULL) {
+    /* WARNING: The arguments/env vars live on the stack, and are not
+     * separate, so the result will be incorrect if more than a page
+     * will be consumed, by up to 31 pages.
+     */
+    uintptr_t estimated_stackaddr = (uintptr_t)environ;
+    estimated_stackaddr &= ~(4096-1);
+    estimated_stackaddr += 4096;
+    estimated_stackaddr -= *stacksize;
+
+    /* And check to see if the derived value is sane.  In the case of
+     * Firefox, it's total garbage and insanity for the main process,
+     * but correct for the content processes, which is where the crash
+     * will happen.
+     */
+    uintptr_t p = (uintptr_t)&estimated_stackaddr;
+    if (p > estimated_stackaddr && p < estimated_stackaddr+*stacksize) {
+      *stackaddr = (void*)estimated_stackaddr;
+    }
+  }
+
 #if 0
-  fprintf(stderr, "tbb_stub: Fallback stacksize: %ld\n", *stacksize);
+  fprintf(stderr, "tbb_stub: fallback stackaddr: %p\n", *stackaddr);
+  fprintf(stderr, "tbb_stub: fallback stacksize: %ld\n", *stacksize);
 #endif
 
   return ret;
