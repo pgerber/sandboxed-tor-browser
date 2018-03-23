@@ -50,6 +50,7 @@ static void *(*real_dlopen)(const char *, int) = NULL;
 static int (*real_pthread_attr_getstack)(const pthread_attr_t *, void **, size_t *);
 static struct sockaddr_un socks_addr;
 static struct sockaddr_un control_addr;
+static void *cached_environ;
 extern char **environ;
 
 #define SYSTEM_SOCKS_PORT 9050
@@ -282,16 +283,12 @@ pthread_attr_getstack(const pthread_attr_t *attr, void **stackaddr, size_t *stac
      * separate, so the result will be incorrect if more than a page
      * will be consumed, by up to 31 pages.
      */
-    uintptr_t estimated_stackaddr = (uintptr_t)environ;
+    uintptr_t estimated_stackaddr = (uintptr_t)cached_environ;
     estimated_stackaddr &= ~(4096-1);
     estimated_stackaddr += 4096;
     estimated_stackaddr -= *stacksize;
 
-    /* And check to see if the derived value is sane.  In the case of
-     * Firefox, it's total garbage and insanity for the main process,
-     * but correct for the content processes, which is where the crash
-     * will happen.
-     */
+    /* And check to see if the derived value appears to be sane. */
     uintptr_t p = (uintptr_t)&estimated_stackaddr;
     if (p > estimated_stackaddr && p < estimated_stackaddr+*stacksize) {
       *stackaddr = (void*)estimated_stackaddr;
@@ -299,8 +296,8 @@ pthread_attr_getstack(const pthread_attr_t *attr, void **stackaddr, size_t *stac
   }
 
 #if 0
-  fprintf(stderr, "tbb_stub: fallback stackaddr: %p\n", *stackaddr);
-  fprintf(stderr, "tbb_stub: fallback stacksize: %ld\n", *stacksize);
+  fprintf(stderr, "tbb_stub: Fallback stackaddr: %p\n", *stackaddr);
+  fprintf(stderr, "tbb_stub: Fallback stacksize: %ld\n", *stacksize);
 #endif
 
   return ret;
@@ -362,6 +359,9 @@ stub_init(void)
     fprintf(stderr, "ERROR: Failed to find 'dlopen()' symbol: %s\n", dlerror());
     goto out;
   }
+
+  /* Save this since firefox at least will overwrite it. */
+  cached_environ = environ;
 
   return;
 
